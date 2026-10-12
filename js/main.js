@@ -152,6 +152,13 @@
     canvas.addEventListener('pointerdown', () => { TT.audio.init(); game.input.anyKey = true; game.input.pressed.add('menu'); });
 
     // ---------------------------------------------------------------- API de depuração/testes
+    // Modo demonstração (index.html?demo): o jogo se joga sozinho; qualquer tecla devolve o controle.
+    if (/[?&]demo/.test(location.search)) {
+      game.bot = new Bot(game); game.input.bot = game.bot; game.godMode = true;
+      const stop = () => { game.bot = null; game.input.bot = null; game.godMode = false; window.removeEventListener('keydown', stop); };
+      window.addEventListener('keydown', stop);
+    }
+
     TT.debug = {
       game,
       step(n, renderEvery) {
