@@ -61,7 +61,7 @@
           case 'ring':
             ctx.globalAlpha = k;
             ctx.strokeStyle = p.color; ctx.lineWidth = 4 * k + 1;
-            ctx.beginPath(); ctx.ellipse(x, y, p.size * (1.4 - k), p.size * (1.4 - k) * (p.flat || 1), 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(x, y, p.size * (1.4 - k) * (p.sx || 1), p.size * (1.4 - k) * (p.flat || 1), 0, 0, Math.PI * 2); ctx.stroke();
             ctx.globalAlpha = 1;
             break;
           case 'star':
@@ -271,6 +271,7 @@
     kick: { x: 0, y: 52, r: 78, a0: 0.9, a1: -0.4 },
     dive: { x: 0, y: 40, r: 70, a0: -0.4, a1: 1.0 },
     slam: { x: 10, y: 96, r: 96, a0: -1.6, a1: 0.8 },
+    twirl: { x: 46, y: 96, r: 52, a0: -3.1, a1: 3.1 },
   };
 
   function spawnBolt(f, g, big) {
@@ -283,21 +284,26 @@
     A().play('starbolt');
   }
 
+  // Golpes de cada Titã. anim = trilha de quadros-chave em js/anim.js; s = quadro do impacto, a = ativo, r = recuperação.
+  const morphIn = (f, g, dy) => g.morph(f.x, f.y - (dy || 60));
   const TITANS = {
     robin: {
       name: 'Robin', hp: 120, speed: 4.7, jump: 15.5, color: '#d7262e', fx: '#ff5a3a',
-      dashAtk: { pose: 'flyKick', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 76], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
+      dashAtk: { anim: 'robinDashKick', smear: 'flyKick', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 76], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
       light: [
-        { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, sound0: 'whoosh' },
-        { pose: 'swipe', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 100], kb: 2, weapon: 'staff', sound0: 'whoosh' },
-        { pose: 'swing', s: 8, a: 4, r: 15, dmg: 13, reach: [0, 110], kb: 7, knockdown: true, launch: 7, weapon: 'staff', big: true, sound0: 'whoosh' },
+        { anim: 'robinJab', smear: 'jab', weapon: 'staff', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 96], kb: 1.5, sound0: 'whoosh' },
+        { anim: 'robinTwirl', smear: 'twirl', weapon: 'staff', s: 5, a: 6, r: 8, dmg: 5, rehit: 3, reach: [0, 100], kb: 2, sound0: 'whoosh' },
+        {
+          anim: 'robinFlip', smear: 'slam', weapon: 'staff', s: 12, a: 4, r: 14, dmg: 14, reach: [0, 118], kb: 7, knockdown: true, launch: 7, big: true, sound0: 'jump',
+          onFrame(f, t, g) { if (t === this.s) { g.dust(f.x + f.facing * 80, f.y, 6, '#d9cbbb'); g.shake = Math.max(g.shake, 6); A().play('whoosh'); } },
+        },
       ],
-      heavy: { pose: 'flyKick', s: 7, a: 13, r: 14, dmg: 15, reach: [0, 72], lunge: 10, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
-      air: { pose: 'dive', s: 3, a: 14, r: 6, dmg: 9, reach: [-10, 64], kb: 3, lunge: 5, zr: 130 },
+      heavy: { anim: 'robinBackflip', smear: 'uppercut', s: 9, a: 6, r: 17, dmg: 15, reach: [0, 84], zr: 130, knockdown: true, launch: 11, kb: 5, big: true, sound0: 'whoosh' },
+      air: { anim: 'robinAir', smear: 'dive', s: 3, a: 14, r: 6, dmg: 9, reach: [-10, 64], kb: 3, lunge: 5, zr: 130 },
       special: {
-        cost: 25, pose: 'throw', s: 8, a: 1, r: 14, shout: 'Birdarangues!',
+        cost: 25, anim: 'robinThrow', s: 14, a: 1, r: 14, shout: 'Birdarangues!',
         onFrame(f, t, g) {
-          if (t !== 8) return;
+          if (t !== this.s) return;
           for (const dy of [-34, 0, 34]) g.addProjectile(new Projectile(g, {
             kind: 'birdarang', team: 'hero', owner: f, x: f.x + f.facing * 40, y: f.y, z: f.z + 70,
             vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true, trailN: 7,
@@ -308,60 +314,85 @@
     },
     starfire: {
       name: 'Estelar', hp: 105, speed: 4.6, jump: 16, floaty: true, color: '#f3a35a', fx: GREEN,
-      dashAtk: { pose: 'cross', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 74], lunge: 11, knockdown: true, launch: 6, kb: 8, glow: GREEN, big: true, sound0: 'whoosh' },
+      dashAtk: { anim: 'sfDash', smear: 'jab', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 80], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
       light: [
-        { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, glow: GREEN, sound0: 'whoosh' },
-        { pose: 'cross', s: 4, a: 3, r: 9, dmg: 7, reach: [0, 70], kb: 2, glow: GREEN, sound0: 'whoosh' },
-        { pose: 'cast', s: 7, a: 1, r: 13, glow: GREEN, onFrame(f, t, g) { if (t === 7) spawnBolt(f, g, false); } },
+        { anim: 'sfPunch', smear: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 72], kb: 1.5, sound0: 'whoosh' },
+        { anim: 'sfCross', smear: 'cross', s: 4, a: 3, r: 9, dmg: 7, reach: [0, 76], kb: 2, sound0: 'whoosh' },
+        { anim: 'sfBolt', hands: 'open', s: 8, a: 1, r: 13, onFrame(f, t, g) { if (t === this.s) spawnBolt(f, g, false); } },
       ],
-      heavy: { pose: 'cast', s: 15, a: 1, r: 16, glow: GREEN, onFrame(f, t, g) { if (t === 15) spawnBolt(f, g, true); if (t < 15 && t % 3 === 0) g.particles.spawn('glow', f.x + f.facing * 40 + TT.rand(-20, 20), f.y - f.z - 72 + TT.rand(-20, 20), { color: GREEN, size: 14, life: 10 }); } },
-      air: { pose: 'cast', s: 5, a: 1, r: 12, glow: GREEN, onFrame(f, t, g) { if (t === 5) spawnBolt(f, g, false); } },
+      heavy: {
+        anim: 'sfCharge', hands: 'open', s: 15, a: 1, r: 16,
+        onFrame(f, t, g) {
+          if (t === this.s) spawnBolt(f, g, true);
+          if (t < this.s && t % 3 === 0) g.particles.spawn('glow', f.x + f.facing * 46 + TT.rand(-20, 20), f.y - f.z - 92 + TT.rand(-20, 20), { color: GREEN, size: 14, life: 10, vx: -f.facing * 1.5 });
+        },
+      },
+      air: { anim: 'sfAir', hands: 'open', s: 5, a: 1, r: 12, onFrame(f, t, g) { if (t === this.s) spawnBolt(f, g, false); } },
       special: {
-        cost: 30, pose: 'beam', s: 14, a: 42, r: 14, dmg: 4, rehit: 6, reach: [20, 620], depth: 30, kb: 2, beam: 'eyes', glow: GREEN,
+        anim: 'sfEyes', cost: 30, s: 14, a: 42, r: 14, dmg: 4, rehit: 6, reach: [20, 620], depth: 30, kb: 2, beam: 'eyes',
         shout: 'Raios oculares!', sound: 'laser', mouth: 'shout',
       },
     },
     cyborg: {
       name: 'Ciborgue', hp: 150, speed: 4.0, jump: 14, color: '#5f8fe0', fx: SONIC,
-      dashAtk: { pose: 'cross', s: 4, a: 12, r: 14, dmg: 13, reach: [0, 78], lunge: 10, knockdown: true, launch: 7, kb: 9, big: true, sound0: 'whoosh' },
+      dashAtk: { anim: 'cyTackle', smear: 'jab', s: 4, a: 12, r: 14, dmg: 13, reach: [0, 82], lunge: 10, knockdown: true, launch: 7, kb: 9, big: true, sound0: 'whoosh' },
       light: [
-        { pose: 'jab', s: 5, a: 3, r: 9, dmg: 8, reach: [0, 70], kb: 2, sound0: 'whoosh' },
-        { pose: 'cross', s: 5, a: 3, r: 10, dmg: 9, reach: [0, 74], kb: 2.5, sound0: 'whoosh' },
-        { pose: 'uppercut', s: 8, a: 4, r: 16, dmg: 14, reach: [0, 76], kb: 4, knockdown: true, launch: 10, big: true, sound0: 'whoosh' },
+        {
+          anim: 'cyPiston', smear: 'jab', s: 5, a: 3, r: 10, dmg: 8, reach: [0, 92], kb: 2, sound0: 'whoosh',
+          onFrame(f, t, g) { if (t === this.s) g.particles.spawn('dust', f.x - f.facing * 6, f.y - f.z - 96, { color: 'rgba(230,240,255,0.8)', size: 7, vy: -1, life: 16 }); }, // vapor do pistão
+        },
+        {
+          anim: 'cyHook', smear: 'swipe', s: 6, a: 4, r: 12, dmg: 9, reach: [0, 82], kb: 3, sound0: 'whoosh',
+          onFrame(f, t, g) {
+            if (t >= this.s && t < this.s + 3) for (let i = 0; i < 3; i++) g.particles.spawn('spark', f.x + f.facing * 60, f.y - f.z - 100, { vx: f.facing * TT.rand(2, 7), vy: TT.rand(-4, 2), color: '#9fd8ff', size: 3, life: 10 });
+          },
+        },
+        {
+          anim: 'cyBlast', form: 'cannon', s: 11, a: 4, r: 16, dmg: 14, reach: [10, 175], depth: 50, knockdown: true, launch: 8, kb: 10, big: true,
+          onFrame(f, t, g) {
+            if (t === 1) A().play('alarm');
+            if (t === this.s) { // rajada sônica em cone à queima-roupa
+              const mx = f.x + f.facing * 70 * f.style.scale, my = f.y - f.z - 98;
+              for (let i = 0; i < 4; i++) g.particles.spawn('ring', mx + f.facing * i * 34, my, { color: i % 2 ? '#bfe6ff' : SONIC, size: 22 + i * 12, life: 12 + i * 3, sx: 0.4 });
+              g.particles.spawn('glow', mx + f.facing * 40, my, { color: SONIC, size: 120, life: 12 });
+              g.shake = Math.max(g.shake, 8); A().play('sonic');
+            }
+          },
+        },
       ],
       heavy: {
-        pose: 'slam', s: 15, a: 3, r: 18, dmg: 16, reach: [-70, 140], depth: 60, knockdown: true, launch: 7, kb: 8, big: true,
-        onFrame(f, t, g) { if (t === 15) { g.shake = 12; g.groundRing(f.x + f.facing * 60, f.y, '#cfd6e6'); A().play('shockwave'); } },
+        anim: 'cySlam', s: 15, a: 3, r: 18, dmg: 16, reach: [-70, 140], depth: 60, knockdown: true, launch: 7, kb: 8, big: true,
+        onFrame(f, t, g) { if (t === this.s) { g.shake = 12; g.groundRing(f.x + f.facing * 60, f.y, '#cfd6e6'); A().play('shockwave'); } },
       },
-      air: { pose: 'slam', s: 4, a: 12, r: 8, dmg: 10, reach: [-10, 70], kb: 3, zr: 130 },
+      air: { anim: 'cyAir', smear: 'slam', s: 4, a: 12, r: 8, dmg: 10, reach: [-10, 70], kb: 3, zr: 130 },
       special: {
-        cost: 35, pose: 'beam', form: 'cannon', s: 20, a: 32, r: 16, dmg: 5, rehit: 5, reach: [30, 1300], depth: 38, kb: 3, beam: 'sonic',
+        anim: 'cyCannon', cost: 35, form: 'cannon', s: 20, a: 32, r: 16, dmg: 5, rehit: 5, reach: [30, 1300], depth: 38, kb: 3, beam: 'sonic',
         shout: 'BOOYAH!', shoutColor: '#5fc2ff', sound: 'sonic',
-        onFrame(f, t, g) { if (t < 20 && t % 2 === 0) g.particles.spawn('glow', f.x + f.facing * 70, f.y - f.z - 80, { color: SONIC, size: 30 - t, life: 6 }); },
+        onFrame(f, t, g) { if (t < this.s && t % 2 === 0 && f.rigOut) g.particles.spawn('glow', f.rigOut.fx + g.camX + f.facing * 14, f.rigOut.fy, { color: SONIC, size: 30 - t, life: 6 }); },
       },
     },
     raven: {
       name: 'Ravena', hp: 100, speed: 4.4, jump: 14.5, floaty: true, color: '#7b55c9', fx: '#b98cff',
-      dashAtk: { pose: 'swipe', s: 3, a: 10, r: 12, dmg: 10, reach: [0, 98], lunge: 9, knockdown: true, launch: 6, kb: 7, glow: DARK, claw: true, big: true, sound: 'dark' },
+      dashAtk: { anim: 'rvDash', hands: 'open', s: 3, a: 10, r: 12, dmg: 10, reach: [0, 100], lunge: 9, knockdown: true, launch: 6, kb: 7, claw: true, big: true, sound: 'dark' },
       light: [
-        { pose: 'swipe', s: 4, a: 4, r: 8, dmg: 6, reach: [0, 92], kb: 1.5, glow: DARK, sound0: 'whoosh', claw: true },
-        { pose: 'cast', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 98], kb: 2, glow: DARK, sound0: 'whoosh', claw: true },
-        { pose: 'castUp', s: 9, a: 4, r: 16, dmg: 12, reach: [0, 112], kb: 3, knockdown: true, launch: 11, glow: DARK, big: true, sound: 'dark', claw: true },
+        { anim: 'rvPalm', hands: 'open', s: 5, a: 4, r: 9, dmg: 6, reach: [0, 100], kb: 2, sound0: 'whoosh' },
+        { anim: 'rvSweep', hands: 'open', s: 6, a: 4, r: 10, dmg: 7, reach: [0, 100], kb: 2.5, sound0: 'whoosh' },
+        { anim: 'rvPortal', hands: 'open', s: 10, a: 4, r: 16, dmg: 12, reach: [0, 125], kb: 3, knockdown: true, launch: 11, big: true, sound: 'dark', claw: true },
       ],
       heavy: {
-        pose: 'cast', s: 11, a: 1, r: 18, glow: DARK,
+        anim: 'rvHeavy', hands: 'open', s: 11, a: 1, r: 18,
         onFrame(f, t, g) {
-          if (t !== 11) return;
-          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 70, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
+          if (t !== this.s) return;
+          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 84, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
           A().play('dark');
         },
       },
-      air: { pose: 'cast', s: 4, a: 8, r: 10, dmg: 8, reach: [0, 88], kb: 3, glow: DARK, zr: 130, claw: true },
+      air: { anim: 'rvAir', hands: 'open', s: 4, a: 8, r: 10, dmg: 8, reach: [0, 92], kb: 3, zr: 130, claw: true },
       special: {
-        cost: 40, pose: 'castUp', s: 20, a: 1, r: 26, glow: DARK, shout: 'Azarath Metrion Zinthos!', shoutColor: '#c8a8ff',
+        anim: 'rvSpecial', hands: 'open', cost: 40, s: 20, a: 1, r: 26, shout: 'Azarath Metrion Zinthos!', shoutColor: '#c8a8ff',
         onFrame(f, t, g) {
-          if (t < 20 && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 30, vr: 0.1 });
-          if (t === 20) { g.addEffect(new RavenBlast(g, f)); A().play('dark'); g.shake = 14; }
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 30, vr: 0.1 });
+          if (t === this.s) { g.addEffect(new RavenBlast(g, f)); A().play('dark'); g.shake = 14; }
         },
       },
     },
@@ -372,26 +403,61 @@
         form: 'rhino', pose: 'jab', s: 6, a: 18, r: 14, lunge: 12, dmg: 13, reach: [0, 120], depth: 42, knockdown: true, launch: 7, kb: 10, big: true,
         shout: 'Rinoceronte!', shoutColor: '#8fd463', sound0: 'roar',
         onFrame(f, t, g) {
-          if (t === 1) g.morph(f.x, f.y - 50);
+          if (t === 1) morphIn(f, g, 50);
           if (t > this.s && t < this.s + this.a && t % 3 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 3); }
           if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 50, true);
         },
       },
       light: [
-        { pose: 'jab', s: 4, a: 3, r: 7, dmg: 6, reach: [0, 62], kb: 1.5, sound0: 'whoosh' },
-        { pose: 'kick', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 82], kb: 2, sound0: 'whoosh' },
-        { pose: 'claw', s: 7, a: 4, r: 15, dmg: 12, reach: [0, 100], kb: 6, knockdown: true, launch: 6, big: true, sound0: 'whoosh' },
+        { anim: 'bbJab', smear: 'jab', s: 4, a: 3, r: 7, dmg: 6, reach: [0, 64], kb: 1.5, sound0: 'whoosh' },
+        { anim: 'bbKick', smear: 'kick', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 86], kb: 2, sound0: 'whoosh' },
+        { anim: 'bbClaw', smear: 'claw', s: 7, a: 4, r: 15, dmg: 12, reach: [0, 100], kb: 6, knockdown: true, launch: 6, big: true, sound0: 'whoosh' },
+      ],
+      // fim do combo: vira um animal aleatório
+      finishers: [
+        {
+          form: 'gorilla', s: 12, a: 4, r: 16, dmg: 14, reach: [0, 135], depth: 45, knockdown: true, launch: 8, kb: 9, big: true, shout: 'Gorila!', shoutColor: '#8fd463',
+          onFrame(f, t, g) {
+            if (t === 1) { morphIn(f, g); A().play('roar'); }
+            if (t === this.s) { g.shake = 12; g.groundRing(f.x + f.facing * 105, f.y, '#8dff5a'); g.debrisBurst(f.x + f.facing * 105, f.y - 10, 6, '#8e8880'); }
+            if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 60, true);
+          },
+        },
+        {
+          form: 'rhino', s: 5, a: 12, r: 10, lunge: 10, dmg: 13, reach: [0, 120], depth: 42, knockdown: true, launch: 7, kb: 10, big: true, shout: 'Rinoceronte!', shoutColor: '#8fd463', sound0: 'roar',
+          onFrame(f, t, g) {
+            if (t === 1) morphIn(f, g, 50);
+            if (t > this.s && t % 3 === 0) g.dust(f.x - f.facing * 50, f.y, 2, '#c9b9a8');
+            if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 50, true);
+          },
+        },
+        {
+          form: 'kangaroo', s: 8, a: 4, r: 14, dmg: 13, reach: [0, 120], depth: 40, knockdown: true, launch: 6, kb: 13, big: true, shout: 'Canguru!', shoutColor: '#8fd463',
+          onFrame(f, t, g) {
+            if (t === 1) { morphIn(f, g, 70); A().play('jump'); }
+            if (t === this.s) g.particles.spawn('text', f.x + f.facing * 110, f.y - 130, { text: 'BOING!', size: 38, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 34, rot: TT.rand(-0.2, 0.2) });
+            if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 70, true);
+          },
+        },
+        {
+          form: 'ram', s: 9, a: 6, r: 12, lunge: 8, dmg: 13, reach: [0, 108], depth: 40, knockdown: true, launch: 9, kb: 9, big: true, shout: 'Carneiro!', shoutColor: '#8fd463',
+          onFrame(f, t, g) {
+            if (t === 1) morphIn(f, g, 50);
+            if (t === this.s) A().play('hitHeavy');
+            if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 50, true);
+          },
+        },
       ],
       heavy: {
         form: 'gorilla', pose: 'slam', s: 16, a: 5, r: 16, dmg: 20, reach: [0, 140], depth: 45, knockdown: true, launch: 8, kb: 9, big: true,
         onFrame(f, t, g) {
-          if (t === 1) { g.morph(f.x, f.y - 60); A().play('roar'); }
-          if (t === 16) {
+          if (t === 1) { morphIn(f, g); A().play('roar'); }
+          if (t === this.s) {
             g.shake = 14; g.groundRing(f.x + f.facing * 110, f.y, '#8dff5a');
             g.debrisBurst(f.x + f.facing * 110, f.y - 10, 8, '#8e8880');
             g.particles.spawn('text', f.x + f.facing * 110, f.y - 150, { text: 'BLAM!', size: 42, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 36, rot: TT.rand(-0.2, 0.2) });
           }
-          if (t === 36) g.morph(f.x, f.y - 60, true);
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 60, true);
         },
       },
       air: { pose: 'kick', s: 3, a: 12, r: 8, dmg: 9, reach: [0, 82], kb: 3, zr: 130 },
@@ -399,9 +465,9 @@
         cost: 35, form: 'trex', pose: 'jab', s: 12, a: 46, r: 12, lunge: 7, dmg: 10, rehit: 10, reach: [0, 180], depth: 55, knockdown: true, launch: 7, kb: 10,
         shout: 'RAAAWR!', shoutColor: '#8fd463', sound0: 'roar',
         onFrame(f, t, g) {
-          if (t === 1) g.morph(f.x, f.y - 70);
-          if (t > 12 && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 3, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
-          if (t === 69) g.morph(f.x, f.y - 70, true);
+          if (t === 1) morphIn(f, g, 70);
+          if (t > this.s && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 3, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 70, true);
         },
       },
     },
@@ -410,6 +476,8 @@
   TT.TITAN_ORDER = ['robin', 'beastboy', 'cyborg', 'raven', 'starfire'];
 
   const BUFFERED = ['light', 'heavy', 'special', 'jump', 'dash'];
+  // Formas animais do Mutano: nome da função de desenho em render.js.
+  const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam' };
 
   class Titan extends Fighter {
     constructor(game, key) {
@@ -421,7 +489,10 @@
       this.hp = this.maxHp = this.def.hp;
       this.team = 'hero';
       this.radius = 24;
-      this.height = key === 'cyborg' ? 140 : 125;
+      const st = this.style; // altura do modelo (para acertos no ar e balões de fala)
+      this.height = Math.round((st.legL[0] + st.legL[1] + st.torsoH + st.neck + st.headR * 1.9) * st.scale);
+      this.rigOut = {};
+      this.jumpT = 0;
       this.combo = 0; this.comboWindow = 0;
       this.buffer = null; this.bufferT = 0;
       this.ko = false;
@@ -468,7 +539,7 @@
           else if (b === 'heavy') { this.vy = 0; this.startAttack(this.def.heavy); }
           else if (b === 'special') this.trySpecial();
           else if (b === 'jump') {
-            this.vz = this.def.jump; this.z = 1; this.airAttacked = false;
+            this.vz = this.def.jump; this.z = 1; this.airAttacked = false; this.jumpT = 0;
             this.vx = mx * this.def.speed * 1.1;
             this.setState('air'); this.setAnim('jump'); A().play('jump');
             g.dust(this.x, this.y, 4, '#d9cbbb');
@@ -477,10 +548,14 @@
             if (mx) this.facing = mx > 0 ? 1 : -1;
             this.vy = my * 3;
             A().play('whoosh');
+            if (this.key === 'beastboy') g.morph(this.x, this.y - 40);
+            else if (this.key === 'raven') { A().play('dark'); g.poof(this.x, this.y - 70); }
           }
           return;
         }
         case 'air': {
+          this.jumpT++;
+          if (this.key === 'cyborg' && this.vz > 0 && this.jumpT % 2 === 0) this.jets(g);
           this.vx += (mx * this.def.speed - this.vx) * 0.08;
           this.vy = my * this.def.speed * 0.4;
           if (mx) this.facing = mx > 0 ? 1 : -1;
@@ -500,8 +575,11 @@
             return;
           }
           this.vx = this.facing * (13 - this.st * 0.5);
-          if (this.st % 3 === 0) g.particles.spawn('dust', this.x - this.facing * 20, this.y - 6, { color: 'rgba(255,255,255,0.8)', size: 7, life: 14 });
-          if (this.st > 14) { this.vy = 0; this.setState('idle'); this.setAnim('idle'); }
+          this.dashFx(g);
+          if (this.st > 14) {
+            this.vy = 0; this.setState('idle'); this.setAnim('idle');
+            if (this.key === 'beastboy') g.morph(this.x, this.y - 40, true);
+          }
           return;
         }
         case 'attack': {
@@ -524,7 +602,8 @@
 
     doCombo() {
       const i = this.comboWindow > 0 ? Math.min(this.combo, 2) : 0;
-      const def = this.def.light[i];
+      let def = this.def.light[i];
+      if (i === 2 && this.def.finishers) def = TT.choice(this.def.finishers);
       def.combo = i;
       this.vx = 0; this.vy = 0;
       this.startAttack(def);
@@ -574,23 +653,37 @@
       return super.takeHit(src, d, dir);
     }
 
+    // Chamas dos propulsores do Ciborgue.
+    jets(g) {
+      g.particles.spawn('glow', this.x + TT.rand(-8, 8), this.y - this.z - 4, { color: SONIC, size: 22, life: 8, vy: 2 });
+      g.particles.spawn('spark', this.x + TT.rand(-6, 6), this.y - this.z - 2, { vx: -this.facing * TT.rand(1, 3), vy: TT.rand(1, 4), color: '#bfe6ff', size: 2, life: 8 });
+    }
+
+    // Efeitos de cada esquiva: rolamento, guepardo, propulsores, corvo de alma, cometa verde.
+    dashFx(g) {
+      const k = this.key, t = this.st;
+      if (k === 'cyborg') { if (t % 2 === 0) this.jets(g); }
+      else if (k === 'starfire') g.particles.spawn('glow', this.x - this.facing * 30, this.y - 92 + TT.rand(-8, 8), { color: GREEN, size: 34, life: 12, vx: -this.facing * 2 });
+      else if (k === 'raven') g.particles.spawn('feather', this.x - this.facing * 20, this.y - 70 + TT.rand(-30, 30), { color: '#1a0f2e', size: 9, life: 20, vr: 0.2, vx: -this.facing });
+      else if (t % 3 === 0) g.particles.spawn('dust', this.x - this.facing * 20, this.y - 6, { color: 'rgba(255,255,255,0.8)', size: 7, life: 14 });
+    }
+
     draw(ctx, camX) {
       const a = this.atk, f = a && a.def.form;
       const sx = this.x - camX, sy = this.y - this.z;
       if (this.invul > 0 && this.state !== 'getup' && this.state !== 'dash' && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.55;
       const fl = this.flash > 3;
-      if (f === 'gorilla' && a.t > 1 && a.t < 36) {
-        TT.drawGorilla(ctx, sx, sy, this.facing, a.t, a.def.s, fl);
-      } else if (f === 'trex' && a.t > 1 && a.t < 69) {
-        TT.drawTRex(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
-      } else if (f === 'rhino' && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
-        TT.drawRhino(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
+      const FORM = f && FORMS[f];
+      if (FORM && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+        TT[FORM](ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
+      } else if (this.state === 'dash' && this.key === 'beastboy') {
+        TT.drawCheetah(ctx, sx, sy, this.facing, this.animT, fl);
+      } else if (this.state === 'dash' && this.key === 'raven') {
+        TT.drawSoulRaven(ctx, sx, sy - 70, this.facing, this.animT);
       } else {
+        if (this.state === 'dash' && this.key === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
-        if (this.key === 'starfire' || this.key === 'raven') {
-          if (this.state === 'air' || (this.state === 'attack' && this.z > 0)) this.pose.legB[1] -= 0.4;
-        }
-        TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3, t: this.animT });
+        TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: fl, t: this.animT, out: this.rigOut });
       }
       ctx.globalAlpha = 1;
       // efeitos de ataque (feixes, garras de energia, rastros de movimento)
@@ -601,10 +694,21 @@
       if (a && a.def.dmg && !a.def.beam && !a.def.form && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
     }
 
+    // Rastro verde da Estelar voando na esquiva.
+    drawComet(ctx, sx, sy) {
+      const fc = this.facing, y = sy - 92;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const gr = ctx.createLinearGradient(sx, 0, sx - fc * 170, 0);
+      gr.addColorStop(0, 'rgba(93,255,138,0.85)'); gr.addColorStop(1, 'rgba(93,255,138,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.moveTo(sx, y - 16); ctx.lineTo(sx - fc * 170, y - 4); ctx.lineTo(sx - fc * 170, y + 4); ctx.lineTo(sx, y + 16); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
     // Rastro de movimento (smear) em arco na cor do Titã.
     drawSmear(ctx, sx, sy, a) {
       const d = a.def, k = (a.t - d.s) / (d.a + 5), sc = this.style.scale;
-      const P = SMEAR[d.pose] || SMEAR.jab;
+      const P = SMEAR[d.smear || d.pose] || SMEAR.jab;
       const col = this.def.fx || '#ffffff';
       const grow = Math.min(1, (a.t - d.s + 1) / 3);
       const a0 = P.a0, a1 = P.a0 + (P.a1 - P.a0) * grow;
@@ -635,9 +739,9 @@
 
     drawBeam(ctx, sx, sy, a) {
       const d = a.def, fc = this.facing;
-      const sc = this.style.scale, eyes = d.beam === 'eyes';
-      const ox = sx + fc * (eyes ? 16 : 66) * sc;
-      const oy = sy - (eyes ? 106 : 84) * sc;
+      const eyes = d.beam === 'eyes', R = this.rigOut;
+      const ox = eyes ? R.hx + fc * R.hr * 0.75 : R.fx + fc * 18;
+      const oy = eyes ? R.hy - R.hr * 0.12 : R.fy;
       const len = d.reach[1];
       const k = a.t - d.s, fade = TT.clamp((d.a - k) / 6, 0, 1), grow = Math.min(1, (k + 1) / 4);
       const L = len * grow;

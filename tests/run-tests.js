@@ -376,38 +376,52 @@ async page => {
   await page.waitForFunction(() => window.TT && TT.debug);
   await sleep(400);
   await ev(() => { TT.paused = false; TT.debug.bot(false); TT.debug.god(false); TT.game.state = 'title'; TT.game.stateT = 50; TT.game.menuIdx = 0; TT.game.setPlayers(1); });
-  await sleep(100);
-  await page.keyboard.press('ArrowDown'); await sleep(60);
-  await page.keyboard.press('ArrowRight'); await sleep(60);
+  // cada tecla espera o jogo processar alguns passos (o 1º quadro após recarregar monta os cenários e demora)
+  const tap = async (key) => {
+    const f0 = await ev(() => TT.game.frame);
+    await page.keyboard.press(key);
+    await page.waitForFunction((f) => TT.game.frame >= f + 3, f0, { timeout: 5000 }).catch(() => {});
+  };
+  await page.waitForFunction(() => TT.game.frame > 30, null, { timeout: 8000 }).catch(() => {});
+  await tap('ArrowDown');
+  await tap('ArrowRight');
   const coopSel = await ev(() => TT.game.numPlayers);
-  await page.keyboard.press('ArrowUp'); await sleep(60);
-  await page.keyboard.press('Enter'); await sleep(200);
+  await tap('ArrowUp');
+  await tap('Enter'); await sleep(100);
   const coopStart = await ev(() => ({ st: TT.game.state, n: TT.game.players().length, keys: TT.game.players().map((t) => t.key) }));
   ok('co-op: escolher 2 jogadores no título e começar', coopSel === 2 && coopStart.st === 'play' && coopStart.n === 2 && coopStart.keys[0] !== coopStart.keys[1], { coopSel, coopStart });
   await ev(() => { TT.game.banner = null; for (const t of TT.game.players()) t.invul = 0; });
   // controles independentes com teclado real
   const pos = () => ev(() => TT.game.players().map((t) => Math.round(t.x)));
   const a0 = await pos();
-  await page.keyboard.down('KeyD'); await sleep(400); await page.keyboard.up('KeyD');
+  // segura a tecla por 24 passos do jogo (não por tempo: independe da carga da máquina)
+  const hold = async (key) => {
+    const f0 = await ev(() => TT.game.frame);
+    await page.keyboard.down(key);
+    await page.waitForFunction((f) => TT.game.frame >= f + 24, f0, { timeout: 5000 }).catch(() => {});
+    await page.keyboard.up(key);
+  };
+  await hold('KeyD');
   const a1 = await pos();
-  await page.keyboard.down('ArrowRight'); await sleep(400); await page.keyboard.up('ArrowRight');
+  await hold('ArrowRight');
   const a2 = await pos();
   ok('co-op: P1 (WASD) e P2 (setas) andam de forma independente', a1[0] > a0[0] + 60 && Math.abs(a1[1] - a0[1]) < 5 && a2[1] > a1[1] + 60 && Math.abs(a2[0] - a1[0]) < 5, { a0, a1, a2 });
-  await page.keyboard.press('Numpad1'); await sleep(40);
+  const waitFrames = async (n) => { const f0 = await ev(() => TT.game.frame); await page.waitForFunction((a) => TT.game.frame >= a[0] + a[1], [f0, n], { timeout: 8000 }).catch(() => {}); };
+  await tap('Numpad1');
   const atk2 = await ev(() => TT.game.players().map((t) => t.state));
-  await sleep(500);
-  await page.keyboard.press('KeyJ'); await sleep(40);
+  await waitFrames(40);
+  await tap('KeyJ');
   const atk1 = await ev(() => TT.game.players().map((t) => t.state));
   ok('co-op: P2 ataca no Numpad1 e P1 no J', atk2[1] === 'attack' && atk2[0] !== 'attack' && atk1[0] === 'attack', { atk1, atk2 });
-  await sleep(500);
+  await waitFrames(40);
   // troca de Titã pula o que está com o outro jogador
-  await page.keyboard.press('Numpad6'); await sleep(450);
+  await tap('Numpad6'); await waitFrames(26);
   const sw1 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Digit2'); await sleep(450);
+  await tap('Digit2'); await waitFrames(26);
   const sw2 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Numpad4'); await sleep(450);
+  await tap('Numpad4'); await waitFrames(26);
   const sw3 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Digit1'); await sleep(450);
+  await tap('Digit1'); await waitFrames(26);
   const sw4 = await ev(() => TT.game.players().map((t) => t.key));
   ok('co-op: Titãs sempre distintos (troca pula o do parceiro)',
     sw1[1] === 'cyborg' && sw2[0] === 'beastboy' && sw3[1] === 'robin' && sw4[0] === 'beastboy' && sw4[0] !== sw4[1], { sw1, sw2, sw3, sw4 });
@@ -502,6 +516,28 @@ async page => {
     return { fps: Math.round(frames / 4), avgRenderMs: +(g.stats.renderMs / g.stats.frames).toFixed(2), maxRenderMs: +g.stats.maxRenderMs.toFixed(2), particles: g.particles.list.length };
   });
   ok('desempenho (>= 50 fps, render médio < 2ms)', perf.fps >= 50 && perf.avgRenderMs < 2, perf);
+
+  // Animações próprias de cada Titã
+  const anims = await ev(() => {
+    TT.paused = true; const g = TT.game;
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    const forms = new Set();
+    for (let i = 0; i < 40; i++) { // fim do combo do Mutano: animal aleatório
+      g.switchCool = 0; g.switchTo(1, true); const p = g.player; p.comboWindow = 10; p.combo = 2; p.setState('idle');
+      p.doCombo(); forms.add(p.atk.def.form); p.atk = null; p.setState('idle');
+    }
+    const pose = (key, setup) => { const t = g.team.find((x) => x.key === key); setup(t); return TT.computePose(t, TT.newPose()); };
+    const robinJump = pose('robin', (t) => { t.anim = 'jump'; t.jumpT = 17; t.vz = 0; });
+    const robinRoll = pose('robin', (t) => { t.anim = 'dash'; t.animT = 7; });
+    const atk = (key, i) => pose(key, (t) => { t.anim = 'attack'; t.atk = { def: t.def.light[i], t: t.def.light[i].s, hits: new Set() }; });
+    const rv = atk('raven', 0), sf = atk('starfire', 0), cy = atk('cyborg', 0);
+    const ravenIdle = pose('raven', (t) => { t.anim = 'idle'; t.animT = 0; t.atk = null; });
+    return { forms: [...forms], robinFlip: robinJump.spin, robinRoll: robinRoll.spin, ravenAura: rv.auraF, ravenCircle: rv.circleF, starAura: sf.auraF, cyPiston: cy.piston, ravenHover: ravenIdle.bob };
+  });
+  ok('Mutano vira animais aleatórios no fim do combo', anims.forms.length >= 3, anims.forms);
+  ok('Robin faz mortal no pulo e rolamento na esquiva', anims.robinFlip > 2 && anims.robinRoll > 2, anims);
+  ok('Ravena e Estelar atacam com aura nas mãos e círculo mágico', anims.ravenAura > 0.9 && anims.ravenCircle > 0.5 && anims.starAura > 0.9, anims);
+  ok('Ciborgue usa o punho-pistão e Ravena flutua', anims.cyPiston > 0.9 && anims.ravenHover < -8, anims);
 
   // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca)
   const allFrames = await ev(() => {

@@ -55,13 +55,18 @@ Todos os valores ficam na tabela `TT.DIFFICULTY` em `js/util.js`.
 
 ## Os Titãs
 
-| Titã | Combo | Forte | Especial |
-|---|---|---|---|
-| **Robin** | bastão | voadora | 3 birdarangues |
-| **Mutano** | socos/garra | vira **gorila** | vira **T-Rex** e atropela |
-| **Ciborgue** | socos pesados | soco no chão (onda) | **canhão sônico** ("BOOYAH!") |
-| **Ravena** | garras de energia | corvo sombrio | *"Azarath Metrion Zinthos!"* (área) |
-| **Estelar** | socos + starbolt | starbolt carregado | **raios oculares** |
+Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
+
+| Titã | Correr / pular / esquivar | Combo (J J J) | Forte | Especial |
+|---|---|---|---|---|
+| **Robin** | corrida atlética, **mortal** no pulo, **rolamento** | bastão: estocada, **bastão girando**, **mortal com bastão** descendo | **mortal para trás** com chute | mortal + 3 birdarangues |
+| **Mutano** | corrida agitada, vira **guepardo** na esquiva | socos e chute giratório, e no fim vira um **animal aleatório** (gorila, rinoceronte, canguru ou carneiro) | **gorila** | **T-Rex** |
+| **Ciborgue** | passada pesada, **propulsores** na esquiva e no pulo | **punho-pistão**, gancho, **canhão à queima-roupa** | martelo duplo no chão | canhão sônico |
+| **Ravena** | **flutua** e desliza, levita no pulo, vira **corvo de alma** na esquiva | **mãos de energia negra com círculo mágico**, e no fim abre um **portal** de onde sai a garra | corvo de energia | *"Azarath Metrion Zinthos!"* |
+| **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
+
+Os modelos seguem o visual do jogo de PS2: proporções realistas, volume sombreado (luz e sombra
+em cada membro) e contorno fino.
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.
@@ -104,7 +109,8 @@ Todos os valores ficam na tabela `TT.DIFFICULTY` em `js/util.js`.
 index.html        página do jogo
 js/util.js        constantes, matemática, teclado e gamepad
 js/audio.js       efeitos e músicas sintetizados
-js/render.js      rig dos personagens, poses e rostos
+js/render.js      modelos (rig sombreado), rostos e formas animais
+js/anim.js        animações: quadros-chave, locomoção e golpes de cada Titã
 js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
 js/stages.js      roteiro das fases (ondas, perseguição, chefes)
@@ -122,7 +128,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 72 verificações e todas passam:
+página e chame a função serve.) A suíte tem 77 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e

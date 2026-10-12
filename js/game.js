@@ -760,6 +760,7 @@
       // estado limpo a cada quadro: um desenho que falhe no meio não "vaza" mistura/transparência
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
+      TT.renderScale = this.scale;
       ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
       ctx.imageSmoothingEnabled = true;
       switch (this.state) {

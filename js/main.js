@@ -79,9 +79,11 @@
         if (crate) {
           const aligned = Math.abs(crate.y - p.y) <= 10;
           if (!aligned) this.down.add(crate.y > p.y ? 'down' : 'up');
-          if (crate.x - p.x > 70) this.down.add('right');
-          else if (crate.x < p.x) this.down.add('left');
-          else if (p.facing < 0) this.down.add('right'); // vira para a caixa antes de bater
+          const cdx = crate.x - p.x;
+          if (cdx > 70) this.down.add('right');
+          else if (cdx < -20) this.down.add('left');
+          else if (cdx > 20 && p.facing < 0) this.down.add('right'); // vira para a caixa antes de bater
+          // colado na caixa o golpe acerta de qualquer lado (não fica virando para lá e para cá)
           else if (aligned && this.t % 8 === 0) this.press('light');
           return;
         }
