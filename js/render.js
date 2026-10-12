@@ -1,0 +1,804 @@
+'use strict';
+// Rig de personagens em vetor (estilo cartoon com contorno grosso), poses procedurais e sprites de brilho.
+(function () {
+  const TT = window.TT;
+  const OUT = '#17121f';
+  TT.OUT = OUT;
+  TT.FONT = 'Impact, "Arial Black", "Segoe UI Black", sans-serif';
+
+  let FLASH = false; // quando true, todo preenchimento vira branco (feedback de dano)
+  const C = (c) => (FLASH ? '#ffffff' : c);
+
+  // ------------------------------------------------------------ Brilhos cacheados
+  const glowCache = new Map();
+  TT.glowSprite = function (color, size) {
+    size = size || 64;
+    const key = color + size;
+    let c = glowCache.get(key);
+    if (c) return c;
+    c = TT.makeCanvas(size, size);
+    const g = c.getContext('2d');
+    const r = size / 2;
+    const grad = g.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.18, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+    glowCache.set(key, c);
+    return c;
+  };
+  TT.drawGlow = function (ctx, color, x, y, radius, alpha) {
+    const s = TT.glowSprite(color, 64);
+    const prevA = ctx.globalAlpha, prevC = ctx.globalCompositeOperation;
+    ctx.globalAlpha = prevA * (alpha == null ? 1 : alpha);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(s, x - radius, y - radius, radius * 2, radius * 2);
+    ctx.globalAlpha = prevA;
+    ctx.globalCompositeOperation = prevC;
+  };
+
+  // ------------------------------------------------------------ Poses
+  const BASE = {
+    lean: 0.05, bob: 0, tilt: 0, rot: 0,
+    legB: [-0.2, -0.3], legF: [0.25, 0.05],
+    armB: [0.35, 1.9], armF: [0.55, 2.25],
+  };
+  const NUM_KEYS = ['lean', 'bob', 'tilt', 'rot'];
+  const ARR_KEYS = ['legB', 'legF', 'armB', 'armF'];
+
+  function newPose() {
+    return { lean: 0, bob: 0, tilt: 0, rot: 0, legB: [0, 0], legF: [0, 0], armB: [0, 0], armF: [0, 0],
+      mouth: null, weapon: null, glow: null, form: null, cape: 0, eyes: null };
+  }
+  TT.newPose = newPose;
+
+  function setPose(dst, src) {
+    for (const k of NUM_KEYS) dst[k] = src[k] != null ? src[k] : BASE[k];
+    for (const k of ARR_KEYS) {
+      const s = src[k] || BASE[k];
+      dst[k][0] = s[0]; dst[k][1] = s[1];
+    }
+    return dst;
+  }
+  function blendPose(dst, a, b, t) {
+    for (const k of NUM_KEYS) {
+      const va = a[k] != null ? a[k] : BASE[k], vb = b[k] != null ? b[k] : BASE[k];
+      dst[k] = va + (vb - va) * t;
+    }
+    for (const k of ARR_KEYS) {
+      const sa = a[k] || BASE[k], sb = b[k] || BASE[k];
+      dst[k][0] = sa[0] + (sb[0] - sa[0]) * t;
+      dst[k][1] = sa[1] + (sb[1] - sa[1]) * t;
+    }
+    return dst;
+  }
+
+  // Poses de ataque: w = preparação, h = golpe.
+  const ATK = {
+    jab: { w: { lean: -0.05, armF: [0.2, 2.6] }, h: { lean: 0.22, armF: [1.55, 1.57], armB: [0.1, 1.5], legF: [0.5, 0.25], legB: [-0.5, -0.6] } },
+    cross: { w: { lean: -0.1, armB: [0.1, 2.4] }, h: { lean: 0.32, armB: [1.6, 1.6], armF: [0.2, 2.5], legF: [0.55, 0.3], legB: [-0.5, -0.7] } },
+    uppercut: { w: { bob: 6, armF: [0.1, 0.5], lean: 0.1 }, h: { bob: -6, lean: -0.05, armF: [2.7, 3.0], legF: [0.35, 0.05], legB: [-0.4, -0.6] } },
+    kick: { w: { legF: [1.0, 0.0], lean: -0.15 }, h: { legF: [1.6, 1.6], lean: -0.3, armF: [-0.4, 0.3], armB: [0.8, 1.7] } },
+    flyKick: { w: { legF: [0.9, -0.3], legB: [0.2, -0.6], lean: -0.1 }, h: { lean: -0.15, legF: [1.65, 1.65], legB: [-0.4, -1.0], armF: [-0.9, -0.5], armB: [-1.1, -0.7] } },
+    dive: { w: { legF: [1.0, 0.2] }, h: { lean: 0.3, legF: [0.75, 0.75], legB: [-0.2, -0.9], armF: [2.5, 2.8], armB: [-2.4, -2.7] } },
+    swing: { w: { armF: [-2.6, -2.9], armB: [-2.4, -2.6], lean: -0.25, bob: -2 }, h: { armF: [1.0, 1.35], armB: [0.9, 1.25], lean: 0.32, bob: 4, legF: [0.6, 0.3], legB: [-0.5, -0.8] } },
+    swipe: { w: { armF: [-1.3, -1.1], lean: -0.15 }, h: { armF: [1.65, 1.7], armB: [0.5, 1.2], lean: 0.25, legF: [0.5, 0.3], legB: [-0.45, -0.6] } },
+    cast: { w: { armF: [0.2, 2.4], armB: [0.2, 2.2], lean: -0.12 }, h: { armF: [1.55, 1.6], armB: [1.4, 1.5], lean: 0.15, legF: [0.45, 0.25], legB: [-0.45, -0.55] } },
+    castUp: { w: { armF: [0.3, 0.6], armB: [0.2, 0.5], bob: 4 }, h: { armF: [2.9, 3.1], armB: [2.8, 3.0], bob: -3, lean: -0.05 } },
+    slam: { w: { armF: [2.9, 3.1], armB: [2.8, 3.0], bob: -4, lean: -0.2 }, h: { armF: [0.9, 0.6], armB: [0.8, 0.5], bob: 8, lean: 0.45, legF: [0.7, 0.2], legB: [-0.6, -0.9] } },
+    throw: { w: { armF: [-2.2, -2.6], lean: -0.2 }, h: { armF: [1.45, 1.55], lean: 0.28, legF: [0.5, 0.3], legB: [-0.45, -0.6] } },
+    beam: { w: { armF: [0.8, 1.2], lean: -0.05 }, h: { armF: [1.57, 1.57], armB: [1.1, 1.6], lean: -0.12, legF: [0.55, 0.35], legB: [-0.55, -0.7] } },
+    claw: { w: { armF: [-1.6, -1.2], armB: [-1.4, -1.0], lean: -0.2 }, h: { armF: [1.9, 2.1], armB: [1.7, 1.9], lean: 0.3, legF: [0.5, 0.3], legB: [-0.5, -0.6] } },
+    spin: { w: { armF: [1.5, 1.5], armB: [-1.5, -1.5] }, h: { armF: [1.5, 1.5], armB: [-1.5, -1.5], lean: 0.1 } },
+  };
+  TT.ATK_POSES = ATK;
+
+  const IDLE = { lean: 0.05 };
+  const tmpA = newPose(), tmpB = newPose();
+
+  // Calcula a pose de um lutador a partir do estado atual.
+  TT.computePose = function (f, out) {
+    const t = f.animT;
+    out.mouth = null; out.weapon = null; out.glow = null; out.form = null; out.eyes = null;
+    out.cape = TT.clamp(Math.abs(f.vx) / 6, 0, 1);
+    switch (f.anim) {
+      case 'walk': {
+        const ph = t * 0.21, s = Math.sin(ph), c = Math.cos(ph);
+        out.lean = 0.12; out.bob = -Math.abs(c) * 3; out.tilt = 0; out.rot = 0;
+        out.legF[0] = s * 0.6; out.legF[1] = s * 0.6 - 0.25 - Math.max(0, -c) * 0.7;
+        out.legB[0] = -s * 0.6; out.legB[1] = -s * 0.6 - 0.25 - Math.max(0, c) * 0.7;
+        out.armF[0] = -s * 0.55; out.armF[1] = -s * 0.55 + 1.1;
+        out.armB[0] = s * 0.55; out.armB[1] = s * 0.55 + 1.1;
+        out.cape = 0.6;
+        break;
+      }
+      case 'dash': {
+        setPose(out, { lean: 0.5, bob: 2, legF: [0.9, 0.3], legB: [-0.9, -1.5], armF: [-0.8, -0.3], armB: [-1.0, -0.5] });
+        out.cape = 1;
+        break;
+      }
+      case 'jump': {
+        const rising = f.vz > 0;
+        setPose(out, rising
+          ? { lean: 0.05, legF: [0.9, -0.2], legB: [0.3, -0.7], armF: [2.4, 2.7], armB: [-0.6, 0.2] }
+          : { lean: 0.1, legF: [0.4, 0.0], legB: [-0.3, -0.6], armF: [1.2, 1.6], armB: [-1.3, -1.0] });
+        out.cape = 0.8;
+        break;
+      }
+      case 'hurt': {
+        const k = Math.min(1, t / 6);
+        blendPose(out, IDLE, { lean: -0.4, tilt: -0.35, armF: [-0.7, -0.3], armB: [-1.0, -0.6], legF: [0.4, 0.1], legB: [-0.3, -0.5] }, k);
+        out.mouth = 'open'; out.eyes = 'shut';
+        break;
+      }
+      case 'down': {
+        const air = f.z > 1;
+        setPose(out, { lean: 0, tilt: 0.2, armF: [-2.2, -2.6], armB: [-2.0, -2.3], legF: [0.3, 0.1], legB: [-0.2, -0.3] });
+        out.rot = air ? -0.9 - Math.min(0.6, t * 0.03) : -Math.PI / 2;
+        out.mouth = 'open'; out.eyes = 'shut';
+        break;
+      }
+      case 'getup': {
+        const k = Math.min(1, t / 18);
+        setPose(out, { bob: 10 * (1 - k), lean: 0.4 * (1 - k), legF: [0.9, -0.4], legB: [-0.2, -0.9], armF: [0.6, 0.6], armB: [0.3, 0.3] });
+        out.rot = -Math.PI / 2 * Math.max(0, 1 - k * 2);
+        break;
+      }
+      case 'ko': {
+        setPose(out, { tilt: 0.3, armF: [-2.4, -2.6], armB: [-2.2, -2.4], legF: [0.2, 0.0], legB: [-0.1, -0.2] });
+        out.rot = -Math.PI / 2; out.eyes = 'x';
+        break;
+      }
+      case 'victory': {
+        const s = Math.sin(t * 0.15);
+        // soco para o alto à frente do rosto (sem cobri-lo)
+        setPose(out, { lean: -0.08, bob: -Math.abs(s) * 5, armF: [2.0 + s * 0.1, 2.5 + s * 0.1], armB: [-0.4, 0.5], legF: [0.3, 0.1], legB: [-0.3, -0.4] });
+        out.mouth = 'smile';
+        break;
+      }
+      case 'attack': {
+        const a = f.atk;
+        const def = a ? a.def : null;
+        const P = def && ATK[def.pose] ? ATK[def.pose] : ATK.jab;
+        const s = def ? def.s : 6, act = def ? def.a : 4, r = def ? def.r : 8;
+        const ft = a ? a.t : 0;
+        setPose(tmpA, IDLE); setPose(tmpB, P.w);
+        if (ft < s) {
+          blendPose(out, tmpA, tmpB, TT.easeOut(ft / s));
+        } else if (ft < s + act) {
+          blendPose(out, P.w, P.h, Math.min(1, (ft - s + 1) / 2));
+        } else {
+          const k = Math.min(1, (ft - s - act) / Math.max(1, r));
+          blendPose(out, P.h, IDLE, TT.easeInOut(k));
+        }
+        if (def) {
+          out.weapon = def.weapon || null;
+          out.glow = def.glow || null;
+          out.form = def.form || null;
+          if (def.shout || ft >= s) out.mouth = def.mouth || 'shout';
+        }
+        out.cape = Math.max(out.cape, 0.5);
+        break;
+      }
+      default: { // idle
+        const b = Math.sin(t * 0.08);
+        setPose(out, IDLE);
+        out.bob = b * 1.4;
+        out.armF[1] += b * 0.05;
+        out.armB[1] -= b * 0.05;
+      }
+    }
+    if (f.style && f.style.airIdle && f.z > 0 && f.anim !== 'down') out.legB[1] -= 0.3;
+    return out;
+  };
+
+  // ------------------------------------------------------------ Desenho do rig
+  function limb(ctx, ax, ay, a1, a2, L1, L2, w, c1, c2, endR, endC, isLeg, res) {
+    const kx = ax + Math.sin(a1) * L1, ky = ay + Math.cos(a1) * L1;
+    const ex = kx + Math.sin(a2) * L2, ey = ky + Math.cos(a2) * L2;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(kx, ky); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = OUT; ctx.lineWidth = w + 5; ctx.stroke();
+    ctx.strokeStyle = C(c1); ctx.lineWidth = w; ctx.stroke();
+    if (c2 && c2 !== c1) {
+      const mx = kx + (ex - kx) * 0.4, my = ky + (ey - ky) * 0.4;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ex, ey);
+      ctx.strokeStyle = C(c2); ctx.lineWidth = w + 1; ctx.stroke();
+    }
+    ctx.fillStyle = C(endC); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if (isLeg) ctx.ellipse(ex + endR * 0.45, ey + 1, endR * 1.35, endR * 0.75, 0, 0, Math.PI * 2);
+    else ctx.arc(ex, ey, endR, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    if (res) { res.kx = kx; res.ky = ky; res.ex = ex; res.ey = ey; }
+  }
+
+  function torsoPath(ctx, st) {
+    const hw = st.hipW / 2, sw = st.shW / 2, th = st.torsoH;
+    ctx.beginPath();
+    ctx.moveTo(-hw, 3);
+    ctx.lineTo(hw, 3);
+    ctx.quadraticCurveTo(sw + 4, -th * 0.45, sw, -th + 5);
+    ctx.quadraticCurveTo(sw - 1, -th - 2, sw - 8, -th - 2);
+    ctx.lineTo(-sw + 8, -th - 2);
+    ctx.quadraticCurveTo(-sw + 1, -th - 2, -sw, -th + 5);
+    ctx.quadraticCurveTo(-sw - 4, -th * 0.45, -hw, 3);
+    ctx.closePath();
+  }
+
+  const handF = {}, handB = {};
+  // Desenha um personagem humanoide com o estilo dado.
+  TT.drawRig = function (ctx, st, pose, x, y, facing, opt) {
+    const sc = st.scale * (opt && opt.scale ? opt.scale : 1);
+    FLASH = !!(opt && opt.flash);
+    const t = opt && opt.t ? opt.t : 0;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(facing * sc, sc);
+    if (pose.rot) { ctx.translate(0, -12); ctx.rotate(pose.rot); }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+    const L1 = st.legL[0], L2 = st.legL[1];
+    const Hx = 0, Hy = -(L1 + L2) + 4 + pose.bob;
+    const lean = pose.lean;
+    const cl = Math.cos(lean), sl = Math.sin(lean);
+    const rot = (px, py) => [Hx + px * cl - py * sl, Hy + px * sl + py * cl];
+    const S = rot(0, -st.torsoH);
+    const sF = rot(4, -st.torsoH + 5), sB = rot(-5, -st.torsoH + 4);
+    const hd = rot(st.headOff || 0, -st.torsoH - st.headR * 0.82);
+    const P = { Hx, Hy, S, hd, lean, pose, st, t };
+
+    if (st.drawBack) st.drawBack(ctx, P);
+
+    const dk = st.dark;
+    // perna e braço de trás (tons escurecidos)
+    limb(ctx, Hx - 4, Hy, pose.legB[0], pose.legB[1], L1, L2, st.legW, dk.leg, dk.boot, st.footR, dk.boot, true);
+    limb(ctx, sB[0], sB[1], pose.armB[0], pose.armB[1], st.armL[0], st.armL[1], st.armW, dk.arm, dk.glove, st.handR, dk.hand, false, handB);
+
+    // tronco
+    ctx.save();
+    ctx.translate(Hx, Hy); ctx.rotate(lean);
+    torsoPath(ctx, st);
+    ctx.fillStyle = C(st.torso); ctx.fill();
+    if (st.torsoDetail && !FLASH) { ctx.save(); ctx.clip(); st.torsoDetail(ctx, P); ctx.restore(); }
+    torsoPath(ctx, st);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+
+    // perna da frente
+    limb(ctx, Hx + 4, Hy, pose.legF[0], pose.legF[1], L1, L2, st.legW, st.leg, st.boot, st.footR, st.boot, true);
+
+    if (st.drawMid) st.drawMid(ctx, P);
+
+    // cabeça
+    ctx.save();
+    ctx.translate(hd[0], hd[1]);
+    ctx.rotate(lean * 0.4 + pose.tilt);
+    st.drawHead(ctx, st.headR, pose, t);
+    ctx.restore();
+
+    // braço da frente + arma
+    limb(ctx, sF[0], sF[1], pose.armF[0], pose.armF[1], st.armL[0], st.armL[1], st.armW, st.arm, st.glove, st.handR, st.hand, false, handF);
+    if (pose.weapon === 'staff') drawStaff(ctx, handF, pose.armF[1]);
+    if (st.drawFront) st.drawFront(ctx, P, handF, handB);
+    if (pose.glow && !FLASH) {
+      TT.drawGlow(ctx, pose.glow, handF.ex, handF.ey, 26, 0.9);
+      TT.drawGlow(ctx, pose.glow, handB.ex, handB.ey, 20, 0.7);
+    }
+    ctx.restore();
+    FLASH = false;
+  };
+
+  function drawStaff(ctx, h, a) {
+    const dx = Math.sin(a), dy = Math.cos(a);
+    const x1 = h.ex - dx * 26, y1 = h.ey - dy * 26, x2 = h.ex + dx * 62, y2 = h.ey + dy * 62;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 8; ctx.stroke();
+    ctx.strokeStyle = C('#b9c0cc'); ctx.lineWidth = 4; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2 - dx * 8, y2 - dy * 8); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = C('#e9edf3'); ctx.lineWidth = 4; ctx.stroke();
+  }
+
+  // ------------------------------------------------------------ Rostos
+  function headCircle(ctx, r, skin) {
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = C(skin); ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+  }
+  function eyes(ctx, r, pose, o) {
+    if (FLASH) return;
+    const shut = pose.eyes === 'shut', xx = pose.eyes === 'x';
+    const pos = [[r * 0.12, -r * 0.08, 1], [r * 0.62, -r * 0.08, 0.8]];
+    for (const [ex, ey, k] of pos) {
+      const w = r * 0.24 * k * (o.wide || 1), h = r * 0.3 * (o.tall || 1);
+      if (xx) {
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ex - w, ey - w); ctx.lineTo(ex + w, ey + w); ctx.moveTo(ex + w, ey - w); ctx.lineTo(ex - w, ey + w); ctx.stroke();
+        continue;
+      }
+      if (shut) {
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(ex - w, ey - 2); ctx.lineTo(ex + w * 0.2, ey + 2); ctx.lineTo(ex + w, ey - 2); ctx.stroke();
+        continue;
+      }
+      ctx.beginPath(); ctx.ellipse(ex, ey, w, h, 0, 0, Math.PI * 2);
+      ctx.fillStyle = o.white || '#ffffff'; ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (o.iris) {
+        ctx.beginPath(); ctx.ellipse(ex + w * 0.35, ey + h * 0.1, w * 0.55, h * 0.62, 0, 0, Math.PI * 2);
+        ctx.fillStyle = o.iris; ctx.fill();
+        ctx.beginPath(); ctx.arc(ex + w * 0.45, ey + h * 0.1, w * 0.28, 0, Math.PI * 2);
+        ctx.fillStyle = OUT; ctx.fill();
+        ctx.beginPath(); ctx.arc(ex + w * 0.15, ey - h * 0.3, w * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+      }
+      if (o.lid) {
+        ctx.beginPath(); ctx.ellipse(ex, ey - h * 0.45, w * 1.15, h * 0.6, 0, Math.PI, Math.PI * 2);
+        ctx.fillStyle = o.lid; ctx.fill();
+      }
+      if (o.brow) {
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(ex - w * 1.1, ey - h * 1.25 - (o.angry ? -2 : 0)); ctx.lineTo(ex + w * 1.1, ey - h * 1.25 + (o.angry ? 3 : 0)); ctx.stroke();
+      }
+    }
+  }
+  function mouth(ctx, r, pose, x, y, fang) {
+    if (FLASH) return;
+    x = x == null ? r * 0.45 : x; y = y == null ? r * 0.48 : y;
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.2;
+    if (pose.mouth === 'shout' || pose.mouth === 'open') {
+      ctx.beginPath(); ctx.ellipse(x, y + 1, r * 0.17, r * 0.15, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#5a1020'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.09, r * 0.09, r * 0.05, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#e0607a'; ctx.fill();
+    } else if (pose.mouth === 'smile') {
+      ctx.beginPath(); ctx.arc(x - 1, y - 3, r * 0.2, 0.2, Math.PI - 0.4); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(x - r * 0.14, y); ctx.quadraticCurveTo(x, y + 3, x + r * 0.14, y - 1); ctx.stroke();
+    }
+    if (fang) {
+      ctx.beginPath(); ctx.moveTo(x - 1, y + 1); ctx.lineTo(x + 3, y + 1); ctx.lineTo(x + 1, y + 6); ctx.closePath();
+      ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.2; ctx.stroke();
+    }
+  }
+  TT.drawEyes = eyes;
+  TT.drawMouth = mouth;
+
+  function spikyCap(ctx, r, color, spikes) {
+    ctx.beginPath();
+    ctx.moveTo(r * 0.95, -r * 0.35);
+    for (const [px, py] of spikes) ctx.lineTo(px * r, py * r);
+    ctx.lineTo(-r * 0.75, r * 0.45);
+    ctx.quadraticCurveTo(-r * 0.2, -r * 0.1, r * 0.2, -r * 0.42);
+    ctx.closePath();
+    ctx.fillStyle = C(color); ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  // ------------------------------------------------------------ Estilos
+  function mkStyle(o) {
+    const st = Object.assign({
+      scale: 1, headR: 22, torsoH: 36, shW: 30, hipW: 24, legL: [24, 24], armL: [18, 17],
+      legW: 9, armW: 8, handR: 5.5, footR: 6.5,
+      skin: '#f6c9a0', torso: '#888', arm: '#888', glove: null, hand: '#f6c9a0', leg: '#555', boot: '#222',
+    }, o);
+    st.glove = st.glove || st.arm;
+    st.dark = {
+      leg: TT.shade(st.leg, -0.28), boot: TT.shade(st.boot, -0.28), arm: TT.shade(st.arm, -0.28),
+      glove: TT.shade(st.glove, -0.28), hand: TT.shade(st.hand, -0.28),
+    };
+    return st;
+  }
+
+  const S = {};
+  TT.STYLES = S;
+
+  S.robin = mkStyle({
+    skin: '#f7c9a1', torso: '#d7262e', arm: '#2f9a48', glove: '#2f9a48', hand: '#2f9a48', leg: '#2f9a48', boot: '#1e1e24',
+    drawBack(ctx, P) { // capa preta com forro amarelo
+      const [sx, sy] = P.S;
+      const flow = P.pose.cape;
+      const tx = sx - 26 - flow * 26, ty = P.Hy + 22 - flow * 22;
+      ctx.beginPath();
+      ctx.moveTo(sx + 6, sy - 2);
+      ctx.quadraticCurveTo(sx - 30, sy + 8, tx - 4, ty + 4);
+      ctx.lineTo(tx + 20, ty + 10);
+      ctx.quadraticCurveTo(sx - 6, sy + 30, sx + 4, sy + 4);
+      ctx.closePath();
+      ctx.fillStyle = C('#f2c428'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx + 4, sy - 3);
+      ctx.quadraticCurveTo(sx - 34, sy + 4, tx - 10, ty);
+      ctx.lineTo(tx + 10, ty + 6);
+      ctx.quadraticCurveTo(sx - 14, sy + 22, sx - 2, sy + 6);
+      ctx.closePath();
+      ctx.fillStyle = C('#15151b'); ctx.fill(); ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#f2c428'; ctx.fillRect(-20, -9, 40, 8); // cinto de utilidades
+      ctx.fillStyle = '#c99a12';
+      for (let i = -14; i <= 14; i += 7) ctx.fillRect(i - 2, -8, 4, 6);
+      ctx.fillStyle = '#2f9a48'; ctx.fillRect(-20, -th - 4, 40, 6);
+      ctx.beginPath(); ctx.arc(5, -th + 12, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#f2c428'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = OUT; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('R', 5, -th + 12.5);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#f7c9a1');
+      spikyCap(ctx, r, '#16161c', [[0.7, -0.95], [0.45, -1.25], [0.05, -1.05], [-0.25, -1.4], [-0.55, -0.95], [-1.05, -1.15], [-0.95, -0.55], [-1.45, -0.45], [-1.0, -0.05], [-1.3, 0.3]]);
+      if (!FLASH) { // máscara
+        ctx.beginPath(); ctx.ellipse(r * 0.38, -r * 0.08, r * 0.62, r * 0.27, 0.05, 0, Math.PI * 2);
+        ctx.fillStyle = '#15151b'; ctx.fill();
+        for (const [ex, k] of [[r * 0.13, 1], [r * 0.64, 0.75]]) {
+          ctx.beginPath(); ctx.ellipse(ex, -r * 0.1, r * 0.2 * k, r * 0.13, 0.1, 0, Math.PI * 2);
+          ctx.fillStyle = pose.eyes === 'shut' ? '#15151b' : '#ffffff'; ctx.fill();
+        }
+      }
+      mouth(ctx, r, pose);
+    },
+  });
+
+  S.starfire = mkStyle({
+    skin: '#f3a35a', torso: '#7b2fbc', arm: '#f3a35a', glove: '#f3a35a', hand: '#f3a35a', leg: '#f3a35a', boot: '#7b2fbc', airIdle: true,
+    shW: 26, hipW: 22, armW: 7, legW: 8,
+    drawBack(ctx, P) { // cabelo longo
+      const [hx, hy] = P.hd, r = P.st.headR;
+      const flow = 0.4 + P.pose.cape * 0.6;
+      const wave = Math.sin(P.t * 0.12) * 4;
+      ctx.beginPath();
+      ctx.moveTo(hx + r * 0.6, hy - r * 0.9);
+      ctx.quadraticCurveTo(hx - r * 1.6, hy - r * 1.2, hx - r * 1.3 - flow * 20, hy + r * 1.6 + wave);
+      ctx.quadraticCurveTo(hx - r * 1.6 - flow * 30, hy + r * 3.2, hx - r * 0.5 - flow * 24, P.Hy + 10 + wave);
+      ctx.quadraticCurveTo(hx - r * 0.2, hy + r * 1.5, hx + r * 0.1, hy + r * 0.4);
+      ctx.closePath();
+      ctx.fillStyle = C('#c71f2b'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.strokeStyle = '#ff5a52'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(hx - r * 0.7, hy - r * 0.4); ctx.quadraticCurveTo(hx - r * 1.4 - flow * 18, hy + r * 1.4, hx - r * 0.9 - flow * 20, hy + r * 2.6); ctx.stroke();
+      }
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#f3a35a'; ctx.fillRect(-20, -th * 0.55, 40, th * 0.32); // barriga
+      ctx.fillStyle = '#5c1f92'; ctx.fillRect(-20, -th * 0.25, 40, 3);
+      ctx.beginPath(); ctx.arc(2, -th + 3, 4.5, 0, Math.PI * 2); // gema
+      ctx.fillStyle = '#4ef08a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#c7cbd6'; ctx.fillRect(-20, -th - 4, 40, 4);
+    },
+    drawMid(ctx, P) { // saia
+      ctx.save(); ctx.translate(P.Hx, P.Hy); ctx.rotate(P.lean * 0.6);
+      ctx.beginPath(); ctx.moveTo(-14, -6); ctx.lineTo(14, -6); ctx.lineTo(18, 12); ctx.lineTo(-17, 12); ctx.closePath();
+      ctx.fillStyle = C('#7b2fbc'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      ctx.restore();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#f3a35a');
+      ctx.beginPath(); // franja
+      ctx.moveTo(-r * 1.05, r * 0.5);
+      ctx.quadraticCurveTo(-r * 1.25, -r * 1.25, r * 0.3, -r * 1.1);
+      ctx.quadraticCurveTo(r * 1.2, -r * 0.8, r * 1.02, -r * 0.3);
+      ctx.lineTo(r * 0.85, -r * 0.42); ctx.lineTo(r * 0.6, -r * 0.33); ctx.lineTo(r * 0.3, -r * 0.42); ctx.lineTo(-r * 0.05, -r * 0.36);
+      ctx.quadraticCurveTo(-r * 0.4, -r * 0.3, -r * 0.55, r * 0.55);
+      ctx.closePath();
+      ctx.fillStyle = C('#c71f2b'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      eyes(ctx, r, pose, { iris: '#2fd66b', white: '#c9ffd9', tall: 1.15, wide: 1.1 });
+      mouth(ctx, r, pose);
+    },
+  });
+
+  S.cyborg = mkStyle({
+    scale: 1.1, skin: '#6e4a33', torso: '#d6dbe4', arm: '#c7ccd6', glove: '#8a92a3', hand: '#9aa3b4', leg: '#c7ccd6', boot: '#8a92a3',
+    shW: 38, hipW: 30, torsoH: 38, armW: 12, legW: 12, handR: 7.5, footR: 8, headR: 21, legL: [24, 23],
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#3c6fd6';
+      ctx.fillRect(-8, -th + 6, 16, th - 12);
+      ctx.fillStyle = '#9aa3b4'; ctx.fillRect(-22, -12, 44, 8);
+      ctx.strokeStyle = '#8f98aa'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-18, -th * 0.55); ctx.lineTo(-9, -th * 0.55); ctx.moveTo(9, -th * 0.55); ctx.lineTo(18, -th * 0.55); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -th + 14, 4, 0, Math.PI * 2); ctx.fillStyle = '#ff3b3b'; ctx.fill();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#d6dbe4');
+      if (!FLASH) {
+        ctx.beginPath(); // rosto humano (parte frontal inferior)
+        ctx.moveTo(r * 0.05, -r * 0.45); ctx.lineTo(r * 0.98, -r * 0.3); ctx.lineTo(r * 0.98, r * 0.3);
+        ctx.quadraticCurveTo(r * 0.7, r * 1.0, r * 0.05, r * 0.95); ctx.closePath();
+        ctx.fillStyle = '#6e4a33'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = '#8f98aa'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.1, r * 0.35, 0, Math.PI * 2); ctx.stroke(); // orelha mecânica
+        ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.1, r * 0.14, 0, Math.PI * 2); ctx.fillStyle = '#3c6fd6'; ctx.fill();
+        // olho humano + olho cibernético vermelho
+        ctx.beginPath(); ctx.ellipse(r * 0.62, -r * 0.08, r * 0.15, r * 0.2, 0, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        if (pose.eyes !== 'shut' && pose.eyes !== 'x') { ctx.beginPath(); ctx.arc(r * 0.67, -r * 0.06, r * 0.08, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill(); }
+        ctx.beginPath(); ctx.arc(r * 0.18, -r * 0.1, r * 0.17, 0, Math.PI * 2); ctx.fillStyle = '#2a2d36'; ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.2, -r * 0.1, r * 0.1, 0, Math.PI * 2); ctx.fillStyle = '#ff2a2a'; ctx.fill();
+        TT.drawGlow(ctx, '#ff2a2a', r * 0.2, -r * 0.1, 9, 0.8);
+      }
+      mouth(ctx, r, pose, r * 0.55, r * 0.52);
+    },
+    drawFront(ctx, P, hF) { // canhão sônico
+      if (P.pose.form !== 'cannon') return;
+      const a = P.pose.armF[1];
+      const dx = Math.sin(a), dy = Math.cos(a);
+      ctx.beginPath(); ctx.moveTo(hF.ex - dx * 8, hF.ey - dy * 8); ctx.lineTo(hF.ex + dx * 14, hF.ey + dy * 14);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 20; ctx.stroke();
+      ctx.strokeStyle = C('#8a92a3'); ctx.lineWidth = 15; ctx.stroke();
+      if (!FLASH) {
+        ctx.beginPath(); ctx.arc(hF.ex + dx * 15, hF.ey + dy * 15, 6, 0, Math.PI * 2); ctx.fillStyle = '#bfe6ff'; ctx.fill();
+        TT.drawGlow(ctx, '#4fb4ff', hF.ex + dx * 18, hF.ey + dy * 18, 26, 1);
+      }
+    },
+  });
+
+  S.raven = mkStyle({
+    skin: '#cfc8dc', torso: '#1f1b2e', arm: '#cfc8dc', hand: '#cfc8dc', leg: '#cfc8dc', boot: '#2c3384',
+    shW: 25, hipW: 22, armW: 7, legW: 8,
+    drawBack(ctx, P) { // capa (manto)
+      const [sx, sy] = P.S;
+      const flow = P.pose.cape;
+      const wv = Math.sin(P.t * 0.1) * 3;
+      ctx.beginPath();
+      ctx.moveTo(sx + 12, sy - 4);
+      ctx.quadraticCurveTo(sx + 26, sy + 40, sx + 18 - flow * 8, -6 + wv);
+      ctx.lineTo(sx - 34 - flow * 34, -2 - flow * 18 + wv);
+      ctx.quadraticCurveTo(sx - 26 - flow * 10, sy + 20, sx - 10, sy - 6);
+      ctx.closePath();
+      ctx.fillStyle = C('#2c3384'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.strokeStyle = '#3e48b0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx - 6, sy + 6); ctx.quadraticCurveTo(sx - 18 - flow * 10, sy + 30, sx - 22 - flow * 26, -4 + wv); ctx.stroke();
+      }
+      // capuz atrás da cabeça
+      const [hx, hy] = P.hd, r = P.st.headR;
+      ctx.beginPath(); ctx.ellipse(hx - r * 0.15, hy - r * 0.05, r * 1.32, r * 1.3, 0, 0, Math.PI * 2);
+      ctx.fillStyle = C('#2c3384'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      ctx.fillStyle = '#e2b23c';
+      for (let i = -12; i <= 12; i += 8) { ctx.beginPath(); ctx.arc(i, -6, 3.2, 0, Math.PI * 2); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(3, -P.st.torsoH + 2, 4, 0, Math.PI * 2); ctx.fillStyle = '#e2b23c'; ctx.fill();
+      ctx.beginPath(); ctx.arc(3, -P.st.torsoH + 2, 2, 0, Math.PI * 2); ctx.fillStyle = '#d61f3a'; ctx.fill();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#cfc8dc');
+      ctx.beginPath(); // cabelo violeta
+      ctx.moveTo(-r * 0.95, r * 0.6);
+      ctx.quadraticCurveTo(-r * 1.15, -r * 1.1, r * 0.35, -r * 1.02);
+      ctx.quadraticCurveTo(r * 1.1, -r * 0.8, r * 0.98, -r * 0.2);
+      ctx.lineTo(r * 0.55, -r * 0.5); ctx.lineTo(r * 0.1, -r * 0.45);
+      ctx.quadraticCurveTo(-r * 0.4, -r * 0.3, -r * 0.45, r * 0.75);
+      ctx.closePath();
+      ctx.fillStyle = C('#5b3c8f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      eyes(ctx, r, pose, { iris: '#7b55c9', white: '#f0ecff', lid: '#b9b1cc', tall: 0.85 });
+      if (!FLASH) {
+        ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.48, r * 0.08, 0, Math.PI * 2); ctx.fillStyle = '#d61f3a'; ctx.fill(); // chakra
+      }
+      mouth(ctx, r, pose);
+      if (!FLASH) { // borda do capuz na frente
+        ctx.beginPath(); ctx.arc(-r * 0.1, 0, r * 1.18, -Math.PI * 0.62, -Math.PI * 0.28);
+        ctx.strokeStyle = '#2c3384'; ctx.lineWidth = 5; ctx.stroke();
+      }
+    },
+  });
+
+  S.beastboy = mkStyle({
+    skin: '#79c64c', torso: '#26212f', arm: '#6b3aa1', glove: '#9aa1aa', hand: '#9aa1aa', leg: '#6b3aa1', boot: '#9aa1aa',
+    shW: 27, hipW: 22, headR: 21,
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#6b3aa1'; ctx.fillRect(-20, -th + 6, 7, th);
+      ctx.fillRect(13, -th + 6, 7, th);
+      ctx.fillStyle = '#9aa1aa'; ctx.fillRect(-20, -8, 40, 5);
+      ctx.fillStyle = '#79c64c'; ctx.fillRect(-6, -th - 4, 12, 6);
+    },
+    drawHead(ctx, r, pose) {
+      ctx.beginPath(); // orelha pontuda
+      ctx.moveTo(-r * 0.3, -r * 0.2); ctx.lineTo(-r * 1.25, -r * 0.75); ctx.lineTo(-r * 0.55, r * 0.35); ctx.closePath();
+      ctx.fillStyle = C('#79c64c'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      headCircle(ctx, r, '#79c64c');
+      spikyCap(ctx, r, '#3f8a24', [[0.85, -0.85], [0.5, -1.2], [0.2, -0.95], [-0.1, -1.35], [-0.45, -0.95], [-0.95, -1.15], [-0.85, -0.6], [-1.3, -0.35], [-0.95, 0.0]]);
+      eyes(ctx, r, pose, { iris: '#2e7d1e', brow: true });
+      mouth(ctx, r, pose, null, null, true);
+    },
+  });
+
+  // ---- Inimigos
+  S.hive = mkStyle({
+    skin: '#e8b98f', torso: '#7d8897', arm: '#7d8897', glove: '#2b2f38', hand: '#2b2f38', leg: '#6b7584', boot: '#2b2f38',
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#f0c62e'; ctx.fillRect(-20, -9, 40, 6);
+      ctx.beginPath(); ctx.moveTo(0, -th + 6); ctx.lineTo(8, -th + 11); ctx.lineTo(8, -th + 20); ctx.lineTo(0, -th + 25); ctx.lineTo(-8, -th + 20); ctx.lineTo(-8, -th + 11); ctx.closePath();
+      ctx.fillStyle = '#f0c62e'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = OUT; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', 0, -th + 16);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e8b98f');
+      ctx.beginPath(); // capacete
+      ctx.arc(0, -r * 0.05, r * 1.06, Math.PI * 0.82, Math.PI * 2.05);
+      ctx.closePath();
+      ctx.fillStyle = C('#5d6676'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.beginPath(); // visor
+        ctx.moveTo(-r * 0.1, -r * 0.35); ctx.lineTo(r * 1.04, -r * 0.3); ctx.lineTo(r * 0.98, r * 0.12); ctx.lineTo(-r * 0.05, r * 0.1); ctx.closePath();
+        ctx.fillStyle = '#ffd23a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(r * 0.1, -r * 0.25, r * 0.5, r * 0.08);
+      }
+      mouth(ctx, r, pose, r * 0.5, r * 0.55);
+    },
+  });
+
+  S.slade = mkStyle({
+    skin: '#1f2126', torso: '#1f2126', arm: '#2a2d33', glove: '#80868f', hand: '#80868f', leg: '#2a2d33', boot: '#80868f',
+    shW: 32, hipW: 24, armW: 9, legW: 10,
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#80868f';
+      ctx.fillRect(-18, -th + 2, 36, 10);
+      ctx.fillStyle = '#5c6169'; ctx.fillRect(-18, -10, 36, 6);
+      ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-6, -th + 16); ctx.lineTo(6, -th + 16); ctx.stroke();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#d0711f');
+      if (!FLASH) {
+        ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r - 1.5, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = '#18191d'; ctx.fillRect(-r, -r, r * 1.05, r * 2);
+        ctx.fillStyle = '#18191d';
+        for (let i = 0; i < 3; i++) ctx.fillRect(r * 0.3 + i * 5, r * 0.45, 2.5, r * 0.4);
+        ctx.restore();
+        ctx.beginPath(); ctx.ellipse(r * 0.5, -r * 0.1, r * 0.2, r * 0.13, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#100'; ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.53, -r * 0.1, r * 0.07, 0, Math.PI * 2); ctx.fillStyle = '#ff4a2a'; ctx.fill();
+        TT.drawGlow(ctx, '#ff4a2a', r * 0.53, -r * 0.1, 8, 0.9);
+      }
+    },
+  });
+
+  S.cinderblock = mkStyle({
+    scale: 2.0, skin: '#9b958d', torso: '#8e8880', arm: '#968f86', glove: '#7d776f', hand: '#8a847c', leg: '#857f77', boot: '#6f6a63',
+    shW: 62, hipW: 44, torsoH: 46, headR: 17, legL: [20, 20], armL: [22, 22], armW: 17, legW: 17, handR: 12, footR: 10, headOff: 8,
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.strokeStyle = '#6f6a63'; ctx.lineWidth = 2;
+      for (let y = -6; y > -th; y -= 12) {
+        ctx.beginPath(); ctx.moveTo(-34, y); ctx.lineTo(34, y); ctx.stroke();
+        const off = (y / 12) % 2 === 0 ? 0 : 10;
+        for (let x = -30 + off; x < 34; x += 20) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 12); ctx.stroke(); }
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(-30, -th, 20, th);
+    },
+    drawHead(ctx, r, pose) {
+      ctx.beginPath(); ctx.rect(-r, -r * 0.9, r * 2, r * 1.8);
+      ctx.fillStyle = C('#9b958d'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#ffcf33';
+        ctx.fillRect(r * 0.1, -r * 0.25, r * 0.35, r * 0.22);
+        ctx.fillRect(r * 0.55, -r * 0.25, r * 0.3, r * 0.22);
+        TT.drawGlow(ctx, '#ffb020', r * 0.45, -r * 0.15, 16, 0.8);
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(r * 0.05, -r * 0.45); ctx.lineTo(r * 0.95, -r * 0.3); ctx.stroke();
+      }
+    },
+  });
+
+  // ------------------------------------------------------------ Formas animais do Mutano
+  TT.drawGorilla = function (ctx, x, y, facing, k, flash) {
+    FLASH = !!flash;
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * 1.25, 1.25);
+    const sm = k > 0.5 ? (k - 0.5) * 2 : 0; // golpe
+    const raise = k < 0.5 ? k * 2 : 1 - sm;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // corpo
+    ctx.beginPath(); ctx.ellipse(-4, -60, 42, 40, -0.2, 0, Math.PI * 2);
+    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(10, -54, 22, 26, -0.1, 0, Math.PI * 2); ctx.fillStyle = C('#79c64c'); ctx.fill();
+    // pernas
+    for (const lx of [-22, 12]) { ctx.beginPath(); ctx.ellipse(lx, -14, 13, 16, 0, 0, Math.PI * 2); ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.stroke(); }
+    // cabeça
+    ctx.beginPath(); ctx.arc(26, -94, 18, 0, Math.PI * 2); ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(33, -88, 12, 10, 0, 0, Math.PI * 2); ctx.fillStyle = C('#8fd463'); ctx.fill(); ctx.stroke();
+    if (!FLASH) {
+      ctx.fillStyle = OUT; ctx.fillRect(28, -102, 12, 3);
+      ctx.beginPath(); ctx.arc(34, -97, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(36, -86, 6, 4, 0, 0, Math.PI * 2); ctx.fillStyle = '#4a1020'; ctx.fill();
+    }
+    // braços erguidos -> esmagando
+    const ay = -100 - raise * 50 + sm * 90, ax = 30 + sm * 30;
+    for (const off of [-10, 6]) {
+      ctx.beginPath(); ctx.moveTo(8 + off, -82); ctx.quadraticCurveTo(ax + off - 10, (ay - 82) / 2 - 40, ax + off, ay);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 22; ctx.stroke(); ctx.strokeStyle = C(off < 0 ? '#3f8424' : '#4f9a2f'); ctx.lineWidth = 16; ctx.stroke();
+      ctx.beginPath(); ctx.arc(ax + off, ay, 12, 0, Math.PI * 2); ctx.fillStyle = C('#3f8424'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.restore(); FLASH = false;
+  };
+
+  TT.drawTRex = function (ctx, x, y, facing, t, flash) {
+    FLASH = !!flash;
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * 1.35, 1.35);
+    const step = Math.sin(t * 0.35), jaw = 0.25 + Math.abs(Math.sin(t * 0.18)) * 0.4;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // cauda
+    ctx.beginPath(); ctx.moveTo(-20, -70); ctx.quadraticCurveTo(-80, -80 + step * 4, -120, -50 + step * 6); ctx.quadraticCurveTo(-70, -48, -10, -40); ctx.closePath();
+    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+    // pernas
+    for (const [lx, ph] of [[-12, step], [12, -step]]) {
+      ctx.beginPath(); ctx.moveTo(lx, -50); ctx.lineTo(lx + ph * 12, -22); ctx.lineTo(lx + ph * 6 + 8, 0);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 20; ctx.stroke(); ctx.strokeStyle = C(ph > 0 ? '#3f8424' : '#4f9a2f'); ctx.lineWidth = 14; ctx.stroke();
+    }
+    // corpo
+    ctx.beginPath(); ctx.ellipse(0, -72, 45, 30, -0.35, 0, Math.PI * 2);
+    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(12, -68, 22, 16, -0.4, 0, Math.PI * 2); ctx.fillStyle = C('#8fd463'); ctx.fill();
+    // bracinhos
+    ctx.beginPath(); ctx.moveTo(30, -76); ctx.lineTo(44, -66); ctx.lineTo(48, -72); ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = C('#4f9a2f'); ctx.lineWidth = 4; ctx.stroke();
+    // cabeça + mandíbula
+    ctx.save(); ctx.translate(36, -104);
+    ctx.beginPath(); ctx.moveTo(-12, 10); ctx.quadraticCurveTo(-14, -20, 22, -18); ctx.lineTo(48, -10); ctx.lineTo(48, 2); ctx.lineTo(0, 8); ctx.closePath();
+    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.save(); ctx.translate(0, 8); ctx.rotate(jaw);
+    ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(44, -6); ctx.lineTo(40, 6); ctx.lineTo(-4, 10); ctx.closePath();
+    ctx.fillStyle = C('#3f8424'); ctx.fill(); ctx.stroke();
+    if (!FLASH) { ctx.fillStyle = '#fff'; for (let i = 6; i < 40; i += 8) { ctx.beginPath(); ctx.moveTo(i, -5); ctx.lineTo(i + 4, -5); ctx.lineTo(i + 2, -10); ctx.fill(); } }
+    ctx.restore();
+    if (!FLASH) {
+      ctx.fillStyle = '#fff'; for (let i = 8; i < 44; i += 8) { ctx.beginPath(); ctx.moveTo(i, 2); ctx.lineTo(i + 4, 2); ctx.lineTo(i + 2, 8); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(12, -8, 4, 0, Math.PI * 2); ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(13, -8, 1.8, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill();
+    }
+    ctx.restore();
+    ctx.restore(); FLASH = false;
+  };
+
+  // Estrela/explosão em quadrinhos
+  TT.drawBurst = function (ctx, x, y, r, points, fill, stroke, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const a = rot + (i / (points * 2)) * Math.PI * 2;
+      const rr = i % 2 === 0 ? r : r * 0.5;
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 3; ctx.stroke(); }
+  };
+
+  // Texto com contorno grosso (estilo HQ)
+  TT.drawText = function (ctx, text, x, y, size, fill, stroke, align, lw) {
+    ctx.font = size + 'px ' + TT.FONT;
+    ctx.textAlign = align || 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || Math.max(3, size * 0.16); ctx.strokeText(text, x, y); }
+    ctx.fillStyle = fill; ctx.fillText(text, x, y);
+  };
+
+  // Retrato de um titã (cabeça), usado no HUD; cacheado em canvas.
+  const portraitCache = new Map();
+  TT.portrait = function (key, size) {
+    const k = key + size;
+    let c = portraitCache.get(k);
+    if (c) return c;
+    c = TT.makeCanvas(size, size);
+    const g = c.getContext('2d');
+    const st = S[key];
+    g.translate(size * 0.52, size * 0.56);
+    const s = size / 74; // margem para cabelo/capuz não serem cortados
+    g.scale(s, s);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const pose = newPose();
+    if (key === 'raven') { // capuz
+      g.beginPath(); g.ellipse(-3, -1, 29, 28, 0, 0, Math.PI * 2); g.fillStyle = '#2c3384'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+    }
+    if (key === 'starfire') {
+      g.beginPath(); g.moveTo(10, -22); g.quadraticCurveTo(-40, -30, -30, 34); g.lineTo(0, 30); g.closePath(); g.fillStyle = '#c71f2b'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+    }
+    st.drawHead(g, 22, pose, 0);
+    portraitCache.set(k, c);
+    return c;
+  };
+})();
