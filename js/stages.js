@@ -33,5 +33,21 @@
         { type: 'boss', camX: 6650, boss: 'gizmo', intro: 'O gênio do mal da H.I.V.E.' },
       ],
     },
+    {
+      id: 3,
+      name: 'FASE 3 — USINA DE ENERGIA',
+      subtitle: 'Overload está sugando a energia de Jump City!',
+      length: 7400,
+      song: 'stage3',
+      bossSong: 'overload',
+      crates: [[1200, 600, 'pizza'], [2400, 650, 'energy'], [3700, 560, 'pizza'], [5000, 620, 'energy'], [5500, 560, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['hive', 'shock', 'hive'], ['shock', 'slade', 'drone']] },
+        { type: 'arena', camX: 1500, waves: [['shock', 'shock', 'hive'], ['drone', 'drone', 'slade', 'shock']] },
+        { type: 'arena', camX: 2950, waves: [['slade', 'shock', 'hive', 'hive'], ['shock', 'shock', 'drone', 'slade']] },
+        { type: 'arena', camX: 4300, waves: [['shock', 'slade', 'slade', 'drone'], ['hive', 'hive', 'shock', 'shock', 'drone']] },
+        { type: 'boss', camX: 6000, boss: 'overload', intro: 'A criatura elétrica' },
+      ],
+    },
   ];
 })();

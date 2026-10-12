@@ -204,13 +204,61 @@ async page => {
   });
   ok('super e troca apertados durante hit-stop funcionam', reg2.superOk && reg2.switched, reg2);
 
+  // 4b2) Inimigo novo: Soldado Elétrico — os dois golpes acertam e têm marcação no chão antes
+  const shock = await ev(() => {
+    const g = TT.game, out = {};
+    for (const i of [0, 1]) {
+      TT.debug.start(2); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = new TT.ShockTrooper(g, p.x + (i ? 70 : 160), p.y);
+      e.entering = false; e.facing = -1; g.addEnemy(e);
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[i ? 'descarga' : 'estocada'] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    // a IA respeita os tokens: com 1 token, só um ataca por vez
+    TT.debug.start(2); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(true);
+    g.stage = Object.assign({}, g.stage, { sections: [] }); // sem ondas novas durante a medição
+    g.enemies.length = 0; g.tokens = 1;
+    const p = g.player;
+    for (let k = 0; k < 3; k++) { const e = new TT.ShockTrooper(g, p.x + 200 + k * 60, p.y + (k - 1) * 30); e.entering = false; e.cool = 0; g.addEnemy(e); }
+    let maxAtk = 0;
+    for (let t = 0; t < 600; t++) { g.step(); maxAtk = Math.max(maxAtk, g.enemies.filter((e) => e.kind === 'shock' && e.state === 'attack').length); }
+    TT.debug.god(false); g.enemies.length = 0;
+    out.maxSimultaneous = maxAtk;
+    return out;
+  });
+  ok('inimigo novo: estocada elétrica acerta após o aviso', shock.estocada.zone && shock.estocada.inside && shock.estocada.hitT >= shock.estocada.s, shock);
+  ok('inimigo novo: descarga no chão acerta após o aviso', shock.descarga.zone && shock.descarga.inside && shock.descarga.hitT >= shock.descarga.s, shock);
+  ok('inimigo novo respeita os tokens de ataque', shock.maxSimultaneous === 1, shock);
+
+  // 4b3) Fraqueza do Overload: após o teleporte fica com o chip exposto e leva dano dobrado
+  const weak = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(2); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const normal = h - b.hp;
+    b.startAttack(b.ATK.teleport);
+    for (let t = 0; t < 120 && b.state !== 'overheat'; t++) g.step();
+    const st = b.state;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const exposed = h - b.hp;
+    TT.debug.god(false);
+    return { st, normal, exposed };
+  });
+  ok('Overload: chip exposto após o teleporte (dano dobrado)', weak.st === 'overheat' && weak.exposed === weak.normal * 2, weak);
+
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
   const bossTele = await ev(() => {
     const g = TT.game;
-    const BOSS = { 0: 4, 1: 4, 2: 4 };
+    
     const runAtk = (stage, name, place) => {
-      TT.debug.start(stage); TT.debug.toSection(BOSS[stage]); TT.debug.god(false);
+      TT.debug.start(stage); TT.debug.toSection(4); TT.debug.god(false);
       let n = 0;
       while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
       const b = g.boss;
@@ -254,6 +302,17 @@ async page => {
       (b) => ({ x: b.x - 400, y: b.y + 30, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x - z.rx - 40, y: z.y }) }));
     C(1, 'drill', (b) => ({ x: b.x - 260, y: b.y }), (b) => ({ x: b.x - 260, y: b.y + 80 }));
     C(1, 'laser', (b) => ({ x: b.x - 600, y: b.y - 10 }), (b) => ({ x: b.x - 600, y: b.y + 60 }));
+    // Overload (fase 3)
+    C(2, 'bolt', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(2, 'puddles', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      // depois das poças marcadas, vai para um ponto fora de todas
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    C(2, 'teleport', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(2, 'ring', (b) => ({ x: b.x - 250, y: b.y }), (b) => ({ x: b.x - 80, y: b.y + 20 }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -274,7 +333,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 45000) {
+      while (g.state !== 'victory' && steps < 70000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -293,11 +352,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall, full);
+    ok('jogo completo (3 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:2') && full.seen.includes('clear:2'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1]) {
+  for (const st of [0, 1, 2]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

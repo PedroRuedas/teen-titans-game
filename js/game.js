@@ -98,7 +98,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const e = kind === 'drone' ? new TT.Drone(this, x, y) : new TT.Enemy(this, kind, x, y);
+      const e = kind === 'drone' ? new TT.Drone(this, x, y) : kind === 'shock' ? new TT.ShockTrooper(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
       return e;
@@ -180,6 +180,11 @@
         b = new TT.Cinderblock(this, this.camX + 900, 590);
         b.z = 520; b.vz = -2; b.facing = -1;
         this.introKind = 'fall';
+      } else if (sec.boss === 'overload') {
+        // surge de um raio no meio da arena
+        b = new TT.Overload(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'zap';
       } else {
         b = new TT.GizmoMech(this, this.camX + W + 200, 590);
         b.facing = -1;
@@ -190,7 +195,7 @@
       this.bossIntro = 170;
       this.bossShown = 0;
       this.banner = { text: b.name, sub: sec.intro, t: 0, dur: 160, boss: true };
-      A().playSong('boss');
+      A().playSong(this.stage.bossSong || 'boss');
       A().play('roar');
     }
     updateBossIntro() {
@@ -206,7 +211,13 @@
         this.dust(b.x, b.y, 14, '#c9b9a8');
         this.groundRing(b.x, b.y, '#ffe9a8');
       }
-      if (this.bossIntro === 0) { b.active = true; b.cool = 40; }
+      if (this.introKind === 'zap') {
+        const k = 170 - this.bossIntro;
+        if (k < 60 && k % 12 === 0) { this.particles.spawn('glow', b.x, b.y - 120, { size: 120, color: '#6fe3ff', life: 10 }); A().play('zap'); }
+        if (k === 60) { b.alpha = 1; this.impact(b.x, b.y, 'KRAKA-BOOM!', '#6fe3ff', 1.5); A().play('thunder'); }
+        if (k > 60 && k === 90) this.say(b, 'ENERGIA... MAIS ENERGIA!', '#bff6ff');
+      }
+      if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; }
     }
 
     onBossKilled(b) {
@@ -287,6 +298,11 @@
       this.hitSpark(t.x, hy, big, heroAtk && att.def ? att.def.fx : null);
       A().play(big ? 'hitHeavy' : 'hit');
       if (t.isProp) return;
+      if (d.shock && t.team === 'hero') {
+        // choque elétrico: faíscas ciano e "ZZT!"
+        for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-6, 6), vy: TT.rand(-6, 6), color: TT.choice(['#6fe3ff', '#ffffff', '#ffe14a']), size: 3, life: 12 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'ZZT!', size: 34, color: '#bff6ff', color2: '#2a7bff', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
       if (heroAtk) {
         this.energy = Math.min(100, this.energy + d.dmg * 0.4);
         this.combo++; this.comboT = 110;
@@ -745,6 +761,24 @@
           }
           ctx.globalCompositeOperation = 'source-over';
         }
+      } else if (this.stage.id === 3) {
+        // faíscas elétricas nos painéis e bobinas + piscar de luz ciano
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 5; i++) {
+          if (((f + i * 37) % 90) > 8) continue;
+          const wx = Math.floor((camX + 100) / 560) * 560 + i * 280 + 120, sx = wx - camX, sy = 360 + (i % 3) * 30;
+          if (sx < -50 || sx > W + 50) continue;
+          TT.drawArc(ctx, sx, sy, sx + TT.rand(-60, 60), sy + TT.rand(-40, 40), '#6fe3ff', 2);
+          TT.drawGlow(ctx, '#6fe3ff', sx, sy, 40, 0.6);
+        }
+        if (camX > 5600) for (let i = 0; i < 4; i++) { // arcos entre as bobinas do núcleo
+          if (((f + i * 23) % 50) > 6) continue;
+          const cx = Math.floor((camX + i * 400) / 400) * 400 + 200 - camX;
+          TT.drawArc(ctx, cx, 220, cx + TT.rand(-120, 120), 220 + TT.rand(-80, 40), '#bff6ff', 2.5, 8);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        const fl = (f % 240) < 4 ? 0.06 : 0;
+        if (fl) { ctx.fillStyle = 'rgba(120,230,255,' + fl + ')'; ctx.fillRect(0, 0, W, H); }
       } else {
         // poeira flutuando nos túneis
         ctx.fillStyle = 'rgba(255,220,170,0.35)';
@@ -1058,7 +1092,7 @@
         TT.computePose(t, t.pose);
         TT.drawRig(ctx, t.style, t.pose, xs[i], 560, 1, { t: t.animT + i * 9, scale: 1.1 });
       }
-      TT.drawText(ctx, 'Rascunho com 2 fases — mais fases em breve!', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
+      TT.drawText(ctx, 'Torre Titã • Perfuratriz do Terror • Usina de Energia — 3 fases concluídas!', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
       if (this.stateT > 120 && (f >> 5) % 2 === 0) TT.drawText(ctx, 'ENTER para voltar ao título', W / 2, 680, 26, '#9effa8', OUT, 'center', 5);
     }
   }

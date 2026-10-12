@@ -405,9 +405,270 @@
     });
   }
 
+  // =============================================================== FASE 3 — Usina de Energia
+  const S3_HALL = 2600, S3_CORE = 5750;
+
+  // Torre de transmissão em treliça (silhueta).
+  function pylon(g, x, base, h, col, lw) {
+    const w = h * 0.32;
+    g.strokeStyle = col; g.lineWidth = lw;
+    g.beginPath();
+    g.moveTo(x - w / 2, base); g.lineTo(x - w * 0.12, base - h); g.lineTo(x + w * 0.12, base - h); g.lineTo(x + w / 2, base);
+    for (let k = 1; k < 6; k++) {
+      const y = base - h * k / 6, hw = w / 2 - (w / 2 - w * 0.12) * k / 6, y2 = base - h * (k - 1) / 6, hw2 = w / 2 - (w / 2 - w * 0.12) * (k - 1) / 6;
+      g.moveTo(x - hw, y); g.lineTo(x + hw2, y2); g.moveTo(x + hw, y); g.lineTo(x - hw2, y2); g.moveTo(x - hw, y); g.lineTo(x + hw, y);
+    }
+    // braços com isoladores
+    for (const [yy, ww] of [[0.78, 0.9], [0.62, 0.75]]) { g.moveTo(x - w * ww, base - h * yy); g.lineTo(x + w * ww, base - h * yy); }
+    g.stroke();
+  }
+
+  function s3Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 420);
+    sky.addColorStop(0, '#060818'); sky.addColorStop(0.5, '#141a44'); sky.addColorStop(0.85, '#2c2a5e'); sky.addColorStop(1, '#4b3a6a');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 70, 71, (cx, r) => {
+      g.fillStyle = 'rgba(220,230,255,' + (0.25 + r() * 0.6) + ')';
+      const s = r() > 0.85 ? 3 : 2; g.fillRect(cx + r() * 70, r() * 260, s, s);
+    });
+    // lua
+    const mx = 980, my = 110;
+    if (x1 > mx - 160 && x0 < mx + 160) {
+      const gl = g.createRadialGradient(mx, my, 20, mx, my, 150);
+      gl.addColorStop(0, 'rgba(200,230,255,0.35)'); gl.addColorStop(1, 'rgba(120,160,255,0)');
+      g.fillStyle = gl; g.fillRect(mx - 160, my - 160, 320, 320);
+      g.beginPath(); g.arc(mx, my, 44, 0, Math.PI * 2); g.fillStyle = '#e8f0ff'; g.fill();
+      g.fillStyle = 'rgba(160,180,220,0.45)'; g.beginPath(); g.arc(mx - 12, my - 8, 9, 0, Math.PI * 2); g.arc(mx + 14, my + 12, 6, 0, Math.PI * 2); g.fill();
+    }
+    // brilho da cidade no horizonte
+    const hz = g.createLinearGradient(0, 300, 0, 420);
+    hz.addColorStop(0, 'rgba(90,200,255,0)'); hz.addColorStop(1, 'rgba(90,200,255,0.18)');
+    g.fillStyle = hz; g.fillRect(x0, 300, x1 - x0, 120);
+    // torres de resfriamento ao longe
+    cells(x0, x1, 520, 73, (cx, r) => {
+      const x = cx + r() * 200, w = 90 + r() * 50, h = 120 + r() * 60, base = 420;
+      g.fillStyle = '#1b1d3e';
+      g.beginPath(); g.moveTo(x, base); g.quadraticCurveTo(x + w * 0.22, base - h * 0.55, x + w * 0.12, base - h); g.lineTo(x + w * 0.88, base - h); g.quadraticCurveTo(x + w * 0.78, base - h * 0.55, x + w, base); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(180,200,255,0.12)';
+      for (let k = 0; k < 3; k++) { g.beginPath(); g.ellipse(x + w / 2 + k * 14, base - h - 16 - k * 22, 30 + k * 10, 12 + k * 4, 0, 0, Math.PI * 2); g.fill(); } // vapor
+      g.fillStyle = '#ff3a3a'; g.fillRect(x + w / 2 - 2, base - h - 4, 4, 4);
+    });
+    // linhas de transmissão ao longe
+    cells(x0, x1, 300, 75, (cx) => pylon(g, cx + 150, 420, 130, '#232650', 2.5));
+    g.strokeStyle = '#2a2d5a'; g.lineWidth = 1.5;
+    for (const yy of [318, 339]) {
+      g.beginPath();
+      for (let x = Math.floor(x0 / 300) * 300 + 150 - 300; x < x1 + 300; x += 300) { g.moveTo(x, yy); g.quadraticCurveTo(x + 150, yy + 26, x + 300, yy); }
+      g.stroke();
+    }
+    g.fillStyle = '#10122a'; g.fillRect(x0, 420, x1 - x0, H - 420);
+  }
+
+  function s3Mid(g, x0, x1) {
+    // prédios da usina: galpões de turbinas, chaminés e canos
+    cells(x0, x1, 420, 81, (cx, r) => {
+      const x = cx + r() * 60, w = 240 + r() * 100, h = 150 + r() * 90, base = 470;
+      g.fillStyle = '#1e2448'; g.fillRect(x, base - h, w, h);
+      g.fillStyle = '#262e5a'; g.fillRect(x, base - h, w, 14);
+      // janelas com luz ciano/amarela
+      for (let wy = base - h + 30; wy < base - 30; wy += 34) for (let wx = x + 16; wx < x + w - 30; wx += 40) {
+        const on = r();
+        g.fillStyle = on > 0.7 ? 'rgba(255,214,90,0.75)' : on > 0.4 ? 'rgba(90,220,255,0.6)' : 'rgba(40,50,90,0.9)';
+        g.fillRect(wx, wy, 22, 14);
+      }
+      // chaminé
+      if (r() > 0.4) {
+        const chx = x + w * 0.7, ch = 120 + r() * 80;
+        g.fillStyle = '#1a1f3d'; g.fillRect(chx, base - h - ch, 26, ch);
+        g.fillStyle = '#c83a3a'; g.fillRect(chx, base - h - ch + 10, 26, 8); g.fillRect(chx, base - h - ch + 40, 26, 8);
+      }
+    });
+    // canos grossos horizontais
+    g.fillStyle = '#2b335f'; g.fillRect(x0, 380, x1 - x0, 18);
+    g.fillStyle = '#3c4780'; g.fillRect(x0, 382, x1 - x0, 4);
+    cells(x0, x1, 210, 83, (cx) => { g.fillStyle = '#20264a'; g.fillRect(cx, 376, 14, 26); });
+    // torres de transmissão médias com cabos
+    cells(x0, x1, 640, 85, (cx) => pylon(g, cx + 320, 470, 230, '#14183a', 4));
+    g.strokeStyle = '#0e1130'; g.lineWidth = 2.5;
+    for (const yy of [290, 326]) {
+      g.beginPath();
+      for (let x = Math.floor(x0 / 640) * 640 + 320 - 640; x < x1 + 640; x += 640) { g.moveTo(x, yy); g.quadraticCurveTo(x + 320, yy + 50, x + 640, yy); }
+      g.stroke();
+    }
+  }
+
+  // Painel de alta tensão com placa de perigo.
+  function hvPanel(g, x, y, w, h) {
+    g.fillStyle = '#5a6278'; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
+    g.fillStyle = '#6c7590'; g.fillRect(x + 6, y + 6, w - 12, 10);
+    g.strokeStyle = '#3e4558'; g.lineWidth = 2;
+    for (let k = x + 14; k < x + w - 10; k += 14) { g.beginPath(); g.moveTo(k, y + h - 34); g.lineTo(k, y + h - 12); g.stroke(); } // grade
+    // placa triangular
+    const cx = x + w / 2, cy = y + h * 0.42, s = Math.min(w, h) * 0.26;
+    g.beginPath(); g.moveTo(cx, cy - s); g.lineTo(cx + s * 1.1, cy + s * 0.75); g.lineTo(cx - s * 1.1, cy + s * 0.75); g.closePath();
+    g.fillStyle = '#f2c12e'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+    g.fillStyle = OUT; g.beginPath(); // raio
+    g.moveTo(cx + s * 0.1, cy - s * 0.6); g.lineTo(cx - s * 0.3, cy + s * 0.1); g.lineTo(cx, cy + s * 0.1); g.lineTo(cx - s * 0.12, cy + s * 0.65); g.lineTo(cx + s * 0.32, cy - s * 0.05); g.lineTo(cx + s * 0.02, cy - s * 0.05); g.closePath(); g.fill();
+    // luzinhas
+    g.fillStyle = '#4cff9a'; g.fillRect(x + 10, y + h - 8, 6, 4); g.fillStyle = '#ff4a3a'; g.fillRect(x + 20, y + h - 8, 6, 4);
+  }
+
+  // Turbina gigante embutida na parede do galpão.
+  function turbine(g, cx, cy, R) {
+    g.fillStyle = '#2a3150'; g.strokeStyle = OUT; g.lineWidth = 5;
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#3a4470'; g.beginPath(); g.arc(cx, cy, R * 0.86, 0, Math.PI * 2); g.fill();
+    const gl = g.createRadialGradient(cx, cy, 4, cx, cy, R * 0.8);
+    gl.addColorStop(0, 'rgba(120,240,255,0.9)'); gl.addColorStop(0.3, 'rgba(60,180,255,0.45)'); gl.addColorStop(1, 'rgba(30,60,140,0)');
+    g.fillStyle = gl; g.beginPath(); g.arc(cx, cy, R * 0.8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#20263f'; g.strokeStyle = OUT; g.lineWidth = 3;
+    for (let k = 0; k < 6; k++) { // pás
+      const a = k * Math.PI / 3 + 0.3;
+      g.beginPath(); g.moveTo(cx, cy);
+      g.quadraticCurveTo(cx + Math.cos(a - 0.4) * R * 0.5, cy + Math.sin(a - 0.4) * R * 0.5, cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8);
+      g.quadraticCurveTo(cx + Math.cos(a + 0.25) * R * 0.45, cy + Math.sin(a + 0.25) * R * 0.45, cx, cy);
+      g.fill(); g.stroke();
+    }
+    g.fillStyle = '#c9d2e8'; g.beginPath(); g.arc(cx, cy, R * 0.14, 0, Math.PI * 2); g.fill(); g.stroke();
+    for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; g.fillStyle = '#8590b0'; g.beginPath(); g.arc(cx + Math.cos(a) * R * 0.93, cy + Math.sin(a) * R * 0.93, 3.5, 0, Math.PI * 2); g.fill(); }
+  }
+
+  // Bobina de Tesla (núcleo da usina).
+  function coil(g, x, base) {
+    g.fillStyle = '#3b4262'; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.fillRect(x - 40, base - 40, 80, 40); g.strokeRect(x - 40, base - 40, 80, 40);
+    g.fillStyle = '#b87333';
+    for (let y = base - 230; y < base - 40; y += 12) { g.fillRect(x - 22, y, 44, 8); }
+    g.strokeRect(x - 22, base - 232, 44, 192);
+    g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x - 18, base - 232, 8, 192);
+    g.beginPath(); g.ellipse(x, base - 250, 56, 22, 0, 0, Math.PI * 2); g.fillStyle = '#c9d2e8'; g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.ellipse(x - 14, base - 256, 22, 7, 0, 0, Math.PI * 2); g.fill();
+    const gl = g.createRadialGradient(x, base - 250, 10, x, base - 250, 140);
+    gl.addColorStop(0, 'rgba(120,240,255,0.35)'); gl.addColorStop(1, 'rgba(120,240,255,0)');
+    g.fillStyle = gl; g.fillRect(x - 140, base - 390, 280, 280);
+  }
+
+  function s3Near(g, x0, x1) {
+    // --- pátio externo: cerca, transformadores e painéis
+    if (x0 < S3_HALL) clipX(g, x0, Math.min(x1, S3_HALL), () => {
+      g.fillStyle = '#161a36'; g.fillRect(x0, 330, x1 - x0, FT - 330);
+      // cerca de arame
+      g.strokeStyle = 'rgba(150,170,220,0.35)'; g.lineWidth = 1.5;
+      for (let x = Math.floor(x0 / 18) * 18 - 200; x < x1 + 200; x += 18) { g.beginPath(); g.moveTo(x, 300); g.lineTo(x + 130, FT - 20); g.moveTo(x + 130, 300); g.lineTo(x, FT - 20); g.stroke(); }
+      cells(x0, x1, 160, 91, (cx) => { g.fillStyle = '#4a5270'; g.fillRect(cx, 290, 8, FT - 300); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(cx, 290, 8, FT - 300); });
+      g.strokeStyle = '#8c95b5'; g.lineWidth = 2;
+      for (let x = Math.floor(x0 / 24) * 24; x < x1; x += 24) { g.beginPath(); g.arc(x + 12, 292, 6, 0, Math.PI * 2); g.stroke(); } // arame farpado
+      // transformadores e painéis
+      cells(x0, x1, 560, 93, (cx, r) => {
+        if (cx + 500 > S3_HALL) return;
+        hvPanel(g, cx + 60, 340, 120, 120);
+        const tx = cx + 260;
+        g.fillStyle = '#4b5574'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.fillRect(tx, 300, 170, 160); g.strokeRect(tx, 300, 170, 160);
+        g.fillStyle = '#3a4260'; for (let k = tx + 12; k < tx + 160; k += 16) g.fillRect(k, 312, 8, 136); // aletas
+        for (const ix of [tx + 30, tx + 85, tx + 140]) { // isoladores
+          g.fillStyle = '#d9dde6'; for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(ix, 296 - k * 12, 12, 5, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke(); }
+        }
+        if (r() > 0.5) { g.fillStyle = '#f2c12e'; g.fillRect(tx + 50, 380, 70, 22); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(tx + 50, 380, 70, 22); TT.drawText(g, '13.8 kV', tx + 85, 391, 14, OUT); }
+      });
+    });
+    // --- galpão das turbinas
+    if (x1 > S3_HALL && x0 < S3_CORE) clipX(g, Math.max(x0, S3_HALL), Math.min(x1, S3_CORE), () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#12152c'); wall.addColorStop(1, '#262c50');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      // vigas e passarela
+      g.fillStyle = '#1b2040'; for (let x = Math.floor(x0 / 260) * 260; x < x1; x += 260) g.fillRect(x, 0, 24, FT);
+      g.fillStyle = '#2e3766'; g.fillRect(x0, 140, x1 - x0, 12);
+      g.strokeStyle = '#3c4780'; g.lineWidth = 2;
+      for (let x = Math.floor(x0 / 30) * 30; x < x1; x += 30) { g.beginPath(); g.moveTo(x, 152); g.lineTo(x, 180); g.stroke(); }
+      g.beginPath(); g.moveTo(x0, 180); g.lineTo(x1, 180); g.stroke();
+      // luzes de teto (amarelas)
+      cells(x0, x1, 330, 95, (cx) => {
+        if (cx < S3_HALL) return;
+        const gl = g.createRadialGradient(cx + 160, 60, 4, cx + 160, 140, 220);
+        gl.addColorStop(0, 'rgba(255,220,120,0.4)'); gl.addColorStop(1, 'rgba(255,200,90,0)');
+        g.fillStyle = gl; g.fillRect(cx - 60, 40, 440, 400);
+        g.fillStyle = '#ffe28a'; g.fillRect(cx + 140, 50, 40, 8);
+      });
+      // turbinas gigantes
+      cells(x0, x1, 700, 97, (cx, r) => {
+        if (cx < S3_HALL || cx + 400 > S3_CORE) return;
+        turbine(g, cx + 250, 330, 120);
+        hvPanel(g, cx + 450, 330, 110, 130);
+        if (r() > 0.4) { g.fillStyle = '#f2c12e'; g.fillRect(cx + 430, 230, 150, 50); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 430, 230, 150, 50); TT.drawText(g, 'ALTA TENSÃO', cx + 505, 256, 20, OUT); }
+      });
+      // cabos grossos pendurados
+      g.strokeStyle = '#0b0d1e'; g.lineWidth = 7;
+      cells(x0, x1, 380, 99, (cx, r) => {
+        if (cx < S3_HALL) return;
+        g.beginPath(); g.moveTo(cx, 160); g.quadraticCurveTo(cx + 190, 250 + r() * 60, cx + 380, 160); g.stroke();
+      });
+    });
+    // --- núcleo do reator (arena do Overload)
+    if (x1 > S3_CORE) clipX(g, Math.max(x0, S3_CORE), x1, () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#0a0c1c'); wall.addColorStop(1, '#1b2448');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      // grade hexagonal ciano na parede
+      g.strokeStyle = 'rgba(80,220,255,0.14)'; g.lineWidth = 2;
+      for (let y = 60; y < FT; y += 40) for (let x = Math.floor(x0 / 46) * 46 + ((y / 40) % 2) * 23; x < x1 + 46; x += 46) {
+        g.beginPath(); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.lineTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); } g.closePath(); g.stroke();
+      }
+      cells(x0, x1, 400, 101, (cx) => { if (cx >= S3_CORE - 100) coil(g, cx + 200, FT - 2); });
+      g.fillStyle = '#f2c12e'; g.fillRect(Math.max(x0, S3_CORE), 40, x1, 8);
+    });
+    // borda entre pátio e galpão
+    if (x0 < S3_HALL + 30 && x1 > S3_HALL - 30) {
+      g.fillStyle = '#3a4370'; g.fillRect(S3_HALL - 16, 0, 32, FT);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(S3_HALL - 16, -4, 32, FT + 4);
+    }
+    // piso metálico com chapas, grade e faixas de perigo
+    const fl = g.createLinearGradient(0, FT, 0, H);
+    fl.addColorStop(0, '#4a536e'); fl.addColorStop(0.5, '#363d56'); fl.addColorStop(1, '#232838');
+    g.fillStyle = fl; g.fillRect(x0, FT, x1 - x0, H - FT);
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0, FT, x1 - x0, 8);
+    for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) { // faixa amarela e preta
+      g.fillStyle = (x / 40) % 2 ? '#f2c12e' : '#1c1a1e';
+      g.beginPath(); g.moveTo(x, FT + 8); g.lineTo(x + 20, FT + 8); g.lineTo(x + 40, FT + 20); g.lineTo(x + 20, FT + 20); g.fill();
+    }
+    g.strokeStyle = 'rgba(20,24,40,0.55)'; g.lineWidth = 2;
+    for (const y of [540, 610, 680]) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+    for (let x = Math.floor(x0 / 160) * 160; x < x1 + 160; x += 160) { g.beginPath(); g.moveTo(x, FT + 20); g.lineTo(x - 60, H); g.stroke(); }
+    cells(x0, x1, 160, 103, (cx, r) => {
+      g.fillStyle = 'rgba(140,160,210,0.35)';
+      for (const [px, py] of [[cx + 12, 548], [cx + 140, 548], [cx + 12, 602], [cx + 140, 602]]) g.fillRect(px, py, 4, 4); // rebites
+      if (r() > 0.55) { // grade de ventilação com luz ciano
+        const gx = cx + 40 + r() * 60, gy = 560 + r() * 80;
+        g.fillStyle = '#1a1e2e'; g.fillRect(gx, gy, 70, 26);
+        g.fillStyle = 'rgba(90,220,255,0.35)'; for (let k = 0; k < 5; k++) g.fillRect(gx + 4 + k * 13, gy + 4, 8, 18);
+        g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(gx, gy, 70, 26);
+      }
+      if (r() > 0.6) { // cabo no chão
+        g.strokeStyle = '#111422'; g.lineWidth = 6;
+        g.beginPath(); g.moveTo(cx, 650 + r() * 30); g.bezierCurveTo(cx + 50, 630, cx + 100, 690, cx + 160, 660); g.stroke();
+      }
+    });
+  }
+
+  // Primeiro plano: colunas de cano e cabos pendurados
+  function s3Fg(g, x0, x1) {
+    cells(x0, x1, 1400, 107, (cx) => {
+      const x = cx + 700;
+      g.fillStyle = '#1e2440'; g.fillRect(x, 0, 44, H);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 44, H + 8);
+      g.fillStyle = 'rgba(90,220,255,0.18)'; g.fillRect(x + 6, 0, 6, H);
+      g.fillStyle = '#f2c12e'; for (let y = 120; y < H; y += 220) g.fillRect(x - 4, y, 52, 12);
+    });
+  }
+
   TT.makeBackground = function (id) {
     if (id === 1) {
       return { layers: [new Layer(0.1, s1Far, 1), new Layer(0.35, s1Mid, 2), new Layer(1, s1Near, 3)], fg: null, id };
+    }
+    if (id === 3) {
+      return { layers: [new Layer(0.1, s3Far, 8), new Layer(0.38, s3Mid, 9), new Layer(1, s3Near, 10)], fg: new Layer(1.18, s3Fg, 11), id };
     }
     return { layers: [new Layer(0.12, s2Far, 4), new Layer(0.4, s2Mid, 5), new Layer(1, s2Near, 6)], fg: new Layer(1.18, s2Fg, 7), id };
   };

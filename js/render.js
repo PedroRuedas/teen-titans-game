@@ -322,6 +322,7 @@
     // braço da frente + arma
     limb(ctx, sF[0], sF[1], pose.armF[0], pose.armF[1], st.armL[0], st.armL[1], st.armW, st.arm, st.glove, st.handR, st.hand, false, handF, st.armOpt);
     if (pose.weapon === 'staff') drawStaff(ctx, handF, pose.armF[1]);
+    else if (pose.weapon === 'baton' || st.baton) drawBaton(ctx, handF, pose.armF[1], pose.weapon === 'baton');
     if (st.drawFront) st.drawFront(ctx, P, handF, handB);
     if (pose.glow && !FLASH) {
       TT.drawGlow(ctx, pose.glow, handF.ex, handF.ey, 26, 0.9);
@@ -339,6 +340,20 @@
     ctx.strokeStyle = C('#b9c0cc'); ctx.lineWidth = 4; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x2 - dx * 8, y2 - dy * 8); ctx.lineTo(x2, y2);
     ctx.strokeStyle = C('#e9edf3'); ctx.lineWidth = 4; ctx.stroke();
+  }
+
+  // Bastão elétrico dos soldados da fase 3 (ponta ciano brilhante; mais forte ao atacar).
+  function drawBaton(ctx, h, a, hot) {
+    const dx = Math.sin(a), dy = Math.cos(a);
+    const x1 = h.ex - dx * 8, y1 = h.ey - dy * 8, x2 = h.ex + dx * 40, y2 = h.ey + dy * 40;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 9; ctx.stroke();
+    ctx.strokeStyle = C('#5c6476'); ctx.lineWidth = 5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(h.ex + dx * 6, h.ey + dy * 6);
+    ctx.strokeStyle = C('#1c1c22'); ctx.lineWidth = 6; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2 - dx * 10, y2 - dy * 10); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = C('#bff6ff'); ctx.lineWidth = 6; ctx.stroke();
+    if (!FLASH) TT.drawGlow(ctx, '#6fe3ff', x2, y2, hot ? 26 : 14, hot ? 1 : 0.7);
   }
 
   // ------------------------------------------------------------ Rostos
@@ -739,6 +754,31 @@
         ctx.moveTo(-r * 0.1, -r * 0.35); ctx.lineTo(r * 1.04, -r * 0.3); ctx.lineTo(r * 0.98, r * 0.12); ctx.lineTo(-r * 0.05, r * 0.1); ctx.closePath();
         ctx.fillStyle = '#ffd23a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(r * 0.1, -r * 0.25, r * 0.5, r * 0.08);
+      }
+      mouth(ctx, r, pose, r * 0.5, r * 0.55);
+    },
+  });
+
+  // Soldado elétrico da H.I.V.E. (fase 3): uniforme escuro, visor ciano e bastão elétrico.
+  S.hiveShock = mkStyle({
+    skin: '#e8b98f', torso: '#3a3f50', arm: '#3a3f50', glove: '#f2c12e', hand: '#f2c12e', leg: '#2e3342', boot: '#1c1c22', baton: true,
+    legOpt: { sole: '#6fe3ff' },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#f2c12e'; ctx.fillRect(-20, -9, 40, 6);
+      ctx.fillStyle = '#6fe3ff'; ctx.fillRect(-20, -th + 4, 40, 3);
+      ctx.beginPath(); ctx.moveTo(-2, -th + 8); ctx.lineTo(6, -th + 8); ctx.lineTo(1, -th + 16); ctx.lineTo(7, -th + 16); ctx.lineTo(-4, -th + 28); ctx.lineTo(0, -th + 19); ctx.lineTo(-5, -th + 19); ctx.closePath();
+      ctx.fillStyle = '#f2c12e'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.2; ctx.stroke();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e8b98f');
+      ctx.beginPath(); ctx.arc(0, -r * 0.05, r * 1.06, Math.PI * 0.82, Math.PI * 2.05); ctx.closePath();
+      ctx.fillStyle = C('#2a2e3a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#f2c12e'; ctx.fillRect(-r * 0.7, -r * 0.95, r * 0.4, r * 0.3); // antena de cobre
+        ctx.beginPath(); ctx.moveTo(-r * 0.1, -r * 0.35); ctx.lineTo(r * 1.04, -r * 0.3); ctx.lineTo(r * 0.98, r * 0.12); ctx.lineTo(-r * 0.05, r * 0.1); ctx.closePath();
+        ctx.fillStyle = '#6fe3ff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(r * 0.1, -r * 0.25, r * 0.5, r * 0.08);
       }
       mouth(ctx, r, pose, r * 0.5, r * 0.55);
     },

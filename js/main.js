@@ -13,6 +13,11 @@
       const c = [];
       if (z.k === 'rect') {
         c.push({ x: p.x, y: z.y - z.d - 26 }, { x: p.x, y: z.y + z.d + 26 });
+      } else if (z.k === 'ring') {
+        // anel: entra no furo do meio ou sai pela borda de fora
+        const dx = p.x - z.x, dy = (p.y - z.y) / z.ry, d = Math.hypot(dx, dy) || 1;
+        for (const r of [z.r0 - 40, z.r1 + 40]) c.push({ x: z.x + dx / d * r, y: z.y + dy / d * r * z.ry });
+        c.push({ x: z.x + (dx >= 0 ? 1 : -1) * (z.r0 - 40), y: z.y }, { x: z.x + (dx >= 0 ? 1 : -1) * (z.r1 + 40), y: z.y });
       } else {
         const ky = Math.sqrt(Math.max(0, 1 - Math.pow((p.x - z.x) / z.rx, 2))) * z.ry;
         const kx = Math.sqrt(Math.max(0, 1 - Math.pow((p.y - z.y) / z.ry, 2))) * z.rx;
@@ -74,6 +79,7 @@
           if (!aligned) this.down.add(crate.y > p.y ? 'down' : 'up');
           if (crate.x - p.x > 70) this.down.add('right');
           else if (crate.x < p.x) this.down.add('left');
+          else if (p.facing < 0) this.down.add('right'); // vira para a caixa antes de bater
           else if (aligned && this.t % 8 === 0) this.press('light');
           return;
         }
