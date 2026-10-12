@@ -105,7 +105,8 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
 - A trilha das fases e do título é a **abertura de Teen Titans**, num arranjo sintetizado feito de
   memória. Os chefes têm músicas próprias.
 - Por enquanto só a **Ravena fala**: "Azarath Metrion Zinthos!" no especial. O jogo toca
-  `audio/vozes/ravena-azarath.mp3`; se o arquivo não existir, usa a voz sintetizada do navegador.
+  `audio/vozes/ravena-azarath.mp3` (recortado da dublagem brasileira de *O Contrato de Judas*); se o
+  arquivo não existir, usa a voz sintetizada do navegador.
   Os outros Titãs só mostram o balão de fala.
 - Para usar a **música original** ou mais falas reais, coloque os arquivos (mp3/ogg/wav) na pasta
   `audio/` e escreva os caminhos em `audio/arquivos.js`. Se algum não for encontrado, o jogo volta
