@@ -371,7 +371,10 @@ async page => {
     ok('bot vence o chefe da fase ' + (st + 1) + ' sem trapaça (NORMAL)', r.result === 'clear', r);
   }
 
-  // 6b) CO-OP LOCAL (2 jogadores)
+  // 6b) CO-OP LOCAL (2 jogadores) — recarrega a página para não herdar estado dos testes anteriores
+  await page.goto('http://localhost:8765/?coop=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.debug);
+  await sleep(400);
   await ev(() => { TT.paused = false; TT.debug.bot(false); TT.debug.god(false); TT.game.state = 'title'; TT.game.stateT = 50; TT.game.menuIdx = 0; TT.game.setPlayers(1); });
   await sleep(100);
   await page.keyboard.press('ArrowDown'); await sleep(60);
