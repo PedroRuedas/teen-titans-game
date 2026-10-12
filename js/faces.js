@@ -14,6 +14,11 @@
     if (lw !== 0) { ctx.strokeStyle = INK; ctx.lineWidth = lw || LW; ctx.stroke(p); }
   }
   function line(ctx, d, lw, col) { ctx.strokeStyle = col || INK; ctx.lineWidth = lw || LW; ctx.stroke(P(d)); }
+  // reflexos do cabelo recortados dentro das mechas (não vazam para fora)
+  function shine(ctx, clips, d, col) {
+    if (FL) return;
+    for (const c of clips) { ctx.save(); ctx.clip(P(c)); line(ctx, d, 5, col); ctx.restore(); }
+  }
   // sombra chapada recortada dentro de um caminho
   function shadow(ctx, clipD, shD, col) {
     if (FL) return;
@@ -108,16 +113,20 @@
   TT.FACES = F;
 
   // ------------------------------------------------------------------ Robin
+  const R_BACK = 'M 88 -50 C 96 -70 98 -92 90 -114 C 80 -102 66 -98 54 -100 C 48 -126 30 -144 4 -154 C 6 -130 -2 -118 -12 -112 ' +
+    'C -34 -134 -66 -144 -102 -140 C -82 -122 -70 -110 -66 -102 C -98 -106 -130 -96 -158 -72 C -124 -70 -104 -64 -94 -56 ' +
+    'C -120 -46 -140 -24 -152 6 C -122 -10 -106 -12 -94 -10 C -106 6 -112 30 -110 54 C -92 34 -80 24 -72 20 L -40 -20 L 40 -70 Z';
+  const R_CAP = 'M 94 -50 C 80 -62 52 -64 30 -58 C 6 -52 -18 -42 -38 -24 C -46 -12 -50 10 -46 34 C -66 36 -84 24 -88 0 ' +
+    'C -94 -60 -50 -104 0 -106 C 50 -108 88 -88 94 -50 Z';
   F.robin = function (ctx, pose) {
-    const skin = '#f4c39e';
-    // cabelo de trás: espetado e jogado para trás
-    fill(ctx, 'M 66 -64 L 96 -84 L 70 -92 L 80 -126 L 46 -108 L 34 -146 L 8 -112 L -20 -144 L -32 -104 L -76 -124 L -68 -80 L -124 -86 L -88 -50 L -128 -26 L -86 -18 L -106 16 L -66 4 L -54 30 L -40 -10 L -10 -50 L 40 -62 Z', '#16161c');
+    const skin = '#f4c39e', hair = '#16161c';
+    // cabelo de trás: mechas grandes e pontudas jogadas para trás
+    fill(ctx, R_BACK, hair);
     baseHead(ctx, skin);
-    fill(ctx, 'M -86 2 C -92 -50 -62 -92 -18 -98 L -30 -40 L -46 -10 L -44 34 C -62 36 -82 24 -86 2 Z', '#16161c'); // nuca
+    // touca do cabelo sobre o crânio e a nuca (linha da testa alta, puxada para trás)
+    fill(ctx, R_CAP, hair);
+    shine(ctx, [R_BACK, R_CAP], 'M 72 -86 Q 40 -104 4 -130 M 20 -92 Q -30 -110 -80 -124 M -40 -74 Q -90 -78 -132 -70 M -66 -40 Q -100 -30 -128 -6', '#4c5a86');
     fill(ctx, EAR, skin, 6); line(ctx, EAR_IN, 4.5, SKIN_SH(skin));
-    // franja: mechas pontudas sobre a testa
-    fill(ctx, 'M -50 -12 C -62 -70 -24 -108 26 -106 C 66 -104 92 -84 104 -58 L 86 -60 L 98 -38 L 70 -56 L 64 -34 L 44 -60 L 30 -40 L 18 -66 L -6 -46 L -12 -70 L -30 -40 Z', '#16161c');
-    if (!FL) line(ctx, 'M -4 -76 Q 30 -88 62 -78 M -60 -60 Q -46 -86 -14 -98', 5, '#5f6f9c'); // brilho azulado
     line(ctx, NOSE, 5.5);
     // máscara preta com pontas e lentes brancas
     fill(ctx, 'M 2 -14 L -18 -42 L 14 -36 C 36 -46 70 -48 100 -36 L 102 -6 C 90 8 72 12 60 4 C 54 12 46 14 38 12 C 22 18 8 10 2 -14 Z', '#141318', 0);
@@ -147,18 +156,25 @@
   };
 
   // ------------------------------------------------------------------ Mutano
+  const B_BACK = 'M 84 -48 C 98 -66 104 -82 100 -102 C 88 -92 76 -90 66 -92 C 66 -114 56 -130 40 -140 C 34 -120 26 -110 16 -106 ' +
+    'C 4 -128 -16 -138 -42 -140 C -32 -120 -32 -108 -36 -100 C -60 -110 -88 -108 -112 -96 C -90 -84 -80 -76 -76 -68 ' +
+    'C -98 -62 -112 -46 -120 -28 C -98 -32 -86 -32 -78 -30 L -40 -20 L 40 -60 Z';
+  const B_CAP = 'M 94 -40 C 86 -52 72 -52 62 -56 C 64 -46 62 -40 56 -34 C 50 -44 40 -50 30 -52 C 28 -44 24 -38 16 -34 ' +
+    'C 10 -44 -2 -50 -16 -48 C -32 -44 -44 -32 -52 -16 C -64 -22 -76 -16 -84 -4 C -92 -52 -56 -104 2 -106 C 54 -108 90 -84 94 -40 Z';
   F.beastboy = function (ctx, pose) {
-    const skin = '#7cc444';
-    // orelha pontuda bem grande (lado de perto)
-    fill(ctx, 'M -40 -14 L -156 -76 L -50 40 Z', skin, 6.5);
-    if (!FL) fill(ctx, 'M -54 -2 L -122 -54 L -58 24 Z', '#5f9e33', 0);
+    const skin = '#7cc444', hair = '#2a6a1a';
+    // tufos de trás: espetados para cima e para trás
+    fill(ctx, B_BACK, hair);
     baseHead(ctx, skin);
-    // cabelo verde-escuro espetado
-    fill(ctx, 'M -60 -10 L -76 -46 L -110 -54 L -74 -76 L -82 -110 L -42 -92 L -26 -134 L 0 -98 L 30 -128 L 40 -92 L 76 -104 L 72 -70 L 104 -60 L 88 -42 C 60 -56 30 -60 0 -54 C -24 -48 -44 -32 -60 -10 Z', '#2a6a1a');
-    if (!FL) line(ctx, 'M -40 -80 Q -10 -98 24 -90', 5, '#76c14a');
+    // touca com franja espetada caindo sobre a testa
+    fill(ctx, B_CAP, hair);
+    shine(ctx, [B_BACK, B_CAP], 'M 60 -80 Q 40 -100 24 -120 M -6 -86 Q -30 -104 -52 -120 M -52 -64 Q -80 -76 -100 -84', '#62b23c');
+    // orelha pontuda bem grande saindo do lado da cabeça
+    fill(ctx, 'M -52 -8 C -90 -40 -132 -66 -172 -86 C -142 -50 -104 -8 -60 36 Z', skin, 6.5);
+    if (!FL) fill(ctx, 'M -64 2 C -94 -26 -122 -48 -148 -64 C -122 -36 -96 -6 -66 22 Z', '#5f9e33', 0);
     line(ctx, NOSE, 5.5);
-    eye(ctx, 32, -6, pose, { rx: 20, ry: 23, iris: '#2d8a1f', irisK: 0.56, look: 0.3, brow: 'M 8 -40 L 52 -34', browW: 6 });
-    eye(ctx, 82, -8, pose, { rx: 12, ry: 21, iris: '#2d8a1f', irisK: 0.52, look: 0.2, brow: 'M 72 -36 L 96 -40', browW: 5.5 });
+    eye(ctx, 32, -4, pose, { rx: 20, ry: 23, iris: '#2d8a1f', irisK: 0.56, look: 0.3, brow: 'M 8 -36 L 52 -30', browW: 6 });
+    eye(ctx, 82, -6, pose, { rx: 12, ry: 21, iris: '#2d8a1f', irisK: 0.52, look: 0.2, brow: 'M 72 -34 L 96 -38', browW: 5.5 });
     mouth(ctx, 58, 58, pose, { grin: true, fang: true });
   };
 
@@ -193,29 +209,32 @@
   };
 
   // ------------------------------------------------------------------ Ravena
-  const HOOD = 'M 10 -150 C 80 -148 130 -96 128 -10 C 126 60 96 112 40 124 C -20 136 -100 110 -130 50 C -150 -10 -130 -90 -80 -126 C -56 -142 -24 -152 10 -150 Z';
+  // capuz: silhueta atrás da cabeça e borda da frente envolvendo o rosto por trás
+  const HOOD = 'M 20 -138 C 80 -138 114 -96 112 -30 C 110 40 90 100 40 116 C -20 130 -100 108 -126 50 C -146 -8 -128 -86 -80 -118 C -56 -132 -20 -140 20 -138 Z';
+  const HOOD_FRONT = 'M 100 -86 C 70 -136 -40 -140 -92 -94 C -128 -58 -136 10 -112 62 C -92 104 -54 120 -8 120 C -30 96 -44 68 -46 40 ' +
+    'C -50 0 -48 -40 -24 -76 C 4 -112 64 -116 104 -96 Z';
+  const RV_HAIR = 'M -64 76 C -92 20 -94 -64 -42 -94 C 8 -118 82 -104 102 -54 L 102 -40 L 78 -40 C 70 -52 62 -58 56 -58 C 50 -58 42 -50 36 -40 ' +
+    'L -6 -40 C -26 -16 -28 30 -26 84 Z';
   F.raven = function (ctx, pose, opt) {
-    const skin = '#c9c3d7', hair = '#4b3182';
-    if (!opt || !opt.noHood) {
-      fill(ctx, HOOD, '#2a3a9e');
-      shadow(ctx, HOOD, 'M -160 -160 L -40 -160 C -60 -40 -50 60 -20 160 L -160 160 Z', '#1d2878');
-      if (!FL) { ctx.fillStyle = '#10153f'; ctx.fill(P('M 14 -126 C 70 -124 108 -84 108 -16 C 108 50 82 96 36 106 C -14 116 -80 96 -104 46 C -122 -2 -108 -70 -66 -102 C -44 -118 -14 -128 14 -126 Z')); }
-    }
+    const skin = '#c9c3d7', hair = '#46307a', hood = !opt || !opt.noHood;
+    if (hood) fill(ctx, HOOD, '#10153f');
     baseHead(ctx, skin);
-    // cabelo violeta curto (chanel), franja reta na altura das sobrancelhas
-    fill(ctx, 'M -70 70 C -96 20 -96 -60 -46 -90 C 0 -116 70 -104 98 -60 C 104 -48 102 -30 98 -22 L 84 -30 L 78 -20 L 60 -32 L 48 -24 L 34 -34 L 16 -28 L 2 -34 C -26 -20 -34 20 -30 80 Z', hair);
-    if (!FL) line(ctx, 'M -52 -64 Q -10 -96 50 -86', 5, '#8e6bd6');
-    // chakra
-    if (!FL) { ctx.fillStyle = '#e0233f'; ctx.beginPath(); ctx.ellipse(58, -46, 5.5, 7, 0, 0, TAU); ctx.fill(); }
+    // cabelo violeta liso (chanel) com franja reta repartida no meio, deixando o chakra à mostra
+    fill(ctx, RV_HAIR, hair);
+    shine(ctx, [RV_HAIR], 'M -50 -60 Q -6 -96 56 -88 M -60 -6 Q -66 30 -56 60', '#7a5cc4');
+    if (!FL) { ctx.fillStyle = '#e0233f'; ctx.beginPath(); ctx.ellipse(56, -44, 6, 7.5, 0, 0, TAU); ctx.fill(); } // chakra
     line(ctx, NOSE, 5);
-    eye(ctx, 34, -2, pose, { rx: 19, ry: 17, iris: '#6a45b8', irisK: 0.58, pupil: '#2b1f55', look: 0.28, lid: skin, lidK: 0.42, lidW: 7.5,
-      brow: 'M 12 -26 Q 32 -34 54 -26', browCol: '#3a2470', browW: 4.5 });
-    eye(ctx, 82, -4, pose, { rx: 11, ry: 16, iris: '#6a45b8', irisK: 0.54, pupil: '#2b1f55', look: 0.2, lid: skin, lidK: 0.42, lidW: 7,
-      brow: 'M 72 -28 Q 84 -34 96 -28', browCol: '#3a2470', browW: 4 });
-    mouth(ctx, 60, 62, pose);
-    if (!opt || !opt.noHood) { // borda do capuz na frente da testa
-      ctx.strokeStyle = INK; ctx.lineWidth = 22; ctx.stroke(P('M -96 -60 C -60 -128 60 -138 112 -60'));
-      ctx.strokeStyle = FL ? '#ffffff' : '#34469e'; ctx.lineWidth = 13; ctx.stroke(P('M -96 -60 C -60 -128 60 -138 112 -60'));
+    // olhos amendoados grandes, íris violeta e pálpebras pesadas
+    eye(ctx, 32, 2, pose, { rx: 24, ry: 21, iris: '#5c3fa6', irisDark: '#3a2672', irisK: 0.56, pupil: '#1a1238', look: 0.26, lid: skin, lidK: 0.34, lidW: 8,
+      brow: 'M 8 -22 Q 32 -30 58 -24', browCol: '#2e1d5c', browW: 4.5 });
+    eye(ctx, 84, 0, pose, { rx: 13, ry: 19, iris: '#5c3fa6', irisDark: '#3a2672', irisK: 0.52, pupil: '#1a1238', look: 0.18, lid: skin, lidK: 0.34, lidW: 7,
+      brow: 'M 74 -24 Q 86 -30 98 -24', browCol: '#2e1d5c', browW: 4 });
+    if (!FL && pose.eyes !== 'shut' && pose.eyes !== 'x') line(ctx, 'M 14 18 Q 32 26 52 16 M 76 16 Q 84 20 94 15', 3, '#7b6f92'); // linha de baixo
+    mouth(ctx, 60, 64, pose);
+    if (hood) {
+      fill(ctx, HOOD_FRONT, '#2a3a9e', 7);
+      shadow(ctx, HOOD_FRONT, 'M -160 -40 L -70 -40 C -80 20 -60 80 -20 140 L -160 140 Z', '#1d2878');
+      shine(ctx, [HOOD_FRONT], 'M 70 -116 Q 0 -132 -70 -102', '#4256c0');
     }
   };
 
