@@ -540,6 +540,18 @@ async page => {
   ok('Ravena e Estelar atacam com aura nas mãos e círculo mágico', anims.ravenAura > 0.9 && anims.ravenCircle > 0.5 && anims.starAura > 0.9, anims);
   ok('Ciborgue usa o punho-pistão e Ravena flutua', anims.cyPiston > 0.9 && anims.ravenHover < -8, anims);
 
+  // Capa do Robin com física: pendurada parada, esvoaça para trás ao correr
+  const capeT = await ev(() => {
+    TT.paused = true; const g = TT.game;
+    TT.debug.start(0); TT.debug.step(60);
+    const p = g.player, tip = () => (p.cape[p.cape.length - 1].x - p.x) * p.facing;
+    const idleTip = tip(), idleDrop = p.cape[p.cape.length - 1].y - p.cape[0].y;
+    g.input.bot = { down: new Set(['right']), pressed: new Set() }; TT.debug.step(40); g.input.bot = null;
+    return { idleTip: Math.round(idleTip), idleDrop: Math.round(idleDrop), runTip: Math.round(tip()), faces: Object.keys(TT.FACES).length };
+  });
+  ok('capa do Robin com física (pendurada parada, esvoaça correndo)', capeT.idleDrop > 40 && capeT.runTip < capeT.idleTip - 15, capeT);
+  ok('rostos vetoriais dos 5 Titãs', capeT.faces === 5, capeT);
+
   // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca)
   const allFrames = await ev(() => {
     TT.paused = true; const g = TT.game; const before = (TT.errors || []).length;

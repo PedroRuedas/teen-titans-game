@@ -662,6 +662,40 @@
       return super.takeHit(src, d, dir);
     }
 
+    physics() {
+      super.physics();
+      if (this.style.capeSim) this.updateCape();
+    }
+
+    // Capa com física de tecido: corrente de pontos (Verlet) presa no ombro, com gravidade e vento.
+    updateCape() {
+      const st = this.style, sc = st.scale, N = 7, seg = 10.5 * sc;
+      const ax = this.x - this.facing * 3 * sc, ay = this.y - this.z - (st.legL[0] + st.legL[1] + st.torsoH - 6) * sc;
+      let c = this.cape;
+      if (!c || Math.abs(c[0].x - ax) > 80 || Math.abs(c[0].y - ay) > 80) { // (re)cria pendurada atrás do corpo
+        c = this.cape = [];
+        for (let i = 0; i < N; i++) c.push({ x: ax - this.facing * i * 3, y: ay + i * seg, px: ax - this.facing * i * 3, py: ay + i * seg });
+      }
+      const t = this.animT, run = Math.min(1, Math.abs(this.vx) / 5);
+      for (let i = 1; i < N; i++) {
+        const p = c[i], vx = (p.x - p.px) * 0.9, vy = (p.y - p.py) * 0.9;
+        p.px = p.x; p.py = p.y;
+        const flutter = Math.sin(t * 0.22 + i * 0.9) * (0.25 + run * 0.6) * (i / N);
+        p.x += vx - this.facing * (0.08 + run * 0.35) * (i / N) + flutter;
+        p.y += vy + 0.55 - Math.abs(flutter) * 0.4;
+        const floor = this.y - 2; if (p.y > floor) p.y = floor;
+      }
+      c[0].x = c[0].px = ax; c[0].y = c[0].py = ay;
+      for (let k = 0; k < 4; k++) { // mantém o comprimento de cada segmento
+        for (let i = 1; i < N; i++) {
+          const a = c[i - 1], b = c[i], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.001, f = (d - seg) / d;
+          if (i === 1) { b.x -= dx * f; b.y -= dy * f; }
+          else { a.x += dx * f * 0.5; a.y += dy * f * 0.5; b.x -= dx * f * 0.5; b.y -= dy * f * 0.5; }
+        }
+        c[0].x = ax; c[0].y = ay;
+      }
+    }
+
     // Chamas dos propulsores do Ciborgue.
     jets(g) {
       g.particles.spawn('glow', this.x + TT.rand(-8, 8), this.y - this.z - 4, { color: SONIC, size: 22, life: 8, vy: 2 });
@@ -692,7 +726,7 @@
       } else {
         if (this.state === 'dash' && this.key === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
-        TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: fl, t: this.animT, out: this.rigOut });
+        TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: fl, t: this.animT, out: this.rigOut, cape: this.cape, camX });
       }
       ctx.globalAlpha = 1;
       // efeitos de ataque (feixes, garras de energia, rastros de movimento)

@@ -66,7 +66,8 @@ Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
 | **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
 
 Os modelos seguem o traço da **série animada de 2003** (a mesma do jogo de PS2): corpos esguios,
-rostos de queixo fino, contorno preto e sombra chapada em dois tons.
+rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos são arte vetorial
+(caminhos SVG em `js/faces.js`) e a capa do Robin tem física de tecido.
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.
@@ -110,6 +111,7 @@ index.html        página do jogo
 js/util.js        constantes, matemática, teclado e gamepad
 js/audio.js       efeitos e músicas sintetizados
 js/render.js      modelos (rig sombreado), rostos e formas animais
+js/faces.js       rostos dos Titãs em arte vetorial (caminhos SVG)
 js/anim.js        animações: quadros-chave, locomoção e golpes de cada Titã
 js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
@@ -128,7 +130,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 77 verificações e todas passam:
+página e chame a função serve.) A suíte tem 79 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
