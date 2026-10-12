@@ -281,11 +281,13 @@
   }
 
   function spawnBolt(f, g, big) {
+    // no chão sai da mão; no ar sai um pouco acima e desce na diagonal até a altura do peito dos inimigos
+    const z0 = f.z > 0 ? f.z + Math.min(handZ(f, 62), 45) : handZ(f, 62);
     g.addProjectile(new Projectile(g, {
       kind: big ? 'bigbolt' : 'starbolt', team: 'hero', owner: f,
-      x: f.x + f.facing * 48, y: f.y, z: f.z + handZ(f, 62), vx: f.facing * (big ? 11 : 13),
+      x: f.x + f.facing * 48, y: f.y, z: z0, vx: f.facing * (big ? 11 : 13),
       r: big ? 24 : 14, dmg: big ? 17 : 8, kb: big ? 8 : 3, knockdown: big, launch: 6, life: 70, color: GREEN,
-      vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
+      vz: f.z > 0 ? -(z0 - 60) / 6 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
     }));
     A().play('starbolt');
   }

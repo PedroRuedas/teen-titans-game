@@ -65,8 +65,8 @@ Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
 | **Ravena** | **flutua** e desliza, levita no pulo, vira **corvo de alma** na esquiva | **mãos de energia negra com círculo mágico**, e no fim abre um **portal** de onde sai a garra | corvo de energia | *"Azarath Metrion Zinthos!"* |
 | **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
 
-Os modelos seguem o visual de **Jovens Titãs em Ação!**: cabeças grandes, corpos pequenos,
-cores chapadas e contorno grosso.
+Os modelos seguem o traço da **série animada de 2003** (a mesma do jogo de PS2): corpos esguios,
+rostos de queixo fino, contorno preto e sombra chapada em dois tons.
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.
