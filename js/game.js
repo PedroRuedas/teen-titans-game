@@ -22,6 +22,9 @@
       this.titleBg = TT.makeBackground(1);
       this.titleTitans = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
       this.showControls = false;
+      const sd = TT.store.get('dificuldade', 'normal');
+      this.difficulty = TT.DIFFICULTY[sd] ? sd : 'normal';
+      this.menuIdx = 0; this.pauseIdx = 0;
       this.resetWorld();
       this.stageIdx = 0;
       this.drawables = [];
@@ -29,6 +32,21 @@
     }
 
     get player() { return this.team[this.activeIdx]; }
+    get diff() { return TT.DIFFICULTY[this.difficulty]; }
+
+    // Troca a dificuldade (dir = +1/-1) e salva a escolha.
+    setDifficulty(key) {
+      if (!TT.DIFFICULTY[key]) return;
+      this.difficulty = key;
+      TT.store.set('dificuldade', key);
+    }
+    cycleDifficulty(dir) {
+      const o = TT.DIFF_ORDER, i = o.indexOf(this.difficulty);
+      this.setDifficulty(o[(i + dir + o.length) % o.length]);
+      A().play('select');
+    }
+    // Tokens de ataque simultâneo (mínimo 1).
+    baseTokens(n) { return Math.max(1, n + this.diff.tokens); }
 
     resetWorld() {
       this.enemies = [];
@@ -42,7 +60,7 @@
       this.shake = 0; this.hitstop = 0; this.slowmo = 0;
       this.energy = 30; this.flashEnergy = 0;
       this.combo = 0; this.comboT = 0;
-      this.tokens = 2;
+      this.tokens = this.baseTokens(2);
       this.banner = null;
       this.boss = null; this.bossShown = 0;
       this.drill = null;
@@ -104,7 +122,7 @@
           if (--this.waveDelay === 0) {
             const wave = sec.waves[this.waveIdx];
             wave.forEach((k, i) => this.spawnEnemy(k, i, wave.length));
-            this.tokens = this.waveIdx === 0 ? 2 : 3;
+            this.tokens = this.baseTokens(this.waveIdx === 0 ? 2 : 3);
           }
           return;
         }
@@ -133,7 +151,7 @@
       this.chaseT = 0;
       this.banner = { text: 'CORRAM!', sub: 'A perfuratriz da H.I.V.E. está vindo!', t: 0, dur: 140 };
       A().play('alarm');
-      this.tokens = 3;
+      this.tokens = this.baseTokens(3);
     }
     updateChase(sec) {
       this.chaseT++;
@@ -256,9 +274,9 @@
 
     onEnemyKilled(e) {
       this.score += (e.def && e.def.score) || 100;
-      const r = Math.random();
-      if (r < 0.12) this.addPickup(new TT.Pickup(this, e.x, e.y, 'pizza'));
-      else if (r < 0.2) this.addPickup(new TT.Pickup(this, e.x, e.y, 'energy'));
+      const r = Math.random(), pz = 0.12 * this.diff.pizza;
+      if (r < pz) this.addPickup(new TT.Pickup(this, e.x, e.y, 'pizza'));
+      else if (r < pz + 0.08) this.addPickup(new TT.Pickup(this, e.x, e.y, 'energy'));
     }
 
     onTitanKO(t) {
@@ -383,9 +401,7 @@
       switch (this.state) {
         case 'title': this.updateTitle(inp); break;
         case 'play': this.updatePlay(inp); break;
-        case 'pause':
-          if (inp.wasPressed('menu')) { this.state = 'play'; }
-          break;
+        case 'pause': this.updatePause(inp); break;
         case 'gameover':
           this.particles.update();
           if (this.stateT > 60 && inp.wasPressed('menu')) { this.score = this.stageStartScore; this.startStage(this.stageIdx); }
@@ -399,19 +415,36 @@
           break;
         case 'victory':
           this.updateCelebration();
-          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; A().playSong('title'); }
+          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; A().playSong('title'); }
           break;
         default: break;
       }
       inp.endStep();
     }
 
+    // Itens do menu do título.
+    titleItems() { return ['play', 'diff', 'controls']; }
+
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
       if (!this.titleSong) { A().playSong('title'); this.titleSong = true; }
-      if (inp.wasPressed('heavy') || inp.wasPressed('special')) this.showControls = !this.showControls;
-      if (this.stateT > 20 && (inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light'))) {
-        A().init(); A().play('select');
+      const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
+      if (this.showControls) {
+        if (inp.wasPressed('heavy') || inp.wasPressed('special') || ok || inp.wasPressed('pause')) this.showControls = false;
+        return;
+      }
+      if (inp.wasPressed('heavy') || inp.wasPressed('special')) { this.showControls = true; return; }
+      const items = this.titleItems(), n = items.length;
+      if (inp.wasPressed('up')) { this.menuIdx = (this.menuIdx + n - 1) % n; A().play('select'); }
+      if (inp.wasPressed('down')) { this.menuIdx = (this.menuIdx + 1) % n; A().play('select'); }
+      const it = items[this.menuIdx] || 'play';
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      if (lr && it === 'diff') this.cycleDifficulty(lr);
+      if (this.stateT > 20 && ok) {
+        A().init();
+        if (it === 'diff') { this.cycleDifficulty(1); return; }
+        if (it === 'controls') { this.showControls = true; A().play('select'); return; }
+        A().play('select');
         this.score = 0;
         this.startStage(0);
       }
@@ -422,8 +455,24 @@
       this.particles.update();
     }
 
+    // Menu de pausa: continuar / dificuldade.
+    updatePause(inp) {
+      if (inp.wasPressed('pause')) { this.state = 'play'; return; }
+      const n = 2;
+      if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; A().play('select'); }
+      if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; A().play('select'); }
+      if (this.pauseIdx === 1) {
+        if (inp.wasPressed('left')) this.cycleDifficulty(-1);
+        if (inp.wasPressed('right')) this.cycleDifficulty(1);
+      }
+      if (inp.wasPressed('menu') || inp.wasPressed('light')) {
+        if (this.pauseIdx === 0) this.state = 'play';
+        else this.cycleDifficulty(1);
+      }
+    }
+
     updatePlay(inp) {
-      if (inp.wasPressed('pause')) { this.state = 'pause'; return; }
+      if (inp.wasPressed('pause')) { this.state = 'pause'; this.pauseIdx = 0; return; }
       if (this.banner) { this.banner.t++; if (this.banner.t > this.banner.dur) this.banner = null; }
       if (this.whiteFlash > 0) this.whiteFlash--;
       if (this.flashEnergy > 0) this.flashEnergy--;
@@ -451,7 +500,8 @@
 
       const p = this.player;
       // Titãs fora de campo recuperam vida devagar
-      for (const t of this.team) if (t !== p && !t.ko && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + 0.05);
+      const rg = 0.05 * this.diff.regen;
+      for (const t of this.team) if (t !== p && !t.ko && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + rg);
 
       p.think(inp);
       p.physics();
@@ -817,19 +867,62 @@
         const t = this.titleTitans[i];
         t.anim = (Math.floor(f / 90) % 5 === i) ? 'victory' : 'idle';
         t.vx = 0;
-        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], 560, 46, 12, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], 515, 44, 11, 0, 0, Math.PI * 2); ctx.fill();
         TT.computePose(t, t.pose);
-        TT.drawRig(ctx, t.style, t.pose, xs[i], 560, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.35 });
-        TT.drawText(ctx, t.name.toUpperCase(), xs[i], 600, 24, t.def.color, OUT, 'center', 5);
+        TT.drawRig(ctx, t.style, t.pose, xs[i], 515, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.25 });
+        TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
       }
-      if (this.showControls) this.drawControls(ctx, W / 2, 400);
-      else if ((f >> 5) % 2 === 0) TT.drawText(ctx, 'PRESSIONE ENTER PARA COMEÇAR', W / 2, 660, 34, '#ffe14a', OUT, 'center', 7);
-      if (!this.showControls) TT.drawText(ctx, 'K = ver controles   •   M = som', W / 2, 700, 18, '#bfc4e8', OUT, 'center', 4);
+      if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
+      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 588, 31);
+      TT.drawText(ctx, '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som', W / 2, 706, 16, '#bfc4e8', OUT, 'center', 4);
+    }
+
+    // Texto e cor de cada item de menu.
+    menuLabel(it) {
+      const df = this.diff;
+      switch (it) {
+        case 'play': return { text: 'JOGAR' };
+        case 'resume': return { text: 'CONTINUAR' };
+        case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
+        case 'controls': return { text: 'CONTROLES' };
+        default: return { text: String(it) };
+      }
+    }
+
+    // Menu vertical; o item selecionado pulsa e mostra setas ‹ › nos valores ajustáveis.
+    drawMenu(ctx, items, sel, cx, y0, gap) {
+      const f = this.frame;
+      items.forEach((it, i) => {
+        const y = y0 + i * gap, on = i === sel;
+        const size = on ? 28 : 24;
+        ctx.font = size + 'px ' + TT.FONT;
+        const lw = ctx.measureText(it.text).width;
+        const vw = it.value ? ctx.measureText(it.value).width + 44 : 0;
+        const total = lw + (it.value ? 14 + vw : 0);
+        let x = cx - total / 2;
+        if (on) {
+          ctx.fillStyle = 'rgba(255,225,74,' + (0.16 + 0.08 * Math.sin(f * 0.15)) + ')';
+          ctx.fillRect(cx - total / 2 - 30, y - size * 0.62, total + 60, size * 1.24);
+          const ax = cx - total / 2 - 22 + Math.sin(f * 0.2) * 3;
+          ctx.beginPath(); ctx.moveTo(ax, y - 9); ctx.lineTo(ax + 12, y); ctx.lineTo(ax, y + 9); ctx.closePath();
+          ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+        }
+        TT.drawText(ctx, it.text, x, y, size, on ? '#ffe14a' : '#ffffff', OUT, 'left', 5);
+        if (it.value) {
+          x += lw + 14;
+          const col = it.color || '#9effa8';
+          for (const [ax, d] of [[x + 6, -1], [x + vw - 6, 1]]) {
+            ctx.beginPath(); ctx.moveTo(ax - d * 5, y - 8); ctx.lineTo(ax + d * 5, y); ctx.lineTo(ax - d * 5, y + 8); ctx.closePath();
+            ctx.fillStyle = on ? col : '#9a95b8'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+          }
+          TT.drawText(ctx, it.value, x + vw / 2, y, size, col, OUT, 'center', 5);
+        }
+      });
     }
 
     drawControls(ctx, cx, cy) {
       ctx.fillStyle = 'rgba(10,6,30,0.9)';
-      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(cx - 360, cy - 150, 720, 330, 20); else ctx.rect(cx - 360, cy - 150, 720, 330); ctx.fill();
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(cx - 360, cy - 150, 720, 350, 20); else ctx.rect(cx - 360, cy - 150, 720, 350); ctx.fill();
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.stroke();
       TT.drawText(ctx, 'CONTROLES', cx, cy - 118, 34, '#ffe14a', OUT);
       const rows = [
@@ -846,14 +939,15 @@
         TT.drawText(ctx, r[0], cx - 330, cy - 74 + i * 32, 22, '#ffffff', OUT, 'left', 4);
         TT.drawText(ctx, r[1], cx + 330, cy - 74 + i * 32, 22, '#9effa8', OUT, 'right', 4);
       });
-      TT.drawText(ctx, 'Controle (gamepad) também funciona!', cx, cy + 162, 18, '#bfc4e8', OUT, 'center', 4);
+      TT.drawText(ctx, 'Controle (gamepad) também funciona!', cx, cy + 180, 18, '#bfc4e8', OUT, 'center', 4);
     }
 
     drawPause(ctx) {
       ctx.fillStyle = 'rgba(5,0,20,0.6)'; ctx.fillRect(0, 0, W, H);
-      TT.drawText(ctx, 'PAUSA', W / 2, 150, 80, '#ffe14a', OUT, 'center', 12);
+      TT.drawText(ctx, 'PAUSA', W / 2, 92, 72, '#ffe14a', OUT, 'center', 12);
+      this.drawMenu(ctx, ['resume', 'diff'].map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, 168, 38);
       this.drawControls(ctx, W / 2, 400);
-      TT.drawText(ctx, 'ESC / ENTER para continuar', W / 2, 600, 24, '#ffffff', OUT, 'center', 5);
+      TT.drawText(ctx, 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar a dificuldade', W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
     }
 
     drawGameOver(ctx) {

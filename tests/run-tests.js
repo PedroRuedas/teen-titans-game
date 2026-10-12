@@ -17,6 +17,31 @@ async page => {
 
   // 1) Tela de título e início com teclado real
   ok('título carregado', await ev(() => TT.game.state === 'title'));
+
+  // 1a) Dificuldade: menu do título com teclado, persistência e falha do storage
+  await ev(() => { TT.game.setDifficulty('normal'); TT.game.menuIdx = 0; });
+  await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowRight'); await sleep(60);
+  const dTitle = await ev(() => ({ d: TT.game.difficulty, idx: TT.game.menuIdx, saved: localStorage.getItem('jovensTitas.dificuldade') }));
+  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 1 && dTitle.saved === 'hard', dTitle);
+  await page.reload(); await page.waitForFunction(() => window.TT && TT.debug); await sleep(300);
+  const dReload = await ev(() => TT.game.difficulty);
+  ok('dificuldade: escolha persiste ao recarregar', dReload === 'hard', dReload);
+  const dFail = await ev(() => {
+    const orig = Storage.prototype.setItem, origGet = Storage.prototype.getItem;
+    Storage.prototype.setItem = () => { throw new Error('bloqueado'); };
+    Storage.prototype.getItem = () => { throw new Error('bloqueado'); };
+    let err = null;
+    try { TT.game.setDifficulty('easy'); TT.store.get('dificuldade', 'normal'); } catch (e) { err = String(e); }
+    const d = TT.game.difficulty;
+    Storage.prototype.setItem = orig; Storage.prototype.getItem = origGet;
+    return { err, d, fallback: (() => { Storage.prototype.getItem = () => { throw 1; }; const v = TT.store.get('x', 'def'); Storage.prototype.getItem = origGet; return v; })() };
+  });
+  ok('dificuldade: jogo funciona com storage bloqueado', !dFail.err && dFail.d === 'easy' && dFail.fallback === 'def', dFail);
+  await ev(() => { TT.game.menuIdx = 1; });
+  await page.keyboard.press('ArrowRight'); await sleep(60); // fácil -> normal
+  await page.keyboard.press('ArrowUp'); await sleep(60);
+  ok('dificuldade: volta para NORMAL e cursor em JOGAR', await ev(() => TT.game.difficulty === 'normal' && TT.game.menuIdx === 0));
   await page.keyboard.press('Enter');
   await sleep(100);
   await page.keyboard.press('Enter');
@@ -42,6 +67,48 @@ async page => {
   ok('pausa (Esc)', await ev(() => TT.game.state === 'pause'));
   await page.keyboard.press('Escape'); await sleep(80);
   ok('despausa (Esc)', await ev(() => TT.game.state === 'play'));
+  // dificuldade pelo menu de pausa
+  await page.keyboard.press('Escape'); await sleep(80);
+  await page.keyboard.press('KeyS'); await sleep(60);
+  await page.keyboard.press('KeyA'); await sleep(60);
+  const dPause = await ev(() => ({ d: TT.game.difficulty, st: TT.game.state, idx: TT.game.pauseIdx }));
+  await page.keyboard.press('KeyD'); await sleep(60);
+  await page.keyboard.press('Escape'); await sleep(80);
+  const dPause2 = await ev(() => ({ d: TT.game.difficulty, st: TT.game.state }));
+  ok('dificuldade: trocar no menu de pausa', dPause.d === 'easy' && dPause.st === 'pause' && dPause2.d === 'normal' && dPause2.st === 'play', { dPause, dPause2 });
+
+  // 2b) Multiplicadores de dificuldade aplicados (NORMAL = balanceamento original)
+  const diffs = await ev(() => {
+    const g = TT.game, out = {};
+    TT.paused = true;
+    for (const k of TT.DIFF_ORDER) {
+      g.setDifficulty(k);
+      TT.debug.start(0); TT.debug.step(2);
+      const hive = new TT.Enemy(g, 'hive', 0, 600), slade = new TT.Enemy(g, 'slade', 0, 600), drone = new TT.Drone(g, 0, 600);
+      const cb = new TT.Cinderblock(g, 0, 600), gz = new TT.GizmoMech(g, 0, 600);
+      const t = g.team[2]; t.invul = 0;
+      const h0 = t.hp; t.takeHit({ x: t.x - 10, dmgMul: 1 }, { dmg: 10 }); const dmg = +(h0 - t.hp).toFixed(2);
+      // regeneração fora de campo em 100 passos
+      const off = g.team[3]; off.hp = 50; TT.debug.step(100); const regen = +(off.hp - 50).toFixed(2);
+      hive.atk = { def: hive.def.attacks[0] }; hive.endAttack();
+      const res = { hive: hive.maxHp, slade: slade.maxHp, drone: drone.maxHp, cinder: cb.maxHp, gizmo: gz.maxHp,
+        swipe: cb.ATK.swipe.s, pound: cb.ATK.pound.s, charge: cb.ATK.charge.s, throw: cb.ATK.throw.s, drill: gz.ATK.drill.s, laser: gz.ATK.laser.s,
+        dmg, regen, tokens: [g.baseTokens(2), g.baseTokens(3)], pizza: +(0.12 * g.diff.pizza).toFixed(3), hiveCool: hive.cool };
+      g.enemies.length = 0;
+      out[k] = res;
+    }
+    g.setDifficulty('normal');
+    return out;
+  });
+  const N = diffs.normal, E = diffs.easy, Hd = diffs.hard;
+  ok('dificuldade NORMAL igual ao balanceamento original',
+    N.hive === 42 && N.slade === 70 && N.drone === 26 && N.cinder === 900 && N.gizmo === 1000 && N.swipe === 28 && N.pound === 32 &&
+    N.charge === 30 && N.throw === 26 && N.drill === 34 && N.laser === 40 && N.dmg === 10 && N.regen === 5 && N.tokens[0] === 2 && N.tokens[1] === 3 &&
+    N.pizza === 0.12 && N.hiveCool >= 50 && N.hiveCool <= 100, N);
+  ok('dificuldade FÁCIL: menos vida/dano, aviso mais longo, mais pizza e cura',
+    E.hive < N.hive && E.cinder < N.cinder && E.dmg < N.dmg && E.swipe > N.swipe && E.laser > N.laser && E.pizza > N.pizza && E.regen > N.regen && E.tokens[1] < N.tokens[1] && E.hiveCool > 50, E);
+  ok('dificuldade DIFÍCIL: mais vida/dano, aviso mais curto, mais tokens',
+    Hd.hive > N.hive && Hd.gizmo > N.gizmo && Hd.dmg > N.dmg && Hd.swipe < N.swipe && Hd.drill < N.drill && Hd.pizza < N.pizza && Hd.regen < N.regen && Hd.tokens[1] > N.tokens[1] && Hd.hiveCool <= 100 / 1.4, Hd);
 
   // 3) Todos os golpes de todos os Titãs (passo a passo, sem tempo real)
   const moves = await ev(() => {

@@ -44,6 +44,28 @@
     return v;
   };
 
+  // ---------------------------------------------------------------- Dificuldade
+  // Multiplicadores centralizados. NORMAL = balanceamento original (tudo 1).
+  //  enemyHp/bossHp: vida; dmg: dano recebido pelos Titãs; aggr: agressividade (divide os cooldowns
+  //  dos inimigos); tokens: ataques simultâneos extras; windup: duração do aviso dos chefes;
+  //  bossCool: intervalo entre golpes dos chefes; pizza: chance de dropar vida; regen: cura fora de campo.
+  TT.DIFFICULTY = {
+    easy: { name: 'FÁCIL', color: '#5dff8a', enemyHp: 0.75, bossHp: 0.8, dmg: 0.6, aggr: 0.7, tokens: -1, windup: 1.45, bossCool: 1.3, pizza: 1.8, regen: 2.5 },
+    normal: { name: 'NORMAL', color: '#ffe14a', enemyHp: 1, bossHp: 1, dmg: 1, aggr: 1, tokens: 0, windup: 1, bossCool: 1, pizza: 1, regen: 1 },
+    hard: { name: 'DIFÍCIL', color: '#ff5a4a', enemyHp: 1.3, bossHp: 1.3, dmg: 1.4, aggr: 1.4, tokens: 1, windup: 0.72, bossCool: 0.75, pizza: 0.5, regen: 0.4 },
+  };
+  TT.DIFF_ORDER = ['easy', 'normal', 'hard'];
+
+  // Armazenamento local tolerante a falhas (modo privado, storage bloqueado...).
+  TT.store = {
+    get(k, def) {
+      try { const v = window.localStorage.getItem('jovensTitas.' + k); return v == null ? def : v; } catch (e) { return def; }
+    },
+    set(k, v) {
+      try { window.localStorage.setItem('jovensTitas.' + k, String(v)); return true; } catch (e) { return false; }
+    },
+  };
+
   TT.makeCanvas = function (w, h) {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.ceil(w));

@@ -513,6 +513,9 @@
       this.game.combo = 0;
     }
 
+    // Dano recebido escala com a dificuldade (NORMAL = 1).
+    get dmgTaken() { return this.game.diff.dmg; }
+
     takeHit(src, d, dir) {
       if (this.game.godMode) return false;
       if (this.state === 'dash' && this.st < 11) return false;
@@ -610,9 +613,9 @@
       this.kind = kind;
       this.def = ENEMIES[kind];
       this.style = TT.STYLES[this.def.style];
-      this.hp = this.maxHp = this.def.hp;
+      this.hp = this.maxHp = Math.round(this.def.hp * game.diff.enemyHp);
       this.team = 'enemy';
-      this.cool = TT.randi(30, 80);
+      this.cool = TT.randi(30, 80) / game.diff.aggr;
       this.token = false;
       this.wait = TT.rand(170, 260);
       this.yOff = TT.rand(-50, 50);
@@ -626,7 +629,7 @@
       super.endAttack();
       if (next != null) { this.startAttack(this.def.attacks[next]); return; }
       this.releaseToken();
-      this.cool = TT.randi(50, 100) / this.def.aggr;
+      this.cool = TT.randi(50, 100) / (this.def.aggr * this.game.diff.aggr);
     }
     think() {
       if (this.commonStates()) return;
@@ -667,11 +670,11 @@
       super(game, x, y);
       this.kind = 'drone';
       this.team = 'enemy';
-      this.hp = this.maxHp = 26;
+      this.hp = this.maxHp = Math.round(26 * game.diff.enemyHp);
       this.radius = 22; this.height = 70;
       this.hover = 26; this.z = this.hover;
       this.grav = 0;
-      this.cool = TT.randi(60, 120);
+      this.cool = TT.randi(60, 120) / game.diff.aggr;
       this.side = Math.random() < 0.5 ? -1 : 1;
       this.shadowW = 20;
       this.charge = 0;
@@ -709,7 +712,7 @@
         if (--this.charge === 0) {
           g.addProjectile(new Projectile(g, { kind: 'laser', team: 'enemy', owner: this, x: this.x + this.facing * 26, y: this.y, z: this.z + 34, vx: this.facing * 9, r: 10, dmg: 8, kb: 3, life: 140 }));
           A().play('laser');
-          this.cool = TT.randi(110, 170);
+          this.cool = TT.randi(110, 170) / g.diff.aggr;
         }
         return;
       }
@@ -764,6 +767,18 @@
       this.isBoss = true;
       this.active = false; // fica parado durante a apresentação
     }
+    // Aplica a dificuldade: vida e duração do aviso (wind-up) de cada ataque.
+    // Os onFrame usam this.s (o "s" já escalado), nunca números fixos.
+    applyDifficulty() {
+      const df = this.game.diff;
+      this.hp = this.maxHp = Math.round(this.maxHp * df.bossHp);
+      for (const k in this.ATK) {
+        const d = this.ATK[k];
+        d.s0 = d.s;
+        d.s = Math.max(6, Math.round(d.s * df.windup));
+      }
+    }
+    nextCool(a, b) { return Math.round(TT.randi(a, b) * this.game.diff.bossCool); }
     onArmorHit(dmg, d) {
       this.poise += dmg * (d.big ? 1.6 : 1);
       if (this.poise > this.poiseMax && this.state !== 'attack') {
@@ -828,17 +843,18 @@
       this.def = { score: 5000 };
       this.ATK = {
         swipe: { pose: 'swing', s: 28, a: 6, r: 26, dmg: 16, reach: [0, 175], depth: 55, kb: 11, knockdown: true, launch: 7, sound0: 'roar',
-          onFrame(f, t, g) { if (t === 28) { g.shake = 8; A().play('hitHeavy'); } } },
+          onFrame(f, t, g) { if (t === this.s) { g.shake = 8; A().play('hitHeavy'); } } },
         pound: { pose: 'slam', s: 32, a: 2, r: 34,
           onFrame(f, t, g) {
-            if (t === 8) { f.vz = 11; f.z = 1; }
-            if (t === 32) { g.shake = 18; A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy')); g.dust(f.x, f.y, 14, '#b9aa9a'); }
+            if (t === Math.max(2, this.s - 24)) { f.vz = 11; f.z = 1; }
+            if (t === this.s) { g.shake = 18; A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy')); g.dust(f.x, f.y, 14, '#b9aa9a'); }
           } },
         charge: { pose: 'cross', s: 30, a: 54, r: 30, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 10.5, sound0: 'roar',
           onFrame(f, t, g) {
-            if (t > 30 && t < 84 && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#b9aa9a'); g.shake = Math.max(g.shake, 3); }
+            const run = t > this.s && t < this.s + this.a;
+            if (run && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#b9aa9a'); g.shake = Math.max(g.shake, 3); }
             const L = g.camX + 70, R = g.camX + TT.W - 70;
-            if (t > 30 && t < 84 && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
+            if (run && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
               // bate na parede e fica atordoado
               f.x = TT.clamp(f.x, L, R); f.atk = null; g.shake = 20; A().play('boom');
               g.debrisBurst(f.x + f.facing * 60, f.y - 120, 12, '#8e8880');
@@ -848,7 +864,7 @@
         throw: { pose: 'throw', s: 26, a: 1, r: 26,
           onFrame(f, t, g) {
             if (t === 4) g.debrisBurst(f.x, f.y - 10, 6, '#8e8880');
-            if (t === 26) {
+            if (t === this.s) {
               const p = g.player; if (!p) return;
               const T = 48, z0 = 190, gr = 0.6;
               g.addProjectile(new Projectile(g, {
@@ -860,6 +876,7 @@
             }
           } },
       };
+      this.applyDifficulty();
     }
     think() {
       if (this.commonBoss()) return;
@@ -880,7 +897,7 @@
         else if (Math.abs(dy) < 50 && adx > 300) pick = Math.random() < 0.6 ? 'charge' : 'throw';
         else pick = TT.choice(['throw', 'pound', 'throw']);
         this.startAttack(this.ATK[pick]);
-        this.cool = p2 ? TT.randi(40, 70) : TT.randi(70, 110);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 110);
       }
     }
     draw(ctx, camX) {
@@ -914,16 +931,16 @@
       this.ATK = {
         drill: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 8, dmg: 6, rehit: 8, reach: [40, 210], depth: 48, kb: 4, stun: 14, sound0: 'drill',
           onFrame(f, t, g) {
-            f.drillSpin += t < 34 ? 0.2 + t * 0.02 : 1.1;
-            if (t >= 34 && t < 68 && t % 4 === 0) { A().play('drill'); g.particles.spawn('spark', f.x + f.facing * 200, f.y - 90, { vx: f.facing * TT.rand(3, 9), vy: TT.rand(-6, 1), color: '#ffcf5a', size: 3, life: 14, grav: 0.4 }); }
-            if (t === 60) f.atk.def = f.ATK.drillEnd;
+            f.drillSpin += t < this.s ? 0.2 + t * 0.02 : 1.1;
+            if (t >= this.s && t < this.s + this.a && t % 4 === 0) { A().play('drill'); g.particles.spawn('spark', f.x + f.facing * 200, f.y - 90, { vx: f.facing * TT.rand(3, 9), vy: TT.rand(-6, 1), color: '#ffcf5a', size: 3, life: 14, grav: 0.4 }); }
+            if (t === this.s + 26) f.atk.def = f.ATK.drillEnd;
           } },
         drillEnd: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 6, dmg: 9, reach: [40, 210], depth: 48, kb: 9, knockdown: true, launch: 6 },
         missiles: { pose: 'castUp', s: 24, a: 1, r: 40,
           onFrame(f, t, g) {
             if (t === 1) A().play('alarm');
             const n = f.phase2() ? 7 : 4;
-            if (t >= 24 && t < 24 + n * 6 && (t - 24) % 6 === 0) {
+            if (t >= this.s && t < this.s + n * 6 && (t - this.s) % 6 === 0) {
               const p = g.player; if (!p) return;
               const tx = TT.clamp(p.x + TT.rand(-160, 160), g.camX + 60, g.camX + TT.W - 60);
               const ty = TT.clamp(p.y + TT.rand(-60, 60), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4);
@@ -933,7 +950,7 @@
           } },
         drones: { pose: 'castUp', s: 20, a: 1, r: 30,
           onFrame(f, t, g) {
-            if (t === 20) {
+            if (t === this.s) {
               for (let i = 0; i < 2; i++) {
                 const d = new Drone(g, f.x + TT.rand(-40, 40), f.y + (i ? 30 : -30));
                 d.z = 160; d.vz = 0;
@@ -944,6 +961,7 @@
           } },
         laser: { pose: 'beam', s: 40, a: 34, r: 24, dmg: 5, rehit: 6, reach: [60, 1300], depth: 24, kb: 3, zr: 50, sound: 'sonic' },
       };
+      this.applyDifficulty();
     }
     think() {
       this.drillSpin += 0.05;
@@ -969,7 +987,7 @@
         if (p2 && Math.abs(p.y - this.y) < 40) opts.push('laser');
         const pick = TT.choice(opts);
         this.startAttack(this.ATK[pick]);
-        this.cool = p2 ? TT.randi(45, 75) : TT.randi(70, 110);
+        this.cool = p2 ? this.nextCool(45, 75) : this.nextCool(70, 110);
         if (Math.random() < 0.25) g.say(this, TT.choice(this.taunts), '#9effa8');
       }
     }
