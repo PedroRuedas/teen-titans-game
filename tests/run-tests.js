@@ -503,6 +503,23 @@ async page => {
   });
   ok('desempenho (>= 50 fps, render médio < 2ms)', perf.fps >= 50 && perf.avgRenderMs < 2, perf);
 
+  // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca)
+  const allFrames = await ev(() => {
+    TT.paused = true; const g = TT.game; const before = (TT.errors || []).length;
+    TT.debug.start(0); TT.debug.god(true); TT.debug.toSection(1); TT.debug.step(60);
+    for (let i = 0; i < 5; i++) {
+      g.switchCool = 0; g.switchTo(i, true); TT.debug.step(20);
+      for (const seq of [['light', 'light', 'light'], ['heavy'], ['special'], ['jump', 'light'], ['dash', 'light']]) {
+        g.energy = 100;
+        for (const b of seq) { g.input.pressed.add(b); for (let f = 0; f < 14; f++) { g.step(); g.render(); } }
+        for (let f = 0; f < 90; f++) { g.step(); g.render(); }
+      }
+    }
+    TT.debug.god(false);
+    return { errors: (TT.errors || []).length - before, comp: g.ctx.globalCompositeOperation, alpha: g.ctx.globalAlpha };
+  });
+  ok('todos os golpes renderizam quadro a quadro sem erro (raio do Ciborgue)', allFrames.errors === 0 && allFrames.comp === 'source-over' && allFrames.alpha === 1, allFrames);
+
   ok('nenhum erro de JavaScript', errors.length === 0 && (await ev(() => (TT.errors || []).length)) === 0, errors.slice(0, 5));
   await ev(() => { TT.paused = false; TT.debug.start(0); TT.game.state = 'title'; });
   const failed = results.filter((r) => !r.pass).length;

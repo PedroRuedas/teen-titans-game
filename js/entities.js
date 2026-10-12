@@ -639,8 +639,9 @@
       const ox = sx + fc * (eyes ? 16 : 66) * sc;
       const oy = sy - (eyes ? 106 : 84) * sc;
       const len = d.reach[1];
-      const k = a.t - d.s, fade = Math.min(1, (d.a - k) / 6), grow = Math.min(1, (k + 1) / 4);
+      const k = a.t - d.s, fade = TT.clamp((d.a - k) / 6, 0, 1), grow = Math.min(1, (k + 1) / 4);
       const L = len * grow;
+      if (fade <= 0) return; // feixe já terminou (evita raios negativos no canvas)
       const w = (eyes ? 13 : 46) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
       const col = eyes ? GREEN : SONIC;
       ctx.save();

@@ -130,7 +130,12 @@
         acc -= STEP; n++;
       }
       if (n === 5) acc = 0;
-      try { game.render(); } catch (e) { reportError(e); }
+      try { game.render(); } catch (e) { reportError(e); resetCanvas(); }
+    }
+    // Após um erro de desenho a pilha save/restore fica desbalanceada: zera o contexto do canvas.
+    function resetCanvas() {
+      const ctx = game.ctx;
+      if (ctx.reset) ctx.reset(); else game.canvas.width = game.canvas.width;
     }
     let errShown = false;
     function reportError(e) {
