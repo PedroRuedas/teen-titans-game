@@ -3,9 +3,9 @@
 (function () {
   const TT = window.TT;
 
-  // Bot simples que joga sozinho — usado nos testes automatizados (e como "demo").
+  // Bot simples que joga sozinho — usado nos testes automatizados (e como "demo"). slot 0 = P1, 1 = P2.
   class Bot {
-    constructor(game) { this.game = game; this.down = new Set(); this.pressed = new Set(); this.t = 0; }
+    constructor(game, slot) { this.game = game; this.slot = slot || 0; this.down = new Set(); this.pressed = new Set(); this.t = 0; }
     press(a) { this.pressed.add(a); }
     // Ponto seguro mais rápido de alcançar fora de uma zona de perigo.
     escape(z, p) {
@@ -35,13 +35,15 @@
     update() {
       const g = this.game; this.t++;
       this.down.clear();
-      if (g.state !== 'play') { if (this.t % 40 === 0) this.press('start'), this.press('menu'); return; }
-      const p = g.player;
+      if (g.state !== 'play') { if (this.slot === 0 && this.t % 40 === 0) this.press('start'), this.press('menu'); return; }
+      const sl = g.slots[this.slot];
+      if (sl.out || (this.slot > 0 && !g.coop)) return;
+      const p = g.team[sl.ai];
       if (!p || p.ko) return;
       // troca de Titã quando está fraco
       if (p.hp < p.maxHp * 0.3 && this.t % 20 === 0) {
         let best = -1, bh = p.hp;
-        g.team.forEach((t, i) => { if (!t.ko && t.hp > bh + 20) { bh = t.hp; best = i; } });
+        g.team.forEach((t, i) => { if (!t.ko && !g.takenBy(i, sl) && t.hp > bh + 20) { bh = t.hp; best = i; } });
         if (best >= 0) this.press('t' + best);
       }
       if (g.energy >= 100 && g.enemies.length >= 2) this.press('super');
@@ -153,7 +155,15 @@
         game.render();
         return TT.debug.info();
       },
-      bot(on) { game.bot = on ? new Bot(game) : null; game.input.bot = game.bot; },
+      bot(on, slot) {
+        slot = slot || 0;
+        game.bots = game.bots || [null, null];
+        game.bots[slot] = on ? new Bot(game, slot) : null;
+        game.input.pl[slot].bot = game.bots[slot];
+        game.bot = game.bots[0];
+      },
+      // Modo de jogo: 1 ou 2 jogadores.
+      players(n) { game.setPlayers(n); },
       god(on) { game.godMode = !!on; },
       start(i) { TT.audio.muted = true; game.score = 0; game.startStage(i || 0); },
       toSection(i) {
@@ -163,16 +173,17 @@
         const sec = game.section;
         const cx = sec.type === 'chase' ? sec.start : sec.camX;
         game.camX = game.camMin = cx - 2;
-        game.player.x = cx + 700;
+        game.players().forEach((t, i) => { t.x = cx + 700 - i * 60; });
       },
       killAll() { for (const e of game.enemies) if (!e.dead) e.takeHit({ x: e.x - 1, dmgMul: 1 }, { dmg: 9999, kb: 5, knockdown: true, launch: 6 }); },
       info() {
         const p = game.player;
+        const pl = game.players().map((t) => ({ key: t.key, hp: Math.round(t.hp), x: Math.round(t.x), y: Math.round(t.y), ko: t.ko }));
         return {
           state: game.state, stage: game.stageIdx, sec: game.secIdx, secActive: game.secActive, wave: game.waveIdx,
           camX: Math.round(game.camX), enemies: game.enemies.length, boss: game.boss ? Math.round(game.boss.hp) : null,
           player: p ? { key: p.key, hp: Math.round(p.hp), x: Math.round(p.x), y: Math.round(p.y), state: p.state } : null,
-          ko: game.team.filter((t) => t.ko).length, score: game.score, energy: Math.round(game.energy),
+          ko: game.team.filter((t) => t.ko).length, numPlayers: game.numPlayers, players: pl, score: game.score, energy: Math.round(game.energy),
           particles: game.particles.list.length, errors: (TT.errors || []).length,
           avgRenderMs: +(game.stats.renderMs / Math.max(1, game.stats.frames)).toFixed(2), maxRenderMs: +game.stats.maxRenderMs.toFixed(2),
         };

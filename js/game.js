@@ -16,7 +16,9 @@
       this.frame = 0;
       this.stateT = 0;
       this.team = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
-      this.activeIdx = 0;
+      // Jogadores: cada "slot" controla um Titã da equipe (o P2 só existe no modo 2 jogadores).
+      this.numPlayers = 1;
+      this.slots = [this.newSlot(0, 0), this.newSlot(1, 1)];
       this.score = 0;
       this.godMode = false;
       this.titleBg = TT.makeBackground(1);
@@ -31,7 +33,24 @@
       this.stats = { frames: 0, renderMs: 0, maxRenderMs: 0 };
     }
 
-    get player() { return this.team[this.activeIdx]; }
+    newSlot(id, ai) { return { id, ai, switchCool: 0, koTimer: 0, out: false }; }
+    // Compatibilidade com o modo 1 jogador: "player" / "activeIdx" / "switchCool" são do P1.
+    get player() { return this.team[this.slots[0].ai]; }
+    get activeIdx() { return this.slots[0].ai; }
+    set activeIdx(i) { this.slots[0].ai = i; }
+    get switchCool() { return this.slots[0].switchCool; }
+    set switchCool(v) { this.slots[0].switchCool = v; }
+    get coop() { return this.numPlayers > 1; }
+    // Slots em jogo (1 ou 2).
+    activeSlots() { return this.numPlayers > 1 ? this.slots : [this.slots[0]]; }
+    slotTitan(s) { return this.team[this.slots[s].ai]; }
+    // Titãs controlados agora (inclui o caído que ainda vai ser trocado; exclui slot sem Titã).
+    players() { const out = []; for (const sl of this.activeSlots()) if (!sl.out) out.push(this.team[sl.ai]); return out; }
+    slotOf(t) { const i = this.team.indexOf(t); for (const sl of this.activeSlots()) if (sl.ai === i && !sl.out) return sl; return null; }
+    setPlayers(n) {
+      this.numPlayers = n === 2 ? 2 : 1;
+      this.input.twoPlayers = this.numPlayers === 2;
+    }
     get diff() { return TT.DIFFICULTY[this.difficulty]; }
 
     // Troca a dificuldade (dir = +1/-1) e salva a escolha.
@@ -65,8 +84,7 @@
       this.boss = null; this.bossShown = 0;
       this.drill = null;
       this.superT = 0;
-      this.switchCool = 0;
-      this.koTimer = 0;
+      for (const sl of this.slots) { sl.switchCool = 0; sl.koTimer = 0; sl.out = false; }
       this.goArrow = 0;
       this.clearTimer = 0;
       this.whiteFlash = 0;
@@ -81,9 +99,11 @@
       this.applyScale();
       this.stageStartScore = this.score;
       for (const t of this.team) t.reset();
-      this.activeIdx = 0;
+      this.slots[0].ai = 0;
       const p = this.player;
       p.x = 220; p.y = 590; p.facing = 1;
+      this.slots[1].ai = 1;
+      if (this.coop) { const p2 = this.slotTitan(1); p2.x = 150; p2.y = 650; p2.facing = 1; }
       for (const c of this.stage.crates) this.props.push(new TT.Crate(this, c[0], c[1], c[2]));
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
@@ -143,7 +163,21 @@
       // Titãs nocauteados voltam com um pouco de vida
       let revived = 0;
       for (const t of this.team) if (t.ko) { t.reset(); t.hp = Math.round(t.maxHp * 0.3); revived++; }
-      if (revived) this.popText(this.player.x, this.player.y - 170, 'TITÃS RECUPERADOS!', '#9effa8');
+      // jogador que ficou sem Titã volta ao lado do parceiro
+      for (const sl of this.activeSlots()) {
+        const t = this.team[sl.ai];
+        if (!sl.out) continue;
+        const mate = this.players().find((m) => m !== t);
+        const free = this.team.findIndex((u, i) => !u.ko && !this.activeSlots().some((o) => o !== sl && !o.out && o.ai === i));
+        if (free >= 0) {
+          sl.out = false; sl.ai = free; sl.koTimer = 0;
+          const n = this.team[free], ref = mate || n;
+          n.x = TT.clamp(ref.x - 60, this.camX + 40, this.camX + W - 40); n.y = ref.y; n.z = 0; n.invul = 90;
+          this.poof(n.x, n.y - 60);
+        }
+      }
+      const pp = this.players()[0] || this.player;
+      if (revived) this.popText(pp.x, pp.y - 170, 'TITÃS RECUPERADOS!', '#9effa8');
     }
 
     startChase(sec) {
@@ -234,6 +268,7 @@
       this.boss = null;
       this.clearTimer = 80;
       for (const t of this.team) if (!t.ko) t.setAnim('victory');
+      this.superBy = null;
     }
 
     // ------------------------------------------------------------------ Eventos de combate
@@ -243,7 +278,7 @@
     addPickup(p) { this.pickups.push(p); }
     allFighters() { return this.enemies.concat(this.heroes()); }
     // Titãs em campo (não nocauteados) — alvos dos inimigos.
-    heroes() { const p = this.player; return p && !p.ko ? [p] : []; }
+    heroes() { const out = []; for (const p of this.players()) if (!p.ko) out.push(p); return out; }
     // Titã mais próximo de um inimigo (ou um aleatório, se random).
     targetFor(f, random) {
       const hs = this.heroes();
@@ -325,16 +360,21 @@
 
     onTitanKO(t) {
       this.popText(t.x, t.y - 170, t.name.toUpperCase() + ' CAIU!', '#ff6a6a', true);
-      this.koTimer = 60;
+      const sl = this.slotOf(t);
+      if (sl) sl.koTimer = 60;
     }
 
-    switchTo(i, forced) {
-      if (i === this.activeIdx || i < 0 || i > 4) return false;
+    // Titã i está sendo usado por outro jogador?
+    takenBy(i, sl) { return this.activeSlots().some((o) => o !== sl && !o.out && o.ai === i); }
+
+    switchTo(i, forced, s) {
+      const sl = this.slots[s || 0];
+      if (i === sl.ai || i < 0 || i > 4) return false;
       const n = this.team[i];
-      if (n.ko) return false;
-      const p = this.player;
+      if (n.ko || this.takenBy(i, sl)) return false;
+      const p = this.team[sl.ai];
       if (!forced) {
-        if (this.switchCool > 0) return false;
+        if (sl.switchCool > 0 || sl.out) return false;
         if (!(p.state === 'idle' || p.state === 'air')) return false;
       }
       n.x = p.x; n.y = p.y; n.z = forced ? 0 : p.z; n.facing = p.facing;
@@ -342,26 +382,29 @@
       n.atk = null;
       n.setState(n.z > 0 ? 'air' : 'idle'); n.setAnim(n.z > 0 ? 'jump' : 'idle');
       n.invul = forced ? 90 : 16;
-      this.activeIdx = i;
-      this.switchCool = 18;
+      sl.ai = i; sl.out = false;
+      sl.switchCool = 18;
       this.poof(n.x, n.y - 60);
       A().play('switch');
       return true;
     }
-    cycleTitan(dir) {
+    // Próximo/anterior: pula os caídos e o Titã em uso pelo outro jogador.
+    cycleTitan(dir, s) {
+      const sl = this.slots[s || 0];
       for (let k = 1; k < 5; k++) {
-        const i = (this.activeIdx + dir * k + 5) % 5;
-        if (!this.team[i].ko) return this.switchTo(i);
+        const i = (sl.ai + dir * k + 5) % 5;
+        if (!this.team[i].ko && !this.takenBy(i, sl)) return this.switchTo(i, false, s);
       }
       return false;
     }
 
-    triggerSuper() {
+    triggerSuper(s) {
       if (this.energy < 100 || this.superT > 0) return;
       this.energy = 0;
       this.superT = 110;
+      this.superBy = this.slotTitan(s || 0);
       A().play('super');
-      this.say(this.player, 'Titãs, AVANTE!', '#ffe14a');
+      this.say(this.superBy, 'Titãs, AVANTE!', '#ffe14a');
     }
     resolveSuper() {
       this.whiteFlash = 14; this.shake = 26;
@@ -371,7 +414,8 @@
         const sx = e.x - this.camX;
         if (sx < -200 || sx > W + 200) continue;
         const d = { dmg: e.isBoss ? 120 : 60, kb: 10, knockdown: true, launch: 12, big: true };
-        if (e.takeHit(this.player, d, TT.sign(e.x - this.player.x))) this.onHit(this.player, e, d);
+        const by = this.superBy || this.player;
+        if (e.takeHit(by, d, TT.sign(e.x - by.x))) this.onHit(by, e, d);
         this.explosion(e.x, e.y, 60, 0.7);
       }
     }
@@ -470,7 +514,7 @@
     // ------------------------------------------------------------------ Atualização
     step() {
       const inp = this.input;
-      if (this.bot) this.bot.update();
+      if (this.bots) { for (const b of this.bots) if (b) b.update(); } else if (this.bot) this.bot.update();
       inp.sample();
       this.frame++; this.stateT++;
       if (inp.wasPressed('mute')) A().toggleMute();
@@ -500,7 +544,7 @@
     }
 
     // Itens do menu do título.
-    titleItems() { return ['play', 'diff', 'controls']; }
+    titleItems() { return ['play', 'players', 'diff', 'controls']; }
 
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
@@ -517,9 +561,11 @@
       const it = items[this.menuIdx] || 'play';
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
+      if (lr && it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
+        if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
         A().play('select');
         this.score = 0;
@@ -555,13 +601,17 @@
       if (this.flashEnergy > 0) this.flashEnergy--;
       this.shake *= 0.86; if (this.shake < 0.3) this.shake = 0;
 
-      this.player.readInput(inp);
-      // Troca de Titã e "Titãs, avante!" são lidos antes dos congelamentos (hit-stop) para não perder o botão
-      if (this.superT === 0) {
-        for (let i = 0; i < 5; i++) if (inp.wasPressed('t' + i)) this.switchTo(i);
-        if (inp.wasPressed('next')) this.cycleTitan(1);
-        if (inp.wasPressed('prev')) this.cycleTitan(-1);
-        if (inp.wasPressed('super')) this.triggerSuper();
+      const slots = this.activeSlots();
+      for (const sl of slots) {
+        const pi = inp.pl[sl.id];
+        if (!sl.out) this.team[sl.ai].readInput(pi);
+        // Troca de Titã e "Titãs, avante!" são lidos antes dos congelamentos (hit-stop) para não perder o botão
+        if (this.superT === 0) {
+          for (let i = 0; i < 5; i++) if (pi.wasPressed('t' + i)) this.switchTo(i, false, sl.id);
+          if (pi.wasPressed('next')) this.cycleTitan(1, sl.id);
+          if (pi.wasPressed('prev')) this.cycleTitan(-1, sl.id);
+          if (pi.wasPressed('super') && !sl.out) this.triggerSuper(sl.id);
+        }
       }
       // Cena do "Titãs, avante!": mundo congelado
       if (this.superT > 0) {
@@ -573,23 +623,26 @@
       if (this.hitstop > 0) { this.hitstop--; this.particles.update(); return; }
       if (this.slowmo > 0) { this.slowmo--; if (this.slowmo % 2 === 1) { this.particles.update(); return; } }
 
-      if (this.switchCool > 0) this.switchCool--;
-
-      const p = this.player;
+      const ps = this.players();
       // Titãs fora de campo recuperam vida devagar
       const rg = 0.05 * this.diff.regen;
-      for (const t of this.team) if (t !== p && !t.ko && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + rg);
+      for (const t of this.team) if (!ps.includes(t) && !t.ko && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + rg);
 
-      p.think(inp);
-      p.physics();
-      // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos
       const b = this.boss;
-      if (b && !b.dead && p.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
-        const dx = p.x - b.x, min = (b.radius + p.radius) * 0.75;
-        if (Math.abs(dx) < min) p.x = b.x + (dx >= 0 ? min : -min);
+      for (const sl of slots) {
+        if (sl.switchCool > 0) sl.switchCool--;
+        if (sl.out) continue;
+        const p = this.team[sl.ai];
+        p.think(inp.pl[sl.id]);
+        p.physics();
+        // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos
+        if (b && !b.dead && p.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
+          const dx = p.x - b.x, min = (b.radius + p.radius) * 0.75;
+          if (Math.abs(dx) < min) p.x = b.x + (dx >= 0 ? min : -min);
+        }
+        // limites da câmera: ninguém sai da tela
+        p.x = TT.clamp(p.x, this.camX + 30, this.camX + W - 30);
       }
-      // limites da câmera para o jogador
-      p.x = TT.clamp(p.x, this.camX + 30, this.camX + W - 30);
 
       this.updateBossIntro();
       for (const e of this.enemies) { e.think(); e.physics(); }
@@ -612,11 +665,16 @@
       if (this.goArrow > 0) this.goArrow++;
       if (this.boss) this.bossShown = Math.min(1, this.bossShown + 0.02);
 
-      // Nocaute: troca automática ou fim de jogo
-      if (p.ko && this.koTimer > 0 && --this.koTimer === 0) {
-        const next = this.team.findIndex((t) => !t.ko);
-        if (next >= 0) this.switchTo(next, true);
-        else { this.state = 'gameover'; this.stateT = 0; A().stopSong(); A().play('ko'); }
+      // Nocaute: troca automática; fim de jogo só quando TODOS os Titãs caírem
+      for (const sl of slots) {
+        const p = this.team[sl.ai];
+        if (sl.out || !p.ko || sl.koTimer <= 0 || --sl.koTimer > 0) continue;
+        const next = this.team.findIndex((t, i) => !t.ko && !this.takenBy(i, sl));
+        if (next >= 0) this.switchTo(next, true, sl.id);
+        else if (this.team.some((t) => !t.ko)) { sl.out = true; this.popText(p.x, p.y - 200, 'P' + (sl.id + 1) + ' VOLTA NA PRÓXIMA ÁREA', '#ffe14a'); }
+      }
+      if (this.team.every((t) => t.ko) && slots.every((sl) => sl.out || sl.koTimer <= 0)) {
+        this.state = 'gameover'; this.stateT = 0; A().stopSong(); A().play('ko');
       }
       if (this.clearTimer > 0 && --this.clearTimer === 0) {
         this.state = 'clear'; this.stateT = 0;
@@ -645,7 +703,7 @@
     }
 
     updateCamera() {
-      const sec = this.section, p = this.player;
+      const sec = this.section;
       let maxCam = this.stage.length - W;
       let locked = false;
       if (sec) {
@@ -661,7 +719,13 @@
         }
       }
       if (!locked) {
-        const target = p.x - W * 0.42;
+        // 1 jogador: segue o Titã; 2 jogadores: segue o meio dos dois sem deixar o de trás sair da tela
+        const ps = this.players().filter((t) => !t.ko);
+        const list = ps.length ? ps : [this.player];
+        let mn = 1e9, mx = -1e9;
+        for (const t of list) { mn = Math.min(mn, t.x); mx = Math.max(mx, t.x); }
+        let target = list.length > 1 ? (mn + mx) / 2 - W * 0.5 : list[0].x - W * 0.42;
+        if (list.length > 1) target = Math.min(target, mn - 60);
         if (target > this.camX) this.camX += (target - this.camX) * 0.12;
         this.camX = TT.clamp(this.camX, this.camMin, maxCam);
         this.camMin = this.camX; // não volta para trás
@@ -727,7 +791,7 @@
       for (const e of this.enemies) if (e.drawGround) e.drawGround(ctx, camX);
       for (const p of this.projectiles) if (p.drawGround) p.drawGround(ctx, camX);
       const D = this.drawables; D.length = 0;
-      if (this.state !== 'clear') D.push(this.player); // na tela de vitória a equipe é desenhada à parte
+      if (this.state !== 'clear') for (const p of this.players()) D.push(p); // na tela de vitória a equipe é desenhada à parte
       for (const e of this.enemies) D.push(e);
       for (const c of this.props) D.push(c);
       for (const k of this.pickups) D.push(k);
@@ -846,50 +910,71 @@
       ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
     }
 
-    drawHUD(ctx) {
-      const p = this.player;
-      // painel do Titã ativo
+    // Painel de um jogador (P2 espelhado no lado direito).
+    drawPlayerPanel(ctx, sl, right) {
+      const p = this.team[sl.ai], X = (x) => (right ? W - x : x), al = right ? 'right' : 'left';
       ctx.fillStyle = 'rgba(12,8,30,0.6)';
-      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(14, 12, 452, 104, 18); else ctx.rect(14, 12, 452, 104); ctx.fill();
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(right ? W - 466 : 14, 12, 452, 104, 18); else ctx.rect(right ? W - 466 : 14, 12, 452, 104); ctx.fill();
       ctx.save();
-      ctx.beginPath(); ctx.arc(66, 64, 44, 0, Math.PI * 2);
-      ctx.fillStyle = p.def.color; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.arc(X(66), 64, 44, 0, Math.PI * 2);
+      ctx.fillStyle = sl.out ? '#2a2440' : p.def.color; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.stroke();
       ctx.clip();
-      ctx.drawImage(TT.portrait(p.key, 96), 18, 18, 96, 96);
+      if (!sl.out) ctx.drawImage(TT.portrait(p.key, 96), X(66) - 48, 18, 96, 96);
       ctx.restore();
-      TT.drawText(ctx, p.name.toUpperCase(), 122, 30, 26, '#ffffff', OUT, 'left', 5);
+      if (this.coop) TT.drawText(ctx, 'P' + (sl.id + 1), X(30), 104, 20, sl.id ? '#6fe3ff' : '#ffe14a', OUT, 'center', 4);
+      if (sl.out) {
+        TT.drawText(ctx, 'AGUARDANDO...', X(122), 52, 26, '#bfc4e8', OUT, al, 5);
+        TT.drawText(ctx, 'volta na próxima área', X(122), 84, 18, '#bfc4e8', OUT, al, 4);
+        return;
+      }
+      TT.drawText(ctx, p.name.toUpperCase(), X(122), 30, 26, '#ffffff', OUT, al, 5);
       const hpk = p.hp / p.maxHp;
-      this.drawBar(ctx, 122, 48, 320, 20, hpk, hpk > 0.5 ? '#4cd964' : hpk > 0.25 ? '#ffcc00' : '#ff3b30');
-      // energia (4 segmentos)
+      const bx = right ? W - 122 - 320 : 122;
+      this.drawBar(ctx, bx, 48, 320, 20, hpk, hpk > 0.5 ? '#4cd964' : hpk > 0.25 ? '#ffcc00' : '#ff3b30');
+      // energia compartilhada (4 segmentos)
       const full = this.energy >= 100;
       const ec = full ? (this.frame >> 3) % 2 ? '#ffe14a' : '#ffffff' : this.flashEnergy > 0 && (this.flashEnergy >> 2) % 2 ? '#ff3b30' : '#5fc2ff';
-      this.drawBar(ctx, 122, 76, 320, 14, this.energy / 100, ec);
+      this.drawBar(ctx, bx, 76, 320, 14, this.energy / 100, ec);
       ctx.strokeStyle = OUT; ctx.lineWidth = 2;
-      for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(122 + 80 * i, 76); ctx.lineTo(122 + 80 * i, 90); ctx.stroke(); }
-      TT.drawText(ctx, full ? 'TITÃS, AVANTE! [U]' : 'ENERGIA', 124, 104, 16, full ? '#ffe14a' : '#bfe6ff', OUT, 'left', 4);
+      for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(bx + 80 * i, 76); ctx.lineTo(bx + 80 * i, 90); ctx.stroke(); }
+      const key = sl.id ? '[Num5]' : '[U]';
+      TT.drawText(ctx, full ? 'TITÃS, AVANTE! ' + key : 'ENERGIA', X(124), 104, 16, full ? '#ffe14a' : '#bfe6ff', OUT, al, 4);
+    }
 
-      // equipe
+    drawHUD(ctx) {
+      const slots = this.activeSlots();
+      this.drawPlayerPanel(ctx, slots[0], false);
+      if (slots[1]) this.drawPlayerPanel(ctx, slots[1], true);
+
+      // equipe (anel branco = P1, ciano = P2)
       for (let i = 0; i < 5; i++) {
-        const t = this.team[i], x = 490 + i * 62, y = 18, act = i === this.activeIdx;
+        const t = this.team[i], x = 490 + i * 62, y = 18;
+        const owner = slots.find((sl) => !sl.out && sl.ai === i), act = !!owner;
         ctx.save();
         ctx.globalAlpha = t.ko ? 0.45 : 1;
         ctx.beginPath(); ctx.arc(x + 26, y + 26, act ? 28 : 24, 0, Math.PI * 2);
         ctx.fillStyle = act ? t.def.color : '#2a2440'; ctx.fill();
-        ctx.lineWidth = act ? 4 : 3; ctx.strokeStyle = act ? '#ffffff' : OUT; ctx.stroke();
+        ctx.lineWidth = act ? 4 : 3; ctx.strokeStyle = act ? (owner.id ? '#6fe3ff' : '#ffffff') : OUT; ctx.stroke();
         ctx.clip();
         ctx.drawImage(TT.portrait(t.key, 56), x - 2, y - 2, 56, 56);
         ctx.restore();
         this.drawBar(ctx, x + 2, y + 58, 48, 7, t.hp / t.maxHp, t.ko ? '#555' : '#4cd964');
         TT.drawText(ctx, String(i + 1), x + 48, y + 6, 16, '#ffe14a', OUT, 'center', 4);
+        if (this.coop && act) TT.drawText(ctx, 'P' + (owner.id + 1), x + 6, y + 6, 15, owner.id ? '#6fe3ff' : '#ffffff', OUT, 'center', 4);
         if (t.ko) TT.drawText(ctx, 'X', x + 26, y + 28, 40, '#ff3b30', OUT, 'center', 6);
       }
 
       // pontuação e combo
-      TT.drawText(ctx, 'PONTOS', W - 24, 26, 18, '#bfe6ff', OUT, 'right', 4);
-      TT.drawText(ctx, String(this.score).padStart(7, '0'), W - 24, 54, 34, '#ffffff', OUT, 'right', 6);
+      if (this.coop) {
+        // pontuação compartilhada no meio, abaixo da equipe
+        TT.drawText(ctx, 'PONTOS ' + String(this.score).padStart(7, '0'), 645, 104, 22, '#ffffff', OUT, 'center', 5);
+      } else {
+        TT.drawText(ctx, 'PONTOS', W - 24, 26, 18, '#bfe6ff', OUT, 'right', 4);
+        TT.drawText(ctx, String(this.score).padStart(7, '0'), W - 24, 54, 34, '#ffffff', OUT, 'right', 6);
+      }
       if (this.combo >= 3) {
         const s = 1 + Math.max(0, (this.comboT - 100) / 20);
-        ctx.save(); ctx.translate(W - 30, 100); ctx.scale(s, s);
+        ctx.save(); ctx.translate(this.coop ? W - 30 : W - 30, this.coop ? 146 : 100); ctx.scale(s, s);
         TT.drawText(ctx, this.combo + ' GOLPES!', 0, 0, 30, '#ffe14a', OUT, 'right', 6);
         ctx.restore();
       }
@@ -970,7 +1055,7 @@
         TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 588, 31);
+      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 584, 29);
       TT.drawText(ctx, '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som', W / 2, 706, 16, '#bfc4e8', OUT, 'center', 4);
     }
 
@@ -980,6 +1065,7 @@
       switch (it) {
         case 'play': return { text: 'JOGAR' };
         case 'resume': return { text: 'CONTINUAR' };
+        case 'players': return { text: 'JOGADORES:', value: this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
         case 'controls': return { text: 'CONTROLES' };
         default: return { text: String(it) };
@@ -1023,7 +1109,7 @@
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.stroke();
       TT.drawText(ctx, 'CONTROLES', cx, cy - 118, 34, '#ffe14a', OUT);
       const rows = [
-        ['Mover', 'WASD / Setas'],
+        ['Mover', this.coop ? 'WASD' : 'WASD / Setas'],
         ['Ataque (combo)', 'J  ou  Z'],
         ['Ataque forte', 'K  ou  X'],
         ['Especial (gasta energia)', 'L  ou  C'],
@@ -1033,10 +1119,12 @@
         ['Pausa / Som', 'Esc / M'],
       ];
       rows.forEach((r, i) => {
-        TT.drawText(ctx, r[0], cx - 330, cy - 74 + i * 32, 22, '#ffffff', OUT, 'left', 4);
-        TT.drawText(ctx, r[1], cx + 330, cy - 74 + i * 32, 22, '#9effa8', OUT, 'right', 4);
+        TT.drawText(ctx, r[0], cx - 330, cy - 76 + i * 30, 21, '#ffffff', OUT, 'left', 4);
+        TT.drawText(ctx, r[1], cx + 330, cy - 76 + i * 30, 21, '#9effa8', OUT, 'right', 4);
       });
-      TT.drawText(ctx, 'Controle (gamepad) também funciona!', cx, cy + 180, 18, '#bfc4e8', OUT, 'center', 4);
+      TT.drawText(ctx, 'Controle (gamepad) também funciona!' + (this.coop ? '  •  2º controle = P2' : ''), cx, cy + 160, 17, '#bfc4e8', OUT, 'center', 4);
+      if (this.coop) TT.drawText(ctx, 'P2: setas • Num1/2/3 golpes • Num0 pula • Num, esquiva • Num4/6 troca • Num5 avante', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
+      else TT.drawText(ctx, 'Co-op: escolha 2 JOGADORES no título (P2 usa setas + teclado numérico)', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
     }
 
     drawPause(ctx) {

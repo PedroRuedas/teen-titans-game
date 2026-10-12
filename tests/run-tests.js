@@ -21,9 +21,10 @@ async page => {
   // 1a) Dificuldade: menu do título com teclado, persistência e falha do storage
   await ev(() => { TT.game.setDifficulty('normal'); TT.game.menuIdx = 0; });
   await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowRight'); await sleep(60);
   const dTitle = await ev(() => ({ d: TT.game.difficulty, idx: TT.game.menuIdx, saved: localStorage.getItem('jovensTitas.dificuldade') }));
-  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 1 && dTitle.saved === 'hard', dTitle);
+  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 2 && dTitle.saved === 'hard', dTitle);
   await page.reload(); await page.waitForFunction(() => window.TT && TT.debug); await sleep(300);
   const dReload = await ev(() => TT.game.difficulty);
   ok('dificuldade: escolha persiste ao recarregar', dReload === 'hard', dReload);
@@ -38,8 +39,9 @@ async page => {
     return { err, d, fallback: (() => { Storage.prototype.getItem = () => { throw 1; }; const v = TT.store.get('x', 'def'); Storage.prototype.getItem = origGet; return v; })() };
   });
   ok('dificuldade: jogo funciona com storage bloqueado', !dFail.err && dFail.d === 'easy' && dFail.fallback === 'def', dFail);
-  await ev(() => { TT.game.menuIdx = 1; });
+  await ev(() => { TT.game.menuIdx = 2; });
   await page.keyboard.press('ArrowRight'); await sleep(60); // fácil -> normal
+  await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   ok('dificuldade: volta para NORMAL e cursor em JOGAR', await ev(() => TT.game.difficulty === 'normal' && TT.game.menuIdx === 0));
   await page.keyboard.press('Enter');
@@ -368,6 +370,122 @@ async page => {
     }, st);
     ok('bot vence o chefe da fase ' + (st + 1) + ' sem trapaça (NORMAL)', r.result === 'clear', r);
   }
+
+  // 6b) CO-OP LOCAL (2 jogadores)
+  await ev(() => { TT.paused = false; TT.debug.bot(false); TT.debug.god(false); TT.game.state = 'title'; TT.game.stateT = 50; TT.game.menuIdx = 0; TT.game.setPlayers(1); });
+  await sleep(100);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowRight'); await sleep(60);
+  const coopSel = await ev(() => TT.game.numPlayers);
+  await page.keyboard.press('ArrowUp'); await sleep(60);
+  await page.keyboard.press('Enter'); await sleep(200);
+  const coopStart = await ev(() => ({ st: TT.game.state, n: TT.game.players().length, keys: TT.game.players().map((t) => t.key) }));
+  ok('co-op: escolher 2 jogadores no título e começar', coopSel === 2 && coopStart.st === 'play' && coopStart.n === 2 && coopStart.keys[0] !== coopStart.keys[1], { coopSel, coopStart });
+  await ev(() => { TT.game.banner = null; for (const t of TT.game.players()) t.invul = 0; });
+  // controles independentes com teclado real
+  const pos = () => ev(() => TT.game.players().map((t) => Math.round(t.x)));
+  const a0 = await pos();
+  await page.keyboard.down('KeyD'); await sleep(400); await page.keyboard.up('KeyD');
+  const a1 = await pos();
+  await page.keyboard.down('ArrowRight'); await sleep(400); await page.keyboard.up('ArrowRight');
+  const a2 = await pos();
+  ok('co-op: P1 (WASD) e P2 (setas) andam de forma independente', a1[0] > a0[0] + 60 && Math.abs(a1[1] - a0[1]) < 5 && a2[1] > a1[1] + 60 && Math.abs(a2[0] - a1[0]) < 5, { a0, a1, a2 });
+  await page.keyboard.press('Numpad1'); await sleep(40);
+  const atk2 = await ev(() => TT.game.players().map((t) => t.state));
+  await sleep(500);
+  await page.keyboard.press('KeyJ'); await sleep(40);
+  const atk1 = await ev(() => TT.game.players().map((t) => t.state));
+  ok('co-op: P2 ataca no Numpad1 e P1 no J', atk2[1] === 'attack' && atk2[0] !== 'attack' && atk1[0] === 'attack', { atk1, atk2 });
+  await sleep(500);
+  // troca de Titã pula o que está com o outro jogador
+  await page.keyboard.press('Numpad6'); await sleep(450);
+  const sw1 = await ev(() => TT.game.players().map((t) => t.key));
+  await page.keyboard.press('Digit2'); await sleep(450);
+  const sw2 = await ev(() => TT.game.players().map((t) => t.key));
+  await page.keyboard.press('Numpad4'); await sleep(450);
+  const sw3 = await ev(() => TT.game.players().map((t) => t.key));
+  await page.keyboard.press('Digit1'); await sleep(450);
+  const sw4 = await ev(() => TT.game.players().map((t) => t.key));
+  ok('co-op: Titãs sempre distintos (troca pula o do parceiro)',
+    sw1[1] === 'cyborg' && sw2[0] === 'beastboy' && sw3[1] === 'robin' && sw4[0] === 'beastboy' && sw4[0] !== sw4[1], { sw1, sw2, sw3, sw4 });
+
+  const coop = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {};
+    g.setPlayers(2);
+    // inimigos escolhem o alvo mais próximo e atacam os dois
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(3);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    const [p1, p2] = g.players();
+    p1.x = g.camX + 200; p1.y = 600; p2.x = g.camX + 1000; p2.y = 600;
+    for (const p of [p1, p2]) { p.hp = p.maxHp = 99999; p.invul = 0; }
+    g.enemies.length = 0; g.tokens = 4;
+    const e1 = new TT.Enemy(g, 'hive', p1.x + 90, 600), e2 = new TT.Enemy(g, 'hive', p2.x - 90, 600);
+    for (const e of [e1, e2]) { e.entering = false; e.cool = 0; g.addEnemy(e); }
+    out.targets = [g.targetFor(e1) === p1, g.targetFor(e2) === p2];
+    for (let i = 0; i < 400; i++) g.step();
+    out.dmg = [Math.round(99999 - p1.hp), Math.round(99999 - p2.hp)];
+    // onda de choque e explosão atingem os dois
+    g.enemies.length = 0; p1.hp = p2.hp = 99999;
+    for (const p of [p1, p2]) { p.setState('idle'); p.z = 0; p.invul = 0; }
+    p1.x = g.camX + 500; p2.x = g.camX + 780; p1.y = p2.y = 600;
+    g.addEffect(new TT.Shockwave(g, g.camX + 640, 600, 400, 10, 'enemy'));
+    for (let i = 0; i < 60; i++) g.step();
+    out.shock = [p1.hp < 99999, p2.hp < 99999];
+    for (let i = 0; i < 80; i++) g.step();
+    for (const p of [p1, p2]) { p.setState('idle'); p.z = 0; p.invul = 0; p.hp = 99999; p.y = 600; }
+    p1.x = g.camX + 600; p2.x = g.camX + 680;
+    g.blast(g.camX + 640, 600, 120, 10, 'enemy', null);
+    out.blast = [p1.hp < 99999, p2.hp < 99999];
+    // câmera mantém os dois na tela (P1 corre para a direita, P2 fica parado)
+    TT.debug.start(0); TT.debug.step(3);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    let onScreen = true, moved = 0;
+    const [q1, q2] = g.players();
+    const x0 = g.camX;
+    for (let i = 0; i < 500; i++) {
+      g.input.pl[0].bot = { down: new Set(['right']), pressed: new Set() };
+      g.step();
+      for (const q of [q1, q2]) if (q.x < g.camX || q.x > g.camX + 1280) onScreen = false;
+    }
+    g.input.pl[0].bot = null;
+    moved = Math.round(g.camX - x0);
+    out.camera = { onScreen, moved, gap: Math.round(q1.x - q2.x) };
+    // game over só quando todos os Titãs de ambos caírem
+    TT.debug.start(0); TT.debug.step(3);
+    const [r1, r2] = g.players();
+    const kill = (t) => { t.invul = 0; t.setState('idle'); t.takeHit({ x: t.x - 5, dmgMul: 1 }, { dmg: 1e6 }); };
+    const run = (n) => { for (let i = 0; i < n; i++) g.step(); };
+    kill(r1); run(80);                     // P1 troca para outro Titã livre
+    const afterFirst = g.state;
+    let guard = 0;
+    while (g.team.filter((t) => !t.ko).length > 1 && guard++ < 10) { const t = g.slotTitan(0); if (g.slots[0].out) break; kill(t); run(80); }
+    out.over = { afterFirst, p1out: g.slots[0].out, stillPlaying: g.state, alive: g.team.filter((t) => !t.ko).map((t) => t.key) };
+    kill(g.slotTitan(1)); run(120);
+    out.over.final = g.state;
+    g.setPlayers(1);
+    return out;
+  });
+  ok('co-op: inimigos miram o Titã mais próximo e atacam os dois', coop.targets.every(Boolean) && coop.dmg[0] > 0 && coop.dmg[1] > 0, coop);
+  ok('co-op: onda de choque e explosão atingem os dois', coop.shock.every(Boolean) && coop.blast.every(Boolean), coop);
+  ok('co-op: câmera mantém os dois jogadores na tela', coop.camera.onScreen && coop.camera.moved > 50, coop.camera);
+  ok('co-op: game over só quando todos os Titãs caem', coop.over.afterFirst === 'play' && coop.over.stillPlaying === 'play' && coop.over.p1out && coop.over.final === 'gameover', coop.over);
+
+  // co-op completo: 2 bots jogam a fase 1 até o fim (modo deus)
+  const coopRun = await ev(() => {
+    const g = TT.game;
+    g.setPlayers(2);
+    TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true, 0); TT.debug.bot(true, 1);
+    let steps = 0, offscreen = 0;
+    while (g.state === 'play' && steps < 30000) {
+      g.step(); steps++;
+      if (steps % 30 === 0) { g.render(); for (const t of g.players()) if (t.x < g.camX || t.x > g.camX + 1280) offscreen++; }
+    }
+    const res = { state: g.state, steps, offscreen, distinct: g.slots[0].ai !== g.slots[1].ai };
+    TT.debug.bot(false, 0); TT.debug.bot(false, 1); TT.debug.god(false); g.setPlayers(1);
+    return res;
+  });
+  ok('co-op: dois bots (P1 e P2) completam a fase 1', coopRun.state === 'clear' && coopRun.offscreen === 0 && coopRun.distinct, coopRun);
 
   // 7) Desempenho em tempo real (com renderização de verdade)
   const perf = await ev(async () => {

@@ -74,24 +74,27 @@
   };
 
   // ---------------------------------------------------------------- Entrada
-  const KEYMAP = {
-    ArrowLeft: 'left', KeyA: 'left',
-    ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: 'up', KeyW: 'up',
-    ArrowDown: 'down', KeyS: 'down',
-    KeyJ: 'light', KeyZ: 'light',
-    KeyK: 'heavy', KeyX: 'heavy',
-    KeyL: 'special', KeyC: 'special',
-    Space: 'jump',
-    ShiftLeft: 'dash', ShiftRight: 'dash',
-    KeyU: 'super', KeyV: 'super',
+  // Teclas do P1 (sempre) e teclas globais (menus).
+  const KEYS_P1 = {
+    KeyA: 'left', KeyD: 'right', KeyW: 'up', KeyS: 'down',
+    KeyJ: 'light', KeyZ: 'light', KeyK: 'heavy', KeyX: 'heavy', KeyL: 'special', KeyC: 'special',
+    Space: 'jump', ShiftLeft: 'dash', ShiftRight: 'dash', KeyU: 'super', KeyV: 'super',
     KeyQ: 'prev', KeyE: 'next',
     Digit1: 't0', Digit2: 't1', Digit3: 't2', Digit4: 't3', Digit5: 't4',
-    Numpad1: 't0', Numpad2: 't1', Numpad3: 't2', Numpad4: 't3', Numpad5: 't4',
-    Enter: 'start', NumpadEnter: 'start',
-    Escape: 'pause', KeyP: 'pause',
-    KeyM: 'mute',
+    Enter: 'start', NumpadEnter: 'start', Escape: 'pause', KeyP: 'pause', KeyM: 'mute',
   };
+  // Setas e Numpad1-5: do P1 só no modo 1 jogador.
+  const KEYS_SOLO = {
+    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+    Numpad1: 't0', Numpad2: 't1', Numpad3: 't2', Numpad4: 't3', Numpad5: 't4',
+  };
+  // P2 no modo 2 jogadores: setas + teclado numérico.
+  const KEYS_P2 = {
+    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+    Numpad1: 'light', Numpad2: 'heavy', Numpad3: 'special', Numpad0: 'jump', NumpadDecimal: 'dash',
+    Numpad4: 'prev', Numpad6: 'next', Numpad5: 'super',
+  };
+  TT.KEYS = { P1: KEYS_P1, SOLO: KEYS_SOLO, P2: KEYS_P2 };
 
   // Gamepad (layout "standard"): índice do botão -> ação.
   const PADMAP = {
@@ -100,74 +103,97 @@
     9: 'pause', 8: 'mute',
     12: 'up', 13: 'down', 14: 'left', 15: 'right',
   };
+  const MENU_ACTS = { pause: 1, start: 1, confirm: 1 };
 
-  class Input {
-    constructor() {
-      this.keys = new Set();
-      this.down = new Set();
-      this.pressed = new Set();
-      this.padPrev = new Set();
-      this.padNow = new Set();
-      this.bot = null; // controlador automático (testes/demo)
-      this.anyKey = false;
-      window.addEventListener('keydown', (e) => {
-        const a = KEYMAP[e.code];
-        this.anyKey = true;
-        if (!a) return;
-        e.preventDefault();
-        if (!this.keys.has(a)) this.pressed.add(a);
-        this.keys.add(a);
-        if (a === 'pause' || a === 'start') this.pressed.add('menu');
-      });
-      window.addEventListener('keyup', (e) => {
-        const a = KEYMAP[e.code];
-        if (a) this.keys.delete(a);
-      });
-      window.addEventListener('blur', () => this.keys.clear());
-    }
-
-    pollPad() {
-      this.padNow.clear();
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (const p of pads) {
-        if (!p || !p.connected) continue;
-        p.buttons.forEach((b, i) => {
-          if (b.pressed && PADMAP[i]) this.padNow.add(PADMAP[i]);
-        });
-        const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
-        if (ax < -0.35) this.padNow.add('left');
-        if (ax > 0.35) this.padNow.add('right');
-        if (ay < -0.35) this.padNow.add('up');
-        if (ay > 0.35) this.padNow.add('down');
-        if (p.buttons[9] && p.buttons[9].pressed) this.padNow.add('start');
-        if (p.buttons[0] && p.buttons[0].pressed) this.padNow.add('confirm');
-        break;
-      }
-      for (const a of this.padNow) if (!this.padPrev.has(a)) {
-        this.pressed.add(a);
-        if (a === 'pause' || a === 'start' || a === 'confirm') this.pressed.add('menu');
-        this.anyKey = true;
-      }
-      this.padPrev = new Set(this.padNow);
-    }
-
-    // Monta o estado do quadro: teclado + gamepad + bot.
-    sample() {
-      this.pollPad();
-      this.down.clear();
-      for (const a of this.keys) this.down.add(a);
-      for (const a of this.padNow) this.down.add(a);
-      if (this.bot) {
-        for (const a of this.bot.down) this.down.add(a);
-        for (const a of this.bot.pressed) this.pressed.add(a);
-        this.bot.pressed.clear();
-      }
-    }
-
+  // Estado de entrada de um jogador.
+  class PlayerInput {
+    constructor() { this.down = new Set(); this.pressed = new Set(); this.padPrev = new Set(); this.padNow = new Set(); this.bot = null; }
     isDown(a) { return this.down.has(a); }
     wasPressed(a) { return this.pressed.has(a); }
     consume(a) { this.pressed.delete(a); }
-    endStep() { this.pressed.clear(); }
+  }
+  TT.PlayerInput = PlayerInput;
+
+  class Input {
+    constructor() {
+      this.pl = [new PlayerInput(), new PlayerInput()];
+      this.twoPlayers = false;
+      this.held = new Map(); // código da tecla -> [jogador, ação]
+      this.anyKey = false;
+      window.addEventListener('keydown', (e) => {
+        this.anyKey = true;
+        const m = this.mapKey(e.code);
+        if (!m) return;
+        e.preventDefault();
+        if (this.held.has(e.code)) return; // repetição automática
+        this.held.set(e.code, m);
+        const P = this.pl[m[0]];
+        P.pressed.add(m[1]);
+        if (MENU_ACTS[m[1]]) P.pressed.add('menu');
+      });
+      window.addEventListener('keyup', (e) => { this.held.delete(e.code); });
+      window.addEventListener('blur', () => this.held.clear());
+    }
+
+    // Tecla -> [jogador, ação], conforme o modo (1 ou 2 jogadores).
+    mapKey(code) {
+      if (KEYS_P1[code]) return [0, KEYS_P1[code]];
+      if (this.twoPlayers) return KEYS_P2[code] ? [1, KEYS_P2[code]] : null;
+      return KEYS_SOLO[code] ? [0, KEYS_SOLO[code]] : null;
+    }
+
+    // Gamepads: no modo 1 jogador o primeiro controle é do P1; no modo 2, o 1º é do P1 e o 2º do P2.
+    pollPad() {
+      for (const P of this.pl) P.padNow.clear();
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      let n = 0;
+      for (const p of pads) {
+        if (!p || !p.connected) continue;
+        const P = this.pl[n];
+        p.buttons.forEach((b, i) => { if (b.pressed && PADMAP[i]) P.padNow.add(PADMAP[i]); });
+        const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+        if (ax < -0.35) P.padNow.add('left');
+        if (ax > 0.35) P.padNow.add('right');
+        if (ay < -0.35) P.padNow.add('up');
+        if (ay > 0.35) P.padNow.add('down');
+        if (p.buttons[9] && p.buttons[9].pressed) P.padNow.add('start');
+        if (p.buttons[0] && p.buttons[0].pressed) P.padNow.add('confirm');
+        if (++n >= (this.twoPlayers ? 2 : 1)) break;
+      }
+      for (const P of this.pl) {
+        for (const a of P.padNow) if (!P.padPrev.has(a)) {
+          P.pressed.add(a);
+          if (MENU_ACTS[a]) P.pressed.add('menu');
+          this.anyKey = true;
+        }
+        P.padPrev = new Set(P.padNow);
+      }
+    }
+
+    // Monta o estado do quadro: teclado + gamepad + bots.
+    sample() {
+      this.pollPad();
+      for (const P of this.pl) P.down.clear();
+      for (const [, m] of this.held) this.pl[m[0]].down.add(m[1]);
+      for (const P of this.pl) {
+        for (const a of P.padNow) P.down.add(a);
+        if (P.bot) {
+          for (const a of P.bot.down) P.down.add(a);
+          for (const a of P.bot.pressed) P.pressed.add(a);
+          P.bot.pressed.clear();
+        }
+      }
+    }
+
+    // Compatibilidade: "bot" e "pressed" do P1.
+    get bot() { return this.pl[0].bot; }
+    set bot(b) { this.pl[0].bot = b; }
+    get pressed() { return this.pl[0].pressed; }
+    // Consultas globais (menus): qualquer jogador.
+    isDown(a) { return this.pl[0].down.has(a) || this.pl[1].down.has(a); }
+    wasPressed(a) { return this.pl[0].pressed.has(a) || this.pl[1].pressed.has(a); }
+    consume(a) { for (const P of this.pl) P.pressed.delete(a); }
+    endStep() { for (const P of this.pl) P.pressed.clear(); }
   }
   TT.Input = Input;
 })();
