@@ -69,6 +69,14 @@
             TT.drawBurst(ctx, x, y, p.size, 4, p.color, null, p.rot);
             ctx.globalAlpha = 1;
             break;
+          case 'cloud': {
+            // nuvem cartoon da transformação do Mutano (cresce e encolhe, com contorno)
+            const g = 1 - k, r = p.size * (0.45 + 0.75 * TT.easeOut(Math.min(1, g * 2.4))) * Math.min(1, k * 3.5);
+            ctx.fillStyle = p.color; ctx.strokeStyle = p.color2 || OUT; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.32, r * 0.34, 0, Math.PI * 2); ctx.fill();
+            break;
+          }
           case 'feather':
             ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = k;
             ctx.fillStyle = p.color; ctx.beginPath(); ctx.ellipse(0, 0, p.size, p.size * 0.35, 0, 0, Math.PI * 2); ctx.fill();
@@ -236,7 +244,12 @@
       if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return; // pisca antes de sumir
       if (this.invul > 0 && this.state !== 'getup' && (this.invul >> 2) % 2 === 0 && this.team === 'hero') ctx.globalAlpha = 0.55;
       TT.computePose(this, this.pose);
-      TT.drawRig(ctx, this.style, this.pose, this.x - camX, this.y - this.z, this.facing, { flash: this.flash > 3, t: this.animT });
+      // inimigos: brilho e piscada curtos antes de atacar
+      const a = this.atk, sx = this.x - camX, sy = this.y - this.z;
+      const tell = this.team === 'enemy' && a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      const blink = tell > 0.55 && (a.t >> 1) % 2 === 0;
+      TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3 || blink, t: this.animT });
+      if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', sx + this.facing * 26, sy - 78, 16 + 22 * tell, 0.35 + 0.5 * tell);
       ctx.globalAlpha = 1;
     }
   }
@@ -244,20 +257,36 @@
 
   // ================================================================ Titãs
   const GREEN = '#5dff8a', DARK = '#a77bff', SONIC = '#5fc2ff';
+  // Rastros (smear) por pose: pivô (x à frente, y acima do pé), raio e ângulos (0 = à frente, + = para baixo).
+  const SMEAR = {
+    jab: { x: 10, y: 84, r: 70, line: true },
+    cross: { x: 10, y: 84, r: 78, line: true },
+    cast: { x: 10, y: 84, r: 84, line: true },
+    flyKick: { x: 0, y: 52, r: 76, line: true },
+    swing: { x: 6, y: 92, r: 104, a0: -2.2, a1: 0.9 },
+    swipe: { x: 6, y: 86, r: 96, a0: -1.2, a1: 0.7 },
+    claw: { x: 8, y: 84, r: 88, a0: -1.4, a1: 0.9 },
+    uppercut: { x: 10, y: 80, r: 74, a0: 1.1, a1: -1.4 },
+    castUp: { x: 8, y: 84, r: 90, a0: 1.0, a1: -1.5 },
+    kick: { x: 0, y: 52, r: 78, a0: 0.9, a1: -0.4 },
+    dive: { x: 0, y: 40, r: 70, a0: -0.4, a1: 1.0 },
+    slam: { x: 10, y: 96, r: 96, a0: -1.6, a1: 0.8 },
+  };
 
   function spawnBolt(f, g, big) {
     g.addProjectile(new Projectile(g, {
       kind: big ? 'bigbolt' : 'starbolt', team: 'hero', owner: f,
       x: f.x + f.facing * 48, y: f.y, z: f.z > 0 ? f.z + 40 : 72, vx: f.facing * (big ? 11 : 13),
       r: big ? 24 : 14, dmg: big ? 17 : 8, kb: big ? 8 : 3, knockdown: big, launch: 6, life: 70, color: GREEN,
-      vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, // no ar: tiro diagonal para baixo
+      vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
     }));
     A().play('starbolt');
   }
 
   const TITANS = {
     robin: {
-      name: 'Robin', hp: 120, speed: 4.7, jump: 15.5, color: '#d7262e',
+      name: 'Robin', hp: 120, speed: 4.7, jump: 15.5, color: '#d7262e', fx: '#ff5a3a',
+      dashAtk: { pose: 'flyKick', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 76], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, sound0: 'whoosh' },
         { pose: 'swipe', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 100], kb: 2, weapon: 'staff', sound0: 'whoosh' },
@@ -271,14 +300,15 @@
           if (t !== 8) return;
           for (const dy of [-34, 0, 34]) g.addProjectile(new Projectile(g, {
             kind: 'birdarang', team: 'hero', owner: f, x: f.x + f.facing * 40, y: f.y, z: f.z + 70,
-            vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true,
+            vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true, trailN: 7,
           }));
           A().play('birdarang');
         },
       },
     },
     starfire: {
-      name: 'Estelar', hp: 105, speed: 4.6, jump: 16, floaty: true, color: '#f3a35a',
+      name: 'Estelar', hp: 105, speed: 4.6, jump: 16, floaty: true, color: '#f3a35a', fx: GREEN,
+      dashAtk: { pose: 'cross', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 74], lunge: 11, knockdown: true, launch: 6, kb: 8, glow: GREEN, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, glow: GREEN, sound0: 'whoosh' },
         { pose: 'cross', s: 4, a: 3, r: 9, dmg: 7, reach: [0, 70], kb: 2, glow: GREEN, sound0: 'whoosh' },
@@ -292,7 +322,8 @@
       },
     },
     cyborg: {
-      name: 'Ciborgue', hp: 150, speed: 4.0, jump: 14, color: '#5f8fe0',
+      name: 'Ciborgue', hp: 150, speed: 4.0, jump: 14, color: '#5f8fe0', fx: SONIC,
+      dashAtk: { pose: 'cross', s: 4, a: 12, r: 14, dmg: 13, reach: [0, 78], lunge: 10, knockdown: true, launch: 7, kb: 9, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 5, a: 3, r: 9, dmg: 8, reach: [0, 70], kb: 2, sound0: 'whoosh' },
         { pose: 'cross', s: 5, a: 3, r: 10, dmg: 9, reach: [0, 74], kb: 2.5, sound0: 'whoosh' },
@@ -310,7 +341,8 @@
       },
     },
     raven: {
-      name: 'Ravena', hp: 100, speed: 4.4, jump: 14.5, floaty: true, color: '#7b55c9',
+      name: 'Ravena', hp: 100, speed: 4.4, jump: 14.5, floaty: true, color: '#7b55c9', fx: '#b98cff',
+      dashAtk: { pose: 'swipe', s: 3, a: 10, r: 12, dmg: 10, reach: [0, 98], lunge: 9, knockdown: true, launch: 6, kb: 7, glow: DARK, claw: true, big: true, sound: 'dark' },
       light: [
         { pose: 'swipe', s: 4, a: 4, r: 8, dmg: 6, reach: [0, 92], kb: 1.5, glow: DARK, sound0: 'whoosh', claw: true },
         { pose: 'cast', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 98], kb: 2, glow: DARK, sound0: 'whoosh', claw: true },
@@ -320,7 +352,7 @@
         pose: 'cast', s: 11, a: 1, r: 18, glow: DARK,
         onFrame(f, t, g) {
           if (t !== 11) return;
-          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 70, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true }));
+          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 70, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
           A().play('dark');
         },
       },
@@ -334,7 +366,17 @@
       },
     },
     beastboy: {
-      name: 'Mutano', hp: 115, speed: 5.1, jump: 15.5, color: '#79c64c',
+      name: 'Mutano', hp: 115, speed: 5.1, jump: 15.5, color: '#79c64c', fx: '#8dff5a',
+      // investida de rinoceronte (ataque em corrida: esquiva + ataque)
+      dashAtk: {
+        form: 'rhino', pose: 'jab', s: 6, a: 18, r: 14, lunge: 12, dmg: 13, reach: [0, 120], depth: 42, knockdown: true, launch: 7, kb: 10, big: true,
+        shout: 'Rinoceronte!', shoutColor: '#8fd463', sound0: 'roar',
+        onFrame(f, t, g) {
+          if (t === 1) g.morph(f.x, f.y - 50);
+          if (t > this.s && t < this.s + this.a && t % 3 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 3); }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 50, true);
+        },
+      },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 7, dmg: 6, reach: [0, 62], kb: 1.5, sound0: 'whoosh' },
         { pose: 'kick', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 82], kb: 2, sound0: 'whoosh' },
@@ -343,9 +385,13 @@
       heavy: {
         form: 'gorilla', pose: 'slam', s: 16, a: 5, r: 16, dmg: 20, reach: [0, 140], depth: 45, knockdown: true, launch: 8, kb: 9, big: true,
         onFrame(f, t, g) {
-          if (t === 1) { g.poof(f.x, f.y - 60); A().play('roar'); }
-          if (t === 16) { g.shake = 12; g.groundRing(f.x + f.facing * 80, f.y, '#79c64c'); }
-          if (t === 36) g.poof(f.x, f.y - 60);
+          if (t === 1) { g.morph(f.x, f.y - 60); A().play('roar'); }
+          if (t === 16) {
+            g.shake = 14; g.groundRing(f.x + f.facing * 110, f.y, '#8dff5a');
+            g.debrisBurst(f.x + f.facing * 110, f.y - 10, 8, '#8e8880');
+            g.particles.spawn('text', f.x + f.facing * 110, f.y - 150, { text: 'BLAM!', size: 42, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 36, rot: TT.rand(-0.2, 0.2) });
+          }
+          if (t === 36) g.morph(f.x, f.y - 60, true);
         },
       },
       air: { pose: 'kick', s: 3, a: 12, r: 8, dmg: 9, reach: [0, 82], kb: 3, zr: 130 },
@@ -353,9 +399,9 @@
         cost: 35, form: 'trex', pose: 'jab', s: 12, a: 46, r: 12, lunge: 7, dmg: 10, rehit: 10, reach: [0, 180], depth: 55, knockdown: true, launch: 7, kb: 10,
         shout: 'RAAAWR!', shoutColor: '#8fd463', sound0: 'roar',
         onFrame(f, t, g) {
-          if (t === 1) g.poof(f.x, f.y - 60);
-          if (t > 12 && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
-          if (t === 69) g.poof(f.x, f.y - 60);
+          if (t === 1) g.morph(f.x, f.y - 70);
+          if (t > 12 && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 3, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
+          if (t === 69) g.morph(f.x, f.y - 70, true);
         },
       },
     },
@@ -447,6 +493,12 @@
           return;
         }
         case 'dash': {
+          // ataque em corrida
+          if ((this.buffer === 'light' || this.buffer === 'heavy') && this.def.dashAtk && this.st >= 2) {
+            this.buffer = null; this.vy = 0; this.invul = Math.min(this.invul, 4);
+            this.startAttack(this.def.dashAtk);
+            return;
+          }
           this.vx = this.facing * (13 - this.st * 0.5);
           if (this.st % 3 === 0) g.particles.spawn('dust', this.x - this.facing * 20, this.y - 6, { color: 'rgba(255,255,255,0.8)', size: 7, life: 14 });
           if (this.st > 14) { this.vy = 0; this.setState('idle'); this.setAnim('idle'); }
@@ -513,6 +565,9 @@
       this.game.combo = 0;
     }
 
+    // Dano recebido escala com a dificuldade (NORMAL = 1).
+    get dmgTaken() { return this.game.diff.dmg; }
+
     takeHit(src, d, dir) {
       if (this.game.godMode) return false;
       if (this.state === 'dash' && this.st < 11) return false;
@@ -523,11 +578,13 @@
       const a = this.atk, f = a && a.def.form;
       const sx = this.x - camX, sy = this.y - this.z;
       if (this.invul > 0 && this.state !== 'getup' && this.state !== 'dash' && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.55;
+      const fl = this.flash > 3;
       if (f === 'gorilla' && a.t > 1 && a.t < 36) {
-        const k = TT.clamp((a.t - 2) / (a.def.s - 2 + 4), 0, 1);
-        TT.drawGorilla(ctx, sx, sy, this.facing, k, this.flash > 3);
+        TT.drawGorilla(ctx, sx, sy, this.facing, a.t, a.def.s, fl);
       } else if (f === 'trex' && a.t > 1 && a.t < 69) {
-        TT.drawTRex(ctx, sx, sy, this.facing, a.t, this.flash > 3);
+        TT.drawTRex(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
+      } else if (f === 'rhino' && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+        TT.drawRhino(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
       } else {
         TT.computePose(this, this.pose);
         if (this.key === 'starfire' || this.key === 'raven') {
@@ -536,48 +593,105 @@
         TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3, t: this.animT });
       }
       ctx.globalAlpha = 1;
-      // efeitos de ataque (feixes, garras de energia)
+      // efeitos de ataque (feixes, garras de energia, rastros de movimento)
       if (a && a.t >= a.def.s && a.t < a.def.s + a.def.a + 2) {
         if (a.def.beam) this.drawBeam(ctx, sx, sy, a);
         if (a.def.claw) this.drawClaw(ctx, sx, sy, a);
       }
+      if (a && a.def.dmg && !a.def.beam && !a.def.form && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
+    }
+
+    // Rastro de movimento (smear) em arco na cor do Titã.
+    drawSmear(ctx, sx, sy, a) {
+      const d = a.def, k = (a.t - d.s) / (d.a + 5), sc = this.style.scale;
+      const P = SMEAR[d.pose] || SMEAR.jab;
+      const col = this.def.fx || '#ffffff';
+      const grow = Math.min(1, (a.t - d.s + 1) / 3);
+      const a0 = P.a0, a1 = P.a0 + (P.a1 - P.a0) * grow;
+      const R = P.r * (d.weapon === 'staff' ? 1.25 : 1) * (d.big ? 1.12 : 1);
+      ctx.save();
+      ctx.translate(sx + this.facing * P.x * sc, sy - P.y * sc); ctx.scale(this.facing * sc, sc);
+      ctx.globalAlpha = 0.85 * (1 - k);
+      if (P.line) {
+        // golpes retos: linhas de velocidade
+        ctx.strokeStyle = col; ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          ctx.lineWidth = 5 - i; const yy = -8 + i * 8;
+          ctx.beginPath(); ctx.moveTo(R * (0.15 + 0.1 * i), yy); ctx.lineTo(R * (0.95 - 0.08 * i) * grow + 6, yy); ctx.stroke();
+        }
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(R * 0.3, 0); ctx.lineTo(R * 0.95 * grow, 0); ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, R, a0, a1, a1 < a0);
+        ctx.arc(R * 0.12, R * 0.04, R * 0.7, a1, a0, a1 >= a0);
+        ctx.closePath();
+        ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, 0, R, a0 + (a1 - a0) * 0.35, a1, a1 < a0); ctx.stroke();
+      }
+      ctx.restore();
     }
 
     drawBeam(ctx, sx, sy, a) {
       const d = a.def, fc = this.facing;
-      const sc = this.style.scale;
-      const ox = sx + fc * (d.beam === 'eyes' ? 20 : 66) * sc;
-      const oy = sy - (d.beam === 'eyes' ? 112 : 84) * sc;
+      const sc = this.style.scale, eyes = d.beam === 'eyes';
+      const ox = sx + fc * (eyes ? 16 : 66) * sc;
+      const oy = sy - (eyes ? 106 : 84) * sc;
       const len = d.reach[1];
-      const k = a.t - d.s, fade = Math.min(1, (d.a - k) / 6);
-      const w = (d.beam === 'sonic' ? 46 : 16) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
-      const col = d.beam === 'sonic' ? SONIC : GREEN;
+      const k = a.t - d.s, fade = Math.min(1, (d.a - k) / 6), grow = Math.min(1, (k + 1) / 4);
+      const L = len * grow;
+      const w = (eyes ? 13 : 46) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
+      const col = eyes ? GREEN : SONIC;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const gr = ctx.createLinearGradient(0, oy - w, 0, oy + w);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = gr;
-      ctx.fillRect(fc > 0 ? ox : ox - len, oy - w, len, w * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.fillRect(fc > 0 ? ox : ox - len, oy - w * 0.18, len, w * 0.36);
-      TT.drawGlow(ctx, col, ox, oy, w * 2.2, 1);
+      // raios oculares: dois feixes (um por olho); sônico: um feixe largo
+      const rows = eyes ? [-5, 5] : [0];
+      for (const off of rows) {
+        const y0 = oy + off;
+        const gr = ctx.createLinearGradient(0, y0 - w, 0, y0 + w);
+        gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(fc > 0 ? ox : ox - L, y0 - w, L, w * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(fc > 0 ? ox : ox - L, y0 - w * 0.2, L, w * 0.4);
+      }
+      if (!eyes) {
+        // ondas concêntricas viajando pelo feixe sônico
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 7; i++) {
+          const dist = ((k * 22 + i * 120) % L), q = dist / L;
+          ctx.strokeStyle = 'rgba(200,240,255,' + (0.9 * (1 - q)) + ')';
+          ctx.beginPath(); ctx.ellipse(ox + fc * dist, oy, 9 + q * 10, w * (1.05 + q * 0.5), 0, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      TT.drawGlow(ctx, col, ox, oy, w * (eyes ? 3.4 : 2.4), 1);
+      TT.drawGlow(ctx, col, ox + fc * L, oy, w * (eyes ? 4 : 2), 0.9 * grow); // clarão na ponta
       ctx.restore();
-      if (k % 3 === 0) this.game.particles.spawn('spark', this.x + fc * TT.rand(60, len), oy + TT.rand(-w, w), { vx: fc * TT.rand(4, 10), vy: TT.rand(-2, 2), color: col, size: 3, life: 10 });
+      if (k % 2 === 0) this.game.particles.spawn('spark', this.x + fc * TT.rand(60, L), oy + TT.rand(-w, w), { vx: fc * TT.rand(4, 10), vy: TT.rand(-2, 2), color: col, size: 3, life: 10 });
     }
 
+    // Garra de energia negra da Ravena: contorno violeta + filete branco e brilho.
     drawClaw(ctx, sx, sy, a) {
       const fc = this.facing, k = (a.t - a.def.s) / a.def.a;
       const r = a.def.reach[1];
+      const cx = sx + fc * r * 0.55, cy = sy - 70;
+      TT.drawGlow(ctx, DARK, cx, cy, r * 0.9, 0.55 * (1 - k * 0.5));
       ctx.save();
-      ctx.translate(sx + fc * r * 0.55, sy - 70);
+      ctx.translate(cx, cy);
       ctx.scale(fc, 1);
-      ctx.globalAlpha = 0.85 * (1 - k * 0.5);
-      ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.92 * (1 - k * 0.45);
       ctx.beginPath();
       ctx.moveTo(-r * 0.4, 30); ctx.quadraticCurveTo(-r * 0.1, -50 - k * 20, r * 0.5, -36);
-      ctx.lineTo(r * 0.2, -12); ctx.lineTo(r * 0.52, -6); ctx.lineTo(r * 0.16, 10); ctx.lineTo(r * 0.45, 26);
+      ctx.lineTo(r * 0.2, -12); ctx.lineTo(r * 0.56, -6); ctx.lineTo(r * 0.16, 10); ctx.lineTo(r * 0.48, 28);
       ctx.quadraticCurveTo(0, 26, -r * 0.4, 30);
-      ctx.fill(); ctx.stroke();
+      ctx.closePath();
+      ctx.fillStyle = '#120a22'; ctx.fill();
+      ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+      // fiapos de sombra
+      ctx.strokeStyle = 'rgba(214,194,255,0.7)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-r * 0.3, 18); ctx.quadraticCurveTo(-r * 0.6, 10 + k * 10, -r * 0.8, 24); ctx.stroke();
       ctx.restore();
       ctx.globalAlpha = 1;
     }
@@ -602,6 +716,16 @@
       ],
     },
   };
+  // Soldado elétrico (fase 3): estocada em investida e descarga no chão, ambas com marcação no chão.
+  ENEMIES.shock = {
+    name: 'Soldado Elétrico', style: 'hiveShock', hp: 55, speed: 2.7, range: 150, score: 180, aggr: 1.1,
+    attacks: [
+      { pose: 'jab', weapon: 'baton', s: 22, a: 10, r: 18, lunge: 9, dmg: 10, reach: [0, 84], depth: 26, kb: 5, stun: 26, shock: true, sound: 'zap',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 200, y: f.y, d: 26 }]; } },
+      { pose: 'slam', weapon: 'baton', s: 26, a: 3, r: 22, dmg: 9, zoneHit: true, knockdown: true, launch: 5, kb: 6, shock: true, sound: 'zap',
+        zone(f) { return [{ k: 'ell', x: f.x + f.facing * 30, y: f.y, rx: 125, ry: 50 }]; } },
+    ],
+  };
   TT.ENEMIES = ENEMIES;
 
   class Enemy extends Fighter {
@@ -610,9 +734,9 @@
       this.kind = kind;
       this.def = ENEMIES[kind];
       this.style = TT.STYLES[this.def.style];
-      this.hp = this.maxHp = this.def.hp;
+      this.hp = this.maxHp = Math.round(this.def.hp * game.diff.enemyHp);
       this.team = 'enemy';
-      this.cool = TT.randi(30, 80);
+      this.cool = TT.randi(30, 80) / game.diff.aggr;
       this.token = false;
       this.wait = TT.rand(170, 260);
       this.yOff = TT.rand(-50, 50);
@@ -626,11 +750,11 @@
       super.endAttack();
       if (next != null) { this.startAttack(this.def.attacks[next]); return; }
       this.releaseToken();
-      this.cool = TT.randi(50, 100) / this.def.aggr;
+      this.cool = TT.randi(50, 100) / (this.def.aggr * this.game.diff.aggr);
     }
     think() {
       if (this.commonStates()) return;
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
       if (this.state !== 'idle') { this.setState('idle'); }
       if (!p || p.ko) { this.vx *= 0.8; this.vy *= 0.8; this.setAnim('idle'); return; }
@@ -667,11 +791,11 @@
       super(game, x, y);
       this.kind = 'drone';
       this.team = 'enemy';
-      this.hp = this.maxHp = 26;
+      this.hp = this.maxHp = Math.round(26 * game.diff.enemyHp);
       this.radius = 22; this.height = 70;
       this.hover = 26; this.z = this.hover;
       this.grav = 0;
-      this.cool = TT.randi(60, 120);
+      this.cool = TT.randi(60, 120) / game.diff.aggr;
       this.side = Math.random() < 0.5 ? -1 : 1;
       this.shadowW = 20;
       this.charge = 0;
@@ -699,7 +823,7 @@
         return;
       }
       if (this.commonStates()) return;
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       this.z += (this.hover + Math.sin(this.animT * 0.08) * 6 - this.z) * 0.1;
       if (!p || p.ko) { this.vx *= 0.9; this.vy *= 0.9; return; }
       const dx = p.x - this.x;
@@ -709,7 +833,7 @@
         if (--this.charge === 0) {
           g.addProjectile(new Projectile(g, { kind: 'laser', team: 'enemy', owner: this, x: this.x + this.facing * 26, y: this.y, z: this.z + 34, vx: this.facing * 9, r: 10, dmg: 8, kb: 3, life: 140 }));
           A().play('laser');
-          this.cool = TT.randi(110, 170);
+          this.cool = TT.randi(110, 170) / g.diff.aggr;
         }
         return;
       }
@@ -753,6 +877,144 @@
   }
   TT.Drone = Drone;
 
+  // Soldado elétrico da H.I.V.E. (fase 3): bastão elétrico, ataca e recua (bate e corre).
+  // Dois golpes, ambos com aviso no chão: estocada em investida (faixa) e descarga no chão (círculo).
+  class ShockTrooper extends Enemy {
+    constructor(game, x, y) {
+      super(game, 'shock', x, y);
+      this.backoff = 0;
+    }
+    think() {
+      if (this.commonStates()) return;
+      const g = this.game, p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (this.state !== 'idle') this.setState('idle');
+      if (!p) { this.vx *= 0.8; this.vy *= 0.8; this.setAnim('idle'); return; }
+      if (this.cool > 0) this.cool--;
+      if (this.backoff > 0) this.backoff--;
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx), side = dx > 0 ? -1 : 1;
+      if (!this.token && this.cool <= 0 && this.backoff <= 0 && g.tokens > 0 && adx < 360) { this.token = true; g.tokens--; }
+      let tx, ty;
+      if (this.backoff > 0) { tx = p.x + side * 300; ty = p.y + this.yOff; } // recua depois de atacar
+      else if (this.token) { tx = p.x + side * 150; ty = p.y; } // distância da estocada
+      else { tx = p.x + side * this.wait; ty = p.y + this.yOff; }
+      const L = g.camX + 40, R = g.camX + TT.W - 40;
+      if (!this.entering) tx = TT.clamp(tx, L, R);
+      else if (this.x > L && this.x < R) this.entering = false;
+      const mx = tx - this.x, my = ty - this.y, sp = this.def.speed * (this.backoff > 0 ? 1.15 : 1);
+      this.vx = Math.abs(mx) > 6 ? TT.sign(mx) * sp : 0;
+      this.vy = Math.abs(my) > 4 ? TT.sign(my) * sp * 0.6 : 0;
+      this.facing = dx > 0 ? 1 : -1;
+      this.setAnim(this.vx || this.vy ? 'walk' : 'idle');
+      if (this.token && this.cool <= 0 && Math.abs(dy) < 18) {
+        const atks = this.def.attacks;
+        if (adx < 95) { this.vx = this.vy = 0; this.startAttack(atks[1]); }
+        else if (adx < 200) { this.vx = this.vy = 0; this.startAttack(atks[0]); }
+      }
+    }
+    startAttack(def) {
+      super.startAttack(def);
+      this.atk.zones = def.zone ? def.zone.call(def, this, this.game, this.atk) : null;
+    }
+    endAttack() {
+      super.endAttack();
+      this.backoff = 70;
+    }
+    drawGround(ctx, camX) { Boss.prototype.drawGround.call(this, ctx, camX); }
+    draw(ctx, camX) {
+      super.draw(ctx, camX);
+      // faíscas no bastão (mais fortes na preparação)
+      const a = this.atk, charging = a && this.state === 'attack' && a.t < a.def.s;
+      if (charging || (this.animT >> 3) % 5 === 0) {
+        const bx = this.x - camX + this.facing * 34, by = this.y - this.z - 92;
+        drawArc(ctx, bx, by, bx + TT.rand(-22, 22), by + TT.rand(-26, 10), charging ? '#bff6ff' : '#6fe3ff', charging ? 3 : 2);
+        if (charging) TT.drawGlow(ctx, '#6fe3ff', bx, by, 26 + 20 * (a.t / a.def.s), 0.8);
+      }
+    }
+  }
+  TT.ShockTrooper = ShockTrooper;
+
+  // Raio em zigue-zague entre dois pontos (para efeitos elétricos).
+  function drawArc(ctx, x0, y0, x1, y1, col, w, segs) {
+    segs = segs || 6;
+    const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    ctx.beginPath(); ctx.moveTo(x0, y0);
+    for (let i = 1; i < segs; i++) {
+      const q = i / segs, j = (Math.random() - 0.5) * Math.min(28, l * 0.25);
+      ctx.lineTo(x0 + dx * q + nx * j, y0 + dy * q + ny * j);
+    }
+    ctx.lineTo(x1, y1);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = col; ctx.lineWidth = w * 2.4; ctx.globalAlpha = 0.35; ctx.stroke();
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = w; ctx.stroke();
+    ctx.restore();
+  }
+  TT.drawArc = drawArc;
+
+  // ================================================================ Avisos de ataque (zonas no chão)
+  // Zonas no plano do chão: 'rect' (faixa), 'ell' (elipse/círculo) e 'half' (arco à frente).
+  // A MESMA zona é usada para desenhar o aviso e para decidir o acerto (pé do alvo dentro da zona).
+  TT.zoneHas = function (z, x, y) {
+    if (z.k === 'rect') return x >= Math.min(z.x0, z.x1) && x <= Math.max(z.x0, z.x1) && Math.abs(y - z.y) <= z.d;
+    if (z.k === 'ring') { const d = Math.hypot(x - z.x, (y - z.y) / z.ry); return d >= z.r0 && d <= z.r1; }
+    if (z.k === 'half' && (x - z.x) * z.f < 0) return false;
+    const dx = (x - z.x) / z.rx, dy = (y - z.y) / z.ry;
+    return dx * dx + dy * dy <= 1;
+  };
+  function zonePath(ctx, z, camX, k) {
+    ctx.beginPath();
+    if (z.k === 'rect') {
+      const x0 = z.x0 - camX, x1 = z.x0 + (z.x1 - z.x0) * k - camX;
+      ctx.rect(Math.min(x0, x1), z.y - z.d, Math.abs(x1 - x0), z.d * 2);
+    } else if (z.k === 'ring') {
+      // anel: borda externa + furo (preenchido com 'evenodd')
+      const r1 = z.r0 + (z.r1 - z.r0) * k;
+      ctx.ellipse(z.x - camX, z.y, r1, r1 * z.ry, 0, 0, Math.PI * 2);
+      ctx.moveTo(z.x - camX + z.r0, z.y);
+      ctx.ellipse(z.x - camX, z.y, z.r0, z.r0 * z.ry, 0, 0, Math.PI * 2, true);
+    } else if (z.k === 'half') {
+      const a0 = z.f > 0 ? -Math.PI / 2 : Math.PI / 2;
+      ctx.moveTo(z.x - camX, z.y);
+      ctx.ellipse(z.x - camX, z.y, z.rx * k, z.ry * k, 0, a0, a0 + Math.PI);
+      ctx.closePath();
+    } else {
+      ctx.ellipse(z.x - camX, z.y, z.rx * k, z.ry * k, 0, 0, Math.PI * 2);
+    }
+  }
+  // k = progresso do aviso (0..1): a zona vai se preenchendo até o impacto.
+  TT.drawZone = function (ctx, z, camX, k, t, rgb) {
+    rgb = rgb || '255,40,40';
+    k = TT.clamp(k, 0, 1);
+    const late = k > 0.7, blink = late ? (t >> 1) % 2 === 0 : (t >> 3) % 2 === 0;
+    ctx.save();
+    zonePath(ctx, z, camX, 1);
+    ctx.fillStyle = 'rgba(' + rgb + ',0.13)'; ctx.fill();
+    zonePath(ctx, z, camX, Math.max(0.03, k));
+    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.18 + 0.27 * k) + ')'; ctx.fill();
+    if (z.rings) {
+      ctx.strokeStyle = 'rgba(' + rgb + ',0.55)'; ctx.lineWidth = 2;
+      for (let i = 1; i < z.rings; i++) {
+        const f = i / z.rings;
+        ctx.beginPath(); ctx.ellipse(z.x - camX, z.y, z.rx * f, z.ry * f, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    if (z.k === 'rect' && z.arrows) {
+      const dir = Math.sign(z.x1 - z.x0) || 1, len = Math.abs(z.x1 - z.x0), h = z.d * 0.55;
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.25 + 0.35 * k) + ')'; ctx.lineWidth = 5;
+      for (let s = (t * 4) % 90; s < len - 20; s += 90) {
+        const x = z.x0 + dir * s - camX;
+        ctx.beginPath(); ctx.moveTo(x, z.y - h); ctx.lineTo(x + dir * h, z.y); ctx.lineTo(x, z.y + h); ctx.stroke();
+      }
+    }
+    zonePath(ctx, z, camX, 1);
+    ctx.lineWidth = late ? 4 : 3;
+    ctx.strokeStyle = blink ? 'rgba(255,255,255,0.95)' : 'rgba(' + rgb + ',0.95)';
+    if (!late) ctx.setLineDash([16, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
   // ================================================================ Chefes
   class Boss extends Fighter {
     constructor(game, x, y) {
@@ -763,6 +1025,54 @@
       this.cool = 90;
       this.isBoss = true;
       this.active = false; // fica parado durante a apresentação
+    }
+    // Aplica a dificuldade: vida e duração do aviso (wind-up) de cada ataque.
+    // Os onFrame usam this.s (o "s" já escalado), nunca números fixos.
+    applyDifficulty() {
+      const df = this.game.diff;
+      this.hp = this.maxHp = Math.round(this.maxHp * df.bossHp);
+      for (const k in this.ATK) {
+        const d = this.ATK[k];
+        d.s0 = d.s;
+        d.s = Math.max(6, Math.round(d.s * df.windup));
+      }
+    }
+    nextCool(a, b) { return Math.round(TT.randi(a, b) * this.game.diff.bossCool); }
+    startAttack(def) {
+      super.startAttack(def);
+      const a = this.atk;
+      a.zones = def.zone ? def.zone.call(def, this, this.game, a) : null;
+    }
+    // Progresso do aviso (0..1) durante a preparação do golpe; -1 fora dela.
+    tellK() {
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.t >= a.def.s) return -1;
+      return a.t / a.def.s;
+    }
+    // Pisca em branco no fim da preparação.
+    tellFlash() { const k = this.tellK(); return k > 0.62 && (this.atk.t >> 1) % 3 === 0; }
+    // Tremor de "carregando" durante a preparação.
+    tellShake() { const k = this.tellK(); return k > 0 ? Math.sin(this.atk.t * 1.7) * k * 3 : 0; }
+    // Marcação no chão: área exata que o golpe vai atingir.
+    drawGround(ctx, camX) {
+      const a = this.atk;
+      if (!a || !a.zones || this.state !== 'attack') return;
+      const d = a.def;
+      if (a.t >= d.s + d.a) return;
+      const k = a.t < d.s ? a.t / d.s : 1;
+      for (const z of a.zones) TT.drawZone(ctx, z, camX, k, a.t);
+    }
+    // Brilho na cor do ataque + "!" estilo HQ sobre a cabeça.
+    drawTell(ctx, sx, sy, headY) {
+      const k = this.tellK();
+      if (k < 0) return;
+      const a = this.atk, col = a.def.color || '#ff3b30', t = a.t;
+      TT.drawGlow(ctx, col, sx, sy - this.height * 0.5, this.height * (0.6 + 0.3 * k) * (0.92 + 0.08 * Math.sin(t * 0.7)), 0.3 + 0.45 * k);
+      const pop = Math.min(1, t / 5) * (1 + 0.18 * k), bob = Math.sin(t * 0.35) * 3;
+      ctx.save(); ctx.translate(sx, (headY != null ? headY : sy - this.height) - 46 + bob); ctx.scale(pop, pop);
+      TT.drawBurst(ctx, 0, 0, 36, 9, k > 0.62 && (t >> 1) % 2 ? '#ffffff' : '#ffe14a', OUT, 0.15);
+      TT.drawText(ctx, '!', 0, 3, 46, '#ff2a2a', OUT, 'center', 6);
+      ctx.restore();
     }
     onArmorHit(dmg, d) {
       this.poise += dmg * (d.big ? 1.6 : 1);
@@ -814,6 +1124,15 @@
       return false;
     }
   }
+  TT.Boss = Boss;
+
+  // Alvo no chão perto de um Titã, dentro da tela.
+  function groundTarget(g, p, spreadX, spreadY) {
+    return {
+      x: TT.clamp(p.x + TT.rand(-spreadX, spreadX), g.camX + 60, g.camX + TT.W - 60),
+      y: TT.clamp(p.y + TT.rand(-spreadY, spreadY), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4),
+    };
+  }
 
   // ---- Cinderblock
   class Cinderblock extends Boss {
@@ -827,46 +1146,74 @@
       this.grav = 1.1;
       this.def = { score: 5000 };
       this.ATK = {
-        swipe: { pose: 'swing', s: 28, a: 6, r: 26, dmg: 16, reach: [0, 175], depth: 55, kb: 11, knockdown: true, launch: 7, sound0: 'roar',
-          onFrame(f, t, g) { if (t === 28) { g.shake = 8; A().play('hitHeavy'); } } },
-        pound: { pose: 'slam', s: 32, a: 2, r: 34,
+        // soco giratório: arco à frente (a hitbox é a própria zona)
+        swipe: { pose: 'bigSwing', s: 28, a: 6, r: 26, dmg: 16, reach: [0, 175], depth: 55, kb: 11, knockdown: true, launch: 7, sound0: 'roar', color: '#ff8a3a',
+          zoneHit: true,
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 205, ry: 58, f: f.facing }]; },
+          onFrame(f, t, g) { if (t === this.s) { A().play('hitHeavy'); g.impact(f.x + f.facing * 130, f.y, 'WHAM!', '#ff8a3a', 0.9); } } },
+        // salto + onda de choque: anéis no chão (pule!)
+        pound: { pose: 'bigSlam', s: 32, a: 2, r: 34, color: '#ffd23a',
+          zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 620, ry: 620 * 0.38, rings: 5, jump: true }]; },
           onFrame(f, t, g) {
-            if (t === 8) { f.vz = 11; f.z = 1; }
-            if (t === 32) { g.shake = 18; A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy')); g.dust(f.x, f.y, 14, '#b9aa9a'); }
+            if (t === Math.max(2, this.s - 20)) { f.vz = 11; f.z = 1; }
+            if (t === this.s) {
+              A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy'));
+              g.dust(f.x, f.y, 14, '#b9aa9a'); g.debrisBurst(f.x, f.y - 20, 10, '#8e8880');
+              g.impact(f.x, f.y, 'KRA-BUM!', '#ffd23a', 1.4);
+            }
           } },
-        charge: { pose: 'cross', s: 30, a: 54, r: 30, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 10.5, sound0: 'roar',
+        // investida: faixa na linha da investida até a parede
+        charge: { pose: 'bigCharge', s: 30, a: 54, r: 30, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 10.5, sound0: 'roar', color: '#ff4a3a',
+          zone(f, g) {
+            const R = g.camX + TT.W - 70, L = g.camX + 70;
+            return [{ k: 'rect', x0: f.x - f.facing * 24, x1: f.facing > 0 ? R + 130 : L - 130, y: f.y, d: 50, arrows: true }];
+          },
           onFrame(f, t, g) {
-            if (t > 30 && t < 84 && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#b9aa9a'); g.shake = Math.max(g.shake, 3); }
+            const run = t > this.s && t < this.s + this.a;
+            if (t === this.s) g.impact(f.x, f.y, 'VRUUUM!', '#ff4a3a', 0.5);
+            if (run && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#b9aa9a'); g.shake = Math.max(g.shake, 3); }
             const L = g.camX + 70, R = g.camX + TT.W - 70;
-            if (t > 30 && t < 84 && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
+            if (run && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
               // bate na parede e fica atordoado
-              f.x = TT.clamp(f.x, L, R); f.atk = null; g.shake = 20; A().play('boom');
+              f.x = TT.clamp(f.x, L, R); f.atk = null; A().play('boom');
               g.debrisBurst(f.x + f.facing * 60, f.y - 120, 12, '#8e8880');
+              g.impact(f.x + f.facing * 60, f.y, 'CRASH!', '#ffae3a', 1.3);
               f.setState('stagger'); f.setAnim('hurt'); f.st = -40; f.vx = -f.facing * 4;
             }
           } },
-        throw: { pose: 'throw', s: 26, a: 1, r: 26,
-          onFrame(f, t, g) {
+        // arremesso de pedra: alvo no chão onde ela vai cair (segue o Titã até a metade do aviso)
+        throw: { pose: 'bigThrow', s: 26, a: 1, r: 26, color: '#c9a27a',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = TT.clamp(p.x, g.camX + 60, g.camX + TT.W - 60); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x + f.facing * 300; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 90, ry: 90 * 0.42 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
             if (t === 4) g.debrisBurst(f.x, f.y - 10, 6, '#8e8880');
-            if (t === 26) {
-              const p = g.player; if (!p) return;
-              const T = 48, z0 = 190, gr = 0.6;
+            if (t < this.s * 0.55) a.zones = [this.aim(f, g, a)];
+            if (t === this.s) {
+              const z = a.zones[0], T = 48, z0 = 190, gr = 0.6, x0 = f.x + f.facing * 40;
               g.addProjectile(new Projectile(g, {
-                kind: 'boulder', team: 'enemy', owner: f, x: f.x + f.facing * 40, y: f.y, z: z0,
-                vx: (p.x - f.x) / T, vy: (p.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
+                kind: 'boulder', team: 'enemy', owner: f, x: x0, y: f.y, z: z0,
+                vx: (z.x - x0) / T, vy: (z.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
                 r: 30, dmg: 14, kb: 6, knockdown: true, launch: 6, life: 120, explodeOnGround: 90,
+                zone: z, flight: T, impactWord: 'BOOM!',
               }));
+              a.zones = null; // daqui em diante a pedra desenha o alvo
               A().play('whoosh');
             }
           } },
       };
+      this.applyDifficulty();
     }
     think() {
       if (this.commonBoss()) return;
       if (this.state === 'down' || this.state === 'hurt') { this.setState('idle'); }
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
-      if (!this.active || !p || p.ko) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
       const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
       this.facing = dx > 0 ? 1 : -1;
       const p2 = this.phase2();
@@ -880,16 +1227,30 @@
         else if (Math.abs(dy) < 50 && adx > 300) pick = Math.random() < 0.6 ? 'charge' : 'throw';
         else pick = TT.choice(['throw', 'pound', 'throw']);
         this.startAttack(this.ATK[pick]);
-        this.cool = p2 ? TT.randi(40, 70) : TT.randi(70, 110);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 110);
       }
     }
     draw(ctx, camX) {
       if (this.state === 'dying' && (this.st >> 2) % 2 === 0) ctx.globalAlpha = 0.7;
       TT.computePose(this, this.pose);
       if (this.state === 'stagger') { this.pose.lean = -0.3; this.pose.tilt = -0.3; }
-      TT.drawRig(ctx, this.style, this.pose, this.x - camX, this.y - this.z, this.facing, { flash: this.flash > 3, t: this.animT });
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      // squash-and-stretch: agacha na preparação, estica no golpe
+      const k = this.tellK(), a = this.atk;
+      let sq = 0;
+      if (k >= 0) sq = -0.07 * TT.easeOut(k);
+      else if (a && a.t < a.def.s + a.def.a + 6) sq = 0.06;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t: this.animT });
+      ctx.restore();
       ctx.globalAlpha = 1;
-      if (this.state === 'stagger') this.drawDizzy(ctx, this.x - camX, this.y - this.z - this.height - 10);
+      // pedra erguida acima da cabeça durante a preparação do arremesso
+      if (k >= 0 && a.def === this.ATK.throw) {
+        const ry = y - this.height + 10 - 14 * TT.easeOut(k);
+        drawBoulder(ctx, x - this.facing * 26, ry, 1.3, a.t * 0.05);
+      }
+      this.drawTell(ctx, x, y, y - this.height - 50);
+      if (this.state === 'stagger') this.drawDizzy(ctx, x, y - this.height - 10);
     }
     drawDizzy(ctx, x, y) {
       for (let i = 0; i < 3; i++) {
@@ -899,6 +1260,15 @@
     }
   }
   TT.Cinderblock = Cinderblock;
+
+  function drawBoulder(ctx, x, y, s, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.fillStyle = '#8e8880'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-12, -26); ctx.lineTo(16, -24); ctx.lineTo(30, -2); ctx.lineTo(18, 22); ctx.lineTo(-14, 24); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#a7a199'; ctx.beginPath(); ctx.moveTo(-20, -8); ctx.lineTo(-10, -20); ctx.lineTo(10, -19); ctx.lineTo(0, -6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#6f6a63'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(6, 4); ctx.lineTo(2, 14); ctx.stroke();
+    ctx.restore();
+  }
 
   // ---- Gizmo no robô-aranha perfurador
   class GizmoMech extends Boss {
@@ -912,28 +1282,36 @@
       this.def = { score: 6000 };
       this.taunts = ['Seus pateta-titãs!', 'Tecnologia de ponta, otários!', 'Vou perfurar vocês!', 'Ninguém vence o Gizmo!'];
       this.ATK = {
-        drill: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 8, dmg: 6, rehit: 8, reach: [40, 210], depth: 48, kb: 4, stun: 14, sound0: 'drill',
+        // broca: faixa à frente cobrindo todo o avanço
+        drill: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 8, dmg: 6, rehit: 8, reach: [40, 210], depth: 48, kb: 4, stun: 14, sound0: 'drill', color: '#ffcf5a',
+          zone(f, g) {
+            const minX = g.camX + f.radius, maxX = g.camX + TT.W - f.radius;
+            const xe = TT.clamp(f.x + f.facing * (26 * 8 + 8 * 6 + 16), minX, maxX);
+            return [{ k: 'rect', x0: f.x + f.facing * 16, x1: xe + f.facing * 234, y: f.y, d: 48, arrows: true }];
+          },
           onFrame(f, t, g) {
-            f.drillSpin += t < 34 ? 0.2 + t * 0.02 : 1.1;
-            if (t >= 34 && t < 68 && t % 4 === 0) { A().play('drill'); g.particles.spawn('spark', f.x + f.facing * 200, f.y - 90, { vx: f.facing * TT.rand(3, 9), vy: TT.rand(-6, 1), color: '#ffcf5a', size: 3, life: 14, grav: 0.4 }); }
-            if (t === 60) f.atk.def = f.ATK.drillEnd;
+            f.drillSpin += t < this.s ? 0.2 + t * 0.02 : 1.1;
+            if (t === this.s) g.impact(f.x + f.facing * 200, f.y, 'VRRRR!', '#ffcf5a', 0.5);
+            if (t >= this.s && t < this.s + this.a && t % 4 === 0) { A().play('drill'); g.particles.spawn('spark', f.x + f.facing * 200, f.y - 90, { vx: f.facing * TT.rand(3, 9), vy: TT.rand(-6, 1), color: '#ffcf5a', size: 3, life: 14, grav: 0.4 }); }
+            if (t === this.s + 26) { const z = f.atk.zones; f.atk.def = f.ATK.drillEnd; f.atk.zones = z; }
           } },
-        drillEnd: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 6, dmg: 9, reach: [40, 210], depth: 48, kb: 9, knockdown: true, launch: 6 },
-        missiles: { pose: 'castUp', s: 24, a: 1, r: 40,
+        drillEnd: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 6, dmg: 9, reach: [40, 210], depth: 48, kb: 9, knockdown: true, launch: 6, color: '#ffcf5a' },
+        // chuva de mísseis: cada míssil marca um círculo no chão
+        missiles: { pose: 'castUp', s: 24, a: 1, r: 40, color: '#ff4a3a',
           onFrame(f, t, g) {
             if (t === 1) A().play('alarm');
             const n = f.phase2() ? 7 : 4;
-            if (t >= 24 && t < 24 + n * 6 && (t - 24) % 6 === 0) {
-              const p = g.player; if (!p) return;
-              const tx = TT.clamp(p.x + TT.rand(-160, 160), g.camX + 60, g.camX + TT.W - 60);
-              const ty = TT.clamp(p.y + TT.rand(-60, 60), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4);
-              g.addProjectile(new Projectile(g, { kind: 'missile', team: 'enemy', owner: f, x: tx, y: ty, z: 700, vz: -12, grav: 0, r: 0, dmg: 0, life: 200, explodeOnGround: 85, blastDmg: 12 }));
+            if (t >= this.s && t < this.s + n * 6 && (t - this.s) % 6 === 0) {
+              const p = g.targetFor(f, true); if (!p) return;
+              const tp = groundTarget(g, p, 160, 60);
+              g.addProjectile(new Projectile(g, { kind: 'missile', team: 'enemy', owner: f, x: tp.x, y: tp.y, z: 700, vz: -12, grav: 0, r: 0, dmg: 0, life: 200,
+                explodeOnGround: 85, blastDmg: 12, zone: { k: 'ell', x: tp.x, y: tp.y, rx: 85, ry: 85 * 0.42 }, flight: 58, impactWord: 'BOOM!' }));
               A().play('laser');
             }
           } },
-        drones: { pose: 'castUp', s: 20, a: 1, r: 30,
+        drones: { pose: 'castUp', s: 20, a: 1, r: 30, color: '#9effa8',
           onFrame(f, t, g) {
-            if (t === 20) {
+            if (t === this.s) {
               for (let i = 0; i < 2; i++) {
                 const d = new Drone(g, f.x + TT.rand(-40, 40), f.y + (i ? 30 : -30));
                 d.z = 160; d.vz = 0;
@@ -942,16 +1320,20 @@
               g.say(f, TT.choice(f.taunts), '#9effa8');
             }
           } },
-        laser: { pose: 'beam', s: 40, a: 34, r: 24, dmg: 5, rehit: 6, reach: [60, 1300], depth: 24, kb: 3, zr: 50, sound: 'sonic' },
+        // laser (fase 2): faixa piscando em toda a tela
+        laser: { pose: 'beam', s: 40, a: 34, r: 24, dmg: 5, rehit: 6, reach: [60, 1300], depth: 24, kb: 3, zr: 50, sound: 'sonic', color: '#ff3a3a',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 36, x1: f.x + f.facing * 1324, y: f.y, d: 24 }]; },
+          onFrame(f, t, g) { if (t === this.s) g.impact(f.x + f.facing * 90, f.y, 'ZZZAP!', '#ff3a3a', 0.6); } },
       };
+      this.applyDifficulty();
     }
     think() {
       this.drillSpin += 0.05;
       if (this.commonBoss()) return;
       if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
-      if (!this.active || !p || p.ko) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
       const dx = p.x - this.x, adx = Math.abs(dx);
       this.facing = dx > 0 ? 1 : -1;
       const p2 = this.phase2();
@@ -969,25 +1351,27 @@
         if (p2 && Math.abs(p.y - this.y) < 40) opts.push('laser');
         const pick = TT.choice(opts);
         this.startAttack(this.ATK[pick]);
-        this.cool = p2 ? TT.randi(45, 75) : TT.randi(70, 110);
+        this.cool = p2 ? this.nextCool(45, 75) : this.nextCool(70, 110);
         if (Math.random() < 0.25) g.say(this, TT.choice(this.taunts), '#9effa8');
       }
     }
     draw(ctx, camX) {
-      const x = this.x - camX, y = this.y - this.z, t = this.animT, fl = this.flash > 3;
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z, t = this.animT, fl = this.flash > 3 || this.tellFlash();
       const col = (c) => (fl ? '#ffffff' : c);
       if (this.state === 'dying' && (this.st >> 2) % 2 === 0) ctx.globalAlpha = 0.75;
-      const a = this.atk;
+      const a = this.atk, tk = this.tellK();
       const walking = this.anim === 'walk';
       ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      const bodyY = -120 + Math.sin(t * 0.1) * 3;
+      // agacha durante a preparação (pose exagerada)
+      const crouch = tk >= 0 ? TT.easeOut(tk) * 22 : 0;
+      const bodyY = -120 + Math.sin(t * 0.1) * 3 + crouch;
       // pernas
       for (let i = 0; i < 4; i++) {
         const back = i < 2;
         const base = [-60, 40, -30, 70][i];
         const ph = walking ? Math.sin(t * 0.2 + i * 1.6) * 16 : 0;
-        const fx = base + ph, kx = base * 0.75 + (base > 0 ? 25 : -25), ky = bodyY - 20;
+        const fx = base + ph + (base > 0 ? 1 : -1) * crouch * 0.8, kx = base * 0.75 + (base > 0 ? 25 : -25) + (base > 0 ? 1 : -1) * crouch, ky = bodyY - 20;
         ctx.strokeStyle = OUT; ctx.lineWidth = 14;
         ctx.beginPath(); ctx.moveTo(base * 0.4, bodyY + 10); ctx.lineTo(kx, ky - 30); ctx.lineTo(fx, back ? -6 : 0); ctx.stroke();
         ctx.strokeStyle = col(back ? '#4f5866' : '#7c8798'); ctx.lineWidth = 8; ctx.stroke();
@@ -998,9 +1382,11 @@
       ctx.fillStyle = col('#6c7686'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
       ctx.beginPath(); ctx.ellipse(0, bodyY + 12, 80, 30, 0, 0, Math.PI); ctx.fillStyle = col('#535c6b'); ctx.fill();
       ctx.fillStyle = col('#f0c62e'); ctx.fillRect(-70, bodyY - 4, 140, 8);
-      // míssil na traseira
-      ctx.fillStyle = col('#3e4652'); ctx.fillRect(-90, bodyY - 60, 50, 34); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-90, bodyY - 60, 50, 34);
-      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-80 + k * 15, bodyY - 43, 5, 0, Math.PI * 2); ctx.fillStyle = col('#ff4a3a'); ctx.fill(); }
+      // casulo de mísseis na traseira (abre ao preparar a chuva de mísseis)
+      const pod = a && a.def === this.ATK.missiles && a.t < a.def.s + 30;
+      ctx.fillStyle = col('#3e4652'); ctx.fillRect(-90, bodyY - 60 - (pod ? 14 : 0), 50, 34); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-90, bodyY - 60 - (pod ? 14 : 0), 50, 34);
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-80 + k * 15, bodyY - 43 - (pod ? 14 : 0), 5, 0, Math.PI * 2); ctx.fillStyle = col('#ff4a3a'); ctx.fill(); }
+      if (pod && !fl) TT.drawGlow(ctx, '#ff4a3a', -65, bodyY - 60, 40 + Math.sin(a.t * 0.8) * 8, 0.9);
       // cabine com o Gizmo
       ctx.beginPath(); ctx.arc(10, bodyY - 48, 40, Math.PI, Math.PI * 2); ctx.closePath();
       ctx.fillStyle = 'rgba(140,220,255,0.35)'; ctx.fill();
@@ -1008,8 +1394,9 @@
       ctx.beginPath(); ctx.arc(10, bodyY - 48, 40, Math.PI, Math.PI * 2); ctx.closePath();
       ctx.fillStyle = 'rgba(200,240,255,0.18)'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(-6, bodyY - 70, 10, 5, -0.5, 0, Math.PI * 2); ctx.fill();
-      // braço-broca
-      const extend = a && a.def.lunge ? Math.min(1, a.t / 20) * 30 : 0;
+      // braço-broca (recua na preparação e avança no golpe)
+      const drilling = a && (a.def === this.ATK.drill || a.def === this.ATK.drillEnd);
+      const extend = drilling ? (a.t < a.def.s ? -TT.easeOut(a.t / a.def.s) * 26 : 30) : 0;
       ctx.save(); ctx.translate(70 + extend, bodyY + 4);
       ctx.fillStyle = col('#7c8798'); ctx.fillRect(-20, -16, 40, 32); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-20, -16, 40, 32);
       ctx.beginPath(); ctx.moveTo(18, -26); ctx.lineTo(120, 0); ctx.lineTo(18, 26); ctx.closePath();
@@ -1019,23 +1406,21 @@
       const sp = (this.drillSpin * 20) % 24;
       for (let k = -24; k < 120; k += 24) { ctx.beginPath(); ctx.moveTo(k + sp, -30); ctx.lineTo(k + sp + 16, 30); ctx.stroke(); }
       ctx.restore();
+      if (drilling && !fl) TT.drawGlow(ctx, '#ffcf5a', 110, 0, 30 + (a.t < a.def.s ? a.t : 20), 0.8);
       ctx.restore();
       // olho-laser
       const charging = a && a.def === this.ATK.laser;
       ctx.beginPath(); ctx.arc(76, bodyY - 26, 12, 0, Math.PI * 2); ctx.fillStyle = '#200'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
       ctx.beginPath(); ctx.arc(78, bodyY - 26, 7, 0, Math.PI * 2); ctx.fillStyle = '#ff3030'; ctx.fill();
-      TT.drawGlow(ctx, '#ff3030', 78, bodyY - 26, charging ? 30 + a.t : 16, 1);
+      TT.drawGlow(ctx, '#ff3030', 78, bodyY - 26, charging ? 30 + Math.min(a.t, 60) : 16, 1);
       ctx.restore();
       ctx.globalAlpha = 1;
       // feixe laser (fase 2)
       if (charging) {
         const d = a.def, oy = y + bodyY - 26;
         if (a.t < d.s) {
-          ctx.strokeStyle = 'rgba(255,60,60,' + (0.3 + (a.t % 6 < 3 ? 0.4 : 0)) + ')'; ctx.lineWidth = 2; ctx.setLineDash([12, 10]);
+          ctx.strokeStyle = 'rgba(255,60,60,' + (0.4 + (a.t % 6 < 3 ? 0.5 : 0)) + ')'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]);
           ctx.beginPath(); ctx.moveTo(x + this.facing * 90, oy); ctx.lineTo(x + this.facing * 1400, oy); ctx.stroke(); ctx.setLineDash([]);
-          // marca no chão da faixa de profundidade atingida
-          ctx.fillStyle = 'rgba(255,40,40,0.18)';
-          ctx.fillRect(this.facing > 0 ? x + 60 : x - 1360, this.y - 24, 1300, 48);
         } else if (a.t < d.s + d.a) {
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           const w = 20 + Math.sin(a.t) * 4;
@@ -1046,6 +1431,7 @@
           ctx.restore();
         }
       }
+      this.drawTell(ctx, x, y, y + bodyY - 100);
       if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height + 20);
     }
     drawGizmo(ctx, x, y, fl) {
@@ -1065,6 +1451,260 @@
     }
   }
   TT.GizmoMech = GizmoMech;
+
+  // ---- Overload: criatura de eletricidade pura com um chip no peito (fase 3)
+  // Fraqueza: depois do teleporte ele superaquece — fica parado com o CHIP EXPOSTO e leva dano dobrado.
+  class Overload extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'OVERLOAD';
+      this.hp = this.maxHp = 1100;
+      this.radius = 64; this.height = 240; this.shadowW = 95;
+      this.poiseMax = 160;
+      this.def = { score: 7000 };
+      this.exposed = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false;
+      this.taunts = ['ENERGIA... MAIS ENERGIA!', 'Vou fritar vocês!', 'Zzzzt... Titãs!', 'Sintam a voltagem!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      this.ATK = {
+        // raio em linha: faixa até a borda da tela (2 faixas na fase 2)
+        bolt: { pose: 'beam', s: 40, a: 14, r: 26, dmg: 14, knockdown: true, launch: 6, kb: 8, zoneHit: true, shock: true, zr: 60, color: '#6fe3ff', sound: 'thunder',
+          zone(f, g) {
+            const end = f.facing > 0 ? g.camX + TT.W + 40 : g.camX - 40;
+            const zs = [{ k: 'rect', x0: f.x + f.facing * 40, x1: end, y: f.y, d: 30 }];
+            if (f.phase2()) {
+              const mid = (TT.FLOOR_TOP + TT.FLOOR_BOTTOM) / 2, y2 = TT.clamp(f.y + (f.y < mid ? 92 : -92), TT.FLOOR_TOP + 36, TT.FLOOR_BOTTOM - 30);
+              zs.push({ k: 'rect', x0: f.x + f.facing * 40, x1: end, y: y2, d: 30 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g) { if (t === this.s) g.impact(f.x + f.facing * 220, f.y, 'KZZZAK!', '#6fe3ff', 0.9); } },
+        // poças elétricas: círculos no chão sob os Titãs (e alguns aleatórios) que explodem em pilares
+        puddles: { pose: 'slam', s: 44, a: 8, r: 30, dmg: 12, knockdown: true, launch: 7, kb: 5, zoneHit: true, shock: true, zr: 40, color: '#ffe14a',
+          zone(f, g) {
+            const zs = [], hs = g.heroes(), n = f.phase2() ? 5 : 3;
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: h.y, rx: 72, ry: 30 });
+            let guard = 0;
+            while (zs.length < n && guard++ < 20) {
+              const tp = groundTarget(g, TT.choice(hs) || f, 330, 100);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 120 || Math.abs(z.y - tp.y) > 50)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: 72, ry: 30 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === this.s) {
+              for (const z of a.zones) { g.impact(z.x, z.y, null, '#ffe14a', 0.35); g.particles.spawn('ring', z.x, z.y, { size: 90, color: '#fff3a0', life: 14, flat: 0.42 }); }
+              g.particles.spawn('text', f.x, f.y - 290, { text: 'ZZZZT!', size: 50, color: '#ffe14a', color2: '#2a7bff', vy: -0.5, life: 44, rot: -0.1 });
+              A().play('thunder');
+            }
+          } },
+        // teleporte: some em faíscas e reaparece com uma descarga no alvo marcado
+        teleport: { pose: 'castUp', s: 46, a: 6, r: 22, dmg: 16, knockdown: true, launch: 9, kb: 9, zoneHit: true, shock: true, zr: 50, color: '#c08cff',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = clampX(g, p.x, f.radius + 20); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 125, ry: 50 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
+            if (t < this.s * 0.5) a.zones = [this.aim(f, g, a)];
+            if (t < this.s) {
+              f.alpha = Math.max(0.15, 1 - t / (this.s * 0.45));
+              if (f.alpha < 0.5) f.invul = 2;
+              if (t % 3 === 0) g.particles.spawn('spark', f.x + TT.rand(-60, 60), f.y - TT.rand(20, 220), { vx: TT.rand(-3, 3), vy: TT.rand(-6, -1), color: '#bff6ff', size: 3, life: 14 });
+              if (t === 2) A().play('zap');
+            }
+            if (t === this.s) {
+              f.x = a.tx; f.y = a.ty; f.alpha = 1; f.invul = 0;
+              g.impact(f.x, f.y, 'KA-ZAP!', '#c08cff', 1.3); A().play('thunder');
+            }
+            if (t === this.s + this.a + this.r - 1) f.overheat();
+          } },
+        // anel de descarga (fase 2): seguro colado nele ou bem longe
+        ring: { pose: 'castUp', s: 38, a: 5, r: 28, dmg: 13, knockdown: true, launch: 8, kb: 8, zoneHit: true, shock: true, zr: 50, color: '#ff5af0',
+          zone(f) { return [{ k: 'ring', x: f.x, y: f.y, r0: 150, r1: 340, ry: 0.4 }]; },
+          onFrame(f, t, g) {
+            if (t === this.s) {
+              g.impact(f.x, f.y, 'VRA-KOOM!', '#ff5af0', 1.1);
+              for (const r of [180, 250, 320]) g.particles.spawn('ring', f.x, f.y, { size: r, color: '#ffb0f6', life: 16, flat: 0.4 });
+              A().play('thunder');
+            }
+          } },
+      };
+      this.applyDifficulty();
+    }
+    // Chip exposto = dano dobrado.
+    get dmgTaken() { return this.exposed > 0 ? 2 : 1; }
+    overheat() {
+      const g = this.game;
+      this.atk = null;
+      this.setState('overheat'); this.setAnim('hurt');
+      this.exposed = 150; this.vx = this.vy = 0;
+      g.say(this, 'Nããão... meu chip!', '#bff6ff');
+      A().play('zap');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'overheat') return; // não interrompe a fraqueza
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'overheat') {
+        this.vx *= 0.8; this.vy *= 0.8;
+        if (this.st % 4 === 0) g.particles.spawn('spark', this.x + TT.rand(-40, 40), this.y - TT.rand(120, 190), { vx: TT.rand(-4, 4), vy: TT.rand(-6, 0), color: TT.choice(['#bff6ff', '#ffe14a']), size: 3, life: 14, grav: 0.3 });
+        if (--this.exposed <= 0) { this.exposed = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 30; }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      this.alpha = 1;
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y;
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'SOBRECARGA TOTAL!', '#ff5af0');
+        g.impact(this.x, this.y, 'SOBRECARGA!', '#ff5af0', 1);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      this.approach(this.sideTarget(p, 230), p.y, p2 ? 2.4 : 1.7);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o teleporte (e a fraqueza logo depois)
+        if (this.atkCount % 3 === 2) pick = 'teleport';
+        else {
+          const opts = ['puddles', 'bolt'];
+          if (Math.abs(dy) < 40) opts.push('bolt');
+          if (p2) opts.push('ring', 'ring');
+          pick = TT.choice(opts);
+        }
+        this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 105);
+        if (Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#bff6ff');
+      }
+    }
+    // Posições dos punhos conforme o golpe (pose exagerada na preparação).
+    fists() {
+      const a = this.atk, t = this.animT, idle = [[96, -112 + Math.sin(t * 0.1) * 6], [-94, -114 - Math.sin(t * 0.1) * 6]];
+      if (!a || this.state !== 'attack') {
+        if (this.state === 'overheat') return [[60, -60], [-60, -62]];
+        return idle;
+      }
+      const d = a.def, k = a.t < d.s ? TT.easeOut(a.t / d.s) : 1, hit = a.t >= d.s;
+      const L = (p, q, u) => [TT.lerp(p[0], q[0], u), TT.lerp(p[1], q[1], u)];
+      if (d === this.ATK.bolt) return hit ? [[168, -150], [-90, -120]] : [L(idle[0], [-10, -214], k), L(idle[1], [-120, -150], k)];
+      if (d === this.ATK.puddles) return hit ? [[118, -16], [-96, -16]] : [L(idle[0], [44, -300], k), L(idle[1], [-44, -300], k)];
+      if (d === this.ATK.ring) return hit ? [[178, -210], [-178, -210]] : [L(idle[0], [26, -156], k), L(idle[1], [-26, -150], k)];
+      return [L(idle[0], [20, -290], k), L(idle[1], [-20, -290], k)];
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, tk = this.tellK();
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z - 14 + Math.sin(t * 0.08) * 5; // flutua
+      const fl = this.flash > 3 || this.tellFlash();
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      const sq = tk >= 0 ? -0.06 * tk : a && this.state === 'attack' && a.t < a.def.s + a.def.a + 6 ? 0.06 : 0;
+      ctx.save(); ctx.globalAlpha = al;
+      TT.drawGlow(ctx, '#2a8cff', x, y - 120, 175 + Math.sin(t * 0.2) * 12, 0.6);
+      ctx.translate(x, y); ctx.scale(this.facing * (1 - sq), 1 + sq);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      const jit = (i) => Math.sin(t * 0.9 + i * 1.7) * 3 + Math.sin(t * 2.3 + i) * 1.5;
+      const SIL = [[0, 0], [-12, -10], [8, -24], [-8, -38], [26, -62], [40, -100], [62, -140], [88, -170], [98, -192], [70, -208], [36, -202], [30, -232], [6, -248], [-22, -240], [-30, -206], [-70, -212], [-98, -190], [-88, -166], [-60, -140], [-40, -100], [-28, -62], [-10, -40], [-18, -22]];
+      const body = (s, cy) => {
+        ctx.beginPath();
+        SIL.forEach(([px, py], i) => { const X = px * s + jit(i), Y = cy + (py - cy) * s + jit(i + 7); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); });
+        ctx.closePath();
+      };
+      const [fF, fB] = this.fists();
+      const arm = (sx, sy, f, col) => {
+        const ex = (sx + f[0]) / 2 + jit(3) * 2, ey = (sy + f[1]) / 2 + 18 + jit(5) * 2;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(f[0], f[1]);
+        ctx.strokeStyle = '#0a1a4a'; ctx.lineWidth = 30; ctx.stroke();
+        ctx.strokeStyle = fl ? '#ffffff' : col; ctx.lineWidth = 23; ctx.stroke();
+        ctx.strokeStyle = '#8ff0ff'; ctx.lineWidth = 9; ctx.stroke();
+        ctx.beginPath(); ctx.arc(f[0], f[1], 20, 0, Math.PI * 2);
+        ctx.fillStyle = fl ? '#ffffff' : col; ctx.fill(); ctx.strokeStyle = '#0a1a4a'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.beginPath(); ctx.arc(f[0], f[1], 11, 0, Math.PI * 2); ctx.fillStyle = '#d8fbff'; ctx.fill();
+      };
+      arm(-74, -186, fB, '#1a5ad8');
+      // corpo em camadas: azul, ciano e núcleo branco
+      body(1, -120); ctx.fillStyle = fl ? '#ffffff' : '#1f6fff'; ctx.fill(); ctx.strokeStyle = '#0a1a4a'; ctx.lineWidth = 4.5; ctx.stroke();
+      if (!fl) {
+        body(0.74, -130); ctx.fillStyle = '#5fd8ff'; ctx.fill();
+        body(0.42, -140); ctx.fillStyle = '#e6fdff'; ctx.fill();
+      }
+      // olhos e boca
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(4, -222); ctx.lineTo(26, -216); ctx.lineTo(22, -208); ctx.lineTo(6, -212); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-14, -220); ctx.lineTo(-2, -216); ctx.lineTo(-4, -209); ctx.lineTo(-14, -212); ctx.closePath(); ctx.fill();
+      TT.drawGlow(ctx, '#ffffff', 12, -214, 16, 0.9);
+      ctx.strokeStyle = '#0a1a4a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-8, -196); ctx.lineTo(0, -192); ctx.lineTo(6, -197); ctx.lineTo(14, -192); ctx.lineTo(22, -196); ctx.stroke();
+      // chip no peito
+      const ex = this.exposed > 0, cs = ex ? 1.6 + Math.sin(t * 0.5) * 0.08 : 1;
+      ctx.save(); ctx.translate(8, -150); ctx.scale(cs, cs);
+      if (ex) TT.drawGlow(ctx, '#ff3a3a', 0, 0, 40, 0.7 + 0.3 * Math.sin(t * 0.6));
+      ctx.fillStyle = '#e2b23c'; for (let k = -10; k <= 10; k += 5) { ctx.fillRect(k - 1, -15, 2.5, 5); ctx.fillRect(k - 1, 10, 2.5, 5); }
+      ctx.fillStyle = '#1f8f4a'; ctx.fillRect(-15, -11, 30, 22); ctx.strokeStyle = '#0a1a4a'; ctx.lineWidth = 2.5; ctx.strokeRect(-15, -11, 30, 22);
+      ctx.strokeStyle = '#9effa8'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-11, -6); ctx.lineTo(-3, -6); ctx.lineTo(-3, 2); ctx.lineTo(8, 2); ctx.moveTo(4, -7); ctx.lineTo(10, -7); ctx.lineTo(10, 6); ctx.stroke();
+      ctx.fillStyle = ex && (t >> 2) % 2 ? '#ff3a3a' : '#2a2d36'; ctx.fillRect(-6, -4, 10, 8);
+      ctx.restore();
+      arm(78, -184, fF, '#2a7bff');
+      ctx.restore();
+      // arcos elétricos ao redor
+      if (al > 0.3 && t % 2 === 0) {
+        const ax0 = x + TT.rand(-80, 80), ay0 = y - TT.rand(40, 220);
+        drawArc(ctx, ax0, ay0, ax0 + TT.rand(-70, 70), ay0 + TT.rand(-60, 60), '#6fe3ff', 2);
+      }
+      ctx.globalAlpha = 1;
+      // efeitos dos golpes ativos
+      if (a && this.state === 'attack' && a.t >= a.def.s && a.t < a.def.s + a.def.a + 2 && a.zones) this.drawStrike(ctx, camX, a);
+      if (tk >= 0 && a.def === this.ATK.bolt) { // punho carregando o raio
+        const fx = x + this.facing * fF[0] * (1 - sq), fy = y + fF[1] * (1 + sq);
+        TT.drawGlow(ctx, '#bff6ff', fx, fy, 30 + 50 * tk, 0.9);
+        if (t % 2 === 0) drawArc(ctx, fx, fy, fx + TT.rand(-50, 50), fy + TT.rand(-50, 50), '#6fe3ff', 2);
+      }
+      this.drawTell(ctx, x, y, y - 262);
+      if (this.state === 'overheat') {
+        Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - 270);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'CHIP EXPOSTO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#9effa8', OUT, 'center', 5);
+      }
+    }
+    // Raio em linha, pilares das poças, descarga do teleporte e anel.
+    drawStrike(ctx, camX, a) {
+      const d = a.def, fade = 1 - (a.t - d.s) / (d.a + 2);
+      ctx.save(); ctx.globalAlpha = Math.max(0, fade);
+      if (d === this.ATK.bolt) {
+        for (const z of a.zones) {
+          const by = z.y - 80;
+          for (let i = 0; i < 2; i++) drawArc(ctx, z.x0 - camX, by, z.x1 - camX, by + TT.rand(-10, 10), '#6fe3ff', 5, 18);
+          ctx.fillStyle = 'rgba(160,240,255,0.35)'; ctx.fillRect(Math.min(z.x0, z.x1) - camX, z.y - z.d, Math.abs(z.x1 - z.x0), z.d * 2);
+        }
+      } else if (d === this.ATK.puddles || d === this.ATK.teleport) {
+        for (const z of a.zones) {
+          const zx = z.x - camX;
+          drawArc(ctx, zx, z.y - 420, zx, z.y, d === this.ATK.puddles ? '#ffe14a' : '#c08cff', 6, 10);
+          TT.drawGlow(ctx, d === this.ATK.puddles ? '#ffe14a' : '#c08cff', zx, z.y - 20, z.rx * 1.3, 0.9);
+        }
+      } else if (d === this.ATK.ring) {
+        const z = a.zones[0], zx = z.x - camX;
+        ctx.globalCompositeOperation = 'lighter';
+        for (const r of [z.r0, (z.r0 + z.r1) / 2, z.r1]) {
+          ctx.strokeStyle = '#ff9af6'; ctx.lineWidth = 6;
+          ctx.beginPath(); ctx.ellipse(zx, z.y, r, r * z.ry, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
+  TT.Overload = Overload;
 
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
@@ -1135,7 +1775,7 @@
   class Projectile {
     constructor(game, o) {
       this.game = game;
-      Object.assign(this, { vy: 0, vz: 0, grav: 0, pierce: false, life: 60, r: 12, t: 0, kb: 3, launch: 5, knockdown: false });
+      Object.assign(this, { vx: 0, vy: 0, vz: 0, grav: 0, pierce: false, life: 60, r: 12, t: 0, kb: 3, launch: 5, knockdown: false });
       Object.assign(this, o);
       this.hits = new Set();
       this.remove = false;
@@ -1145,6 +1785,12 @@
     update() {
       const g = this.game;
       this.t++;
+      // histórico curto de posições para os rastros
+      if (this.trailN) {
+        const tr = this.trail || (this.trail = []);
+        tr.push(this.x, this.y - this.z);
+        if (tr.length > this.trailN * 2) tr.splice(0, 2);
+      }
       this.x += this.vx; this.y += this.vy;
       this.vz -= this.grav; this.z += this.vz;
       if (this.minZ != null && this.z < this.minZ) { this.z = this.minZ; this.vz = 0; }
@@ -1153,19 +1799,22 @@
       if (this.explodeOnGround && this.z <= 0) {
         this.z = 0; this.remove = true;
         g.blast(this.x, this.y, this.explodeOnGround, this.blastDmg || this.dmg, this.team, this.owner);
+        if (this.impactWord) g.impact(this.x, this.y, this.impactWord, '#ff7a2a', 0.5);
         return;
       }
       if (this.kind === 'starbolt' || this.kind === 'bigbolt') {
         if (this.t % 2 === 0) g.particles.spawn('glow', this.x - this.vx, this.y - this.z, { color: '#5dff8a', size: this.r * 1.2, life: 10 });
+        if (this.t % 4 === 0) g.particles.spawn('star', this.x - this.vx * 2, this.y - this.z + TT.rand(-8, 8), { color: '#d9ffe4', size: 6, life: 12, rot: Math.random() });
       } else if (this.kind === 'raven') {
         if (this.t % 3 === 0) g.particles.spawn('feather', this.x - this.vx * 3, this.y - this.z + TT.rand(-20, 20), { color: '#1a0f2e', size: 9, life: 22, vr: 0.2, vy: TT.rand(-1, 1) });
+        if (this.t % 4 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 30, life: 12 });
       } else if (this.kind === 'missile') {
         if (this.t % 2 === 0) g.particles.spawn('dust', this.x, this.y - this.z - 30, { color: 'rgba(200,200,200,0.7)', size: 8, life: 18 });
       }
       if (!this.dmg) return;
       const sx = this.x - g.camX;
       if (sx < -200 || sx > TT.W + 200) { this.remove = true; return; }
-      const targets = this.team === 'hero' ? g.enemies.concat(g.props) : [g.player];
+      const targets = this.team === 'hero' ? g.enemies.concat(g.props) : g.heroes();
       for (const t of targets) {
         if (!t || t.dead || this.hits.has(t) || (t.ko)) continue;
         if (Math.abs(t.x - this.x) > this.r + t.radius) continue;
@@ -1180,10 +1829,24 @@
       }
     }
     get dmgMul() { return 1; }
+    // Rastro: linha que afina e some a partir do histórico de posições.
+    drawTrail(ctx, camX, col, w) {
+      const tr = this.trail;
+      if (!tr || tr.length < 4) return;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.strokeStyle = col;
+      const n = tr.length / 2;
+      for (let i = 1; i < n; i++) {
+        const q = i / n;
+        ctx.globalAlpha = q * 0.7; ctx.lineWidth = Math.max(1, w * q);
+        ctx.beginPath(); ctx.moveTo(tr[i * 2 - 2] - camX, tr[i * 2 - 1]); ctx.lineTo(i === n - 1 ? this.x - camX : tr[i * 2] - camX, i === n - 1 ? this.y - this.z : tr[i * 2 + 1]); ctx.stroke();
+      }
+      ctx.restore();
+    }
     draw(ctx, camX) {
       const x = this.x - camX, y = this.y - this.z;
       switch (this.kind) {
         case 'birdarang': {
+          this.drawTrail(ctx, camX, '#ffe9a0', 5);
           ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin);
           ctx.fillStyle = '#2a2a33'; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
           ctx.beginPath(); ctx.moveTo(-16, -4); ctx.lineTo(0, -1); ctx.lineTo(16, -4); ctx.lineTo(4, 6); ctx.lineTo(0, 3); ctx.lineTo(-4, 6); ctx.closePath();
@@ -1192,20 +1855,21 @@
           ctx.restore();
           break;
         }
-        case 'starbolt': case 'bigbolt':
-          TT.drawGlow(ctx, '#5dff8a', x, y, this.r * 2.4, 1);
-          ctx.fillStyle = '#eaffef'; ctx.beginPath(); ctx.arc(x, y, this.r * 0.45, 0, Math.PI * 2); ctx.fill();
-          break;
-        case 'raven': {
-          ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
-          const f = Math.sin(this.t * 0.4) * 10;
-          ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.moveTo(28, 0); ctx.lineTo(8, -8); ctx.lineTo(-12, -30 - f); ctx.lineTo(-8, -6); ctx.lineTo(-32, -4); ctx.lineTo(-10, 4); ctx.lineTo(-14, 26 + f); ctx.lineTo(8, 6); ctx.closePath();
-          ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(14, -2, 3, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
+        case 'starbolt': case 'bigbolt': {
+          // brilho pulsante + rastro + núcleo branco com anel
+          const pulse = 1 + Math.sin(this.t * 0.7) * 0.18;
+          this.drawTrail(ctx, camX, '#5dff8a', this.r * 0.9);
+          TT.drawGlow(ctx, '#5dff8a', x, y, this.r * 2.6 * pulse, 1);
+          TT.drawGlow(ctx, '#c8ffd8', x, y, this.r * 1.2 * pulse, 0.9);
+          ctx.strokeStyle = 'rgba(220,255,230,0.9)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, this.r * 0.75 * pulse, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, this.r * 0.42, 0, Math.PI * 2); ctx.fill();
           break;
         }
+        case 'raven':
+          this.drawTrail(ctx, camX, '#8a5cff', 16);
+          drawRavenCrow(ctx, x, y, this.facing, 1.35, this.t, 1);
+          break;
         case 'laser':
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           ctx.strokeStyle = '#ff3030'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x - this.vx * 3, y); ctx.lineTo(x, y); ctx.stroke();
@@ -1213,11 +1877,7 @@
           ctx.restore();
           break;
         case 'boulder':
-          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.3);
-          ctx.fillStyle = '#8e8880'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-12, -26); ctx.lineTo(16, -24); ctx.lineTo(30, -2); ctx.lineTo(18, 22); ctx.lineTo(-14, 24); ctx.closePath(); ctx.fill(); ctx.stroke();
-          ctx.strokeStyle = '#6f6a63'; ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(6, 4); ctx.stroke();
-          ctx.restore();
+          drawBoulder(ctx, x, y, 1, this.spin * 0.3);
           break;
         case 'missile': {
           ctx.save(); ctx.translate(x, y);
@@ -1232,17 +1892,17 @@
       }
     }
     drawGround(ctx, camX) {
-      // alvos marcados no chão (míssil/pedra)
-      if (!this.explodeOnGround) return;
-      const x = this.x - camX, k = Math.min(1, this.t / 30);
-      if (this.kind === 'missile') {
-        ctx.strokeStyle = 'rgba(255,50,50,' + (0.4 + 0.4 * ((this.t >> 2) % 2)) + ')'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.ellipse(x, this.y, this.explodeOnGround * k, this.explodeOnGround * 0.38 * k, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,50,50,0.15)'; ctx.fill();
-      } else {
-        ctx.fillStyle = 'rgba(15,5,25,0.3)';
-        ctx.beginPath(); ctx.ellipse(x, this.y, 30, 10, 0, 0, Math.PI * 2); ctx.fill();
-      }
+      // alvo marcado no chão (míssil/pedra): a zona é exatamente a área da explosão
+      if (!this.zone) return;
+      const z = this.zone, k = Math.min(1, this.t / (this.flight || 40));
+      TT.drawZone(ctx, z, camX, k, this.t);
+      // mira no centro
+      const x = z.x - camX, r = 14 + 8 * (1 - k);
+      ctx.strokeStyle = (this.t >> 2) % 2 ? '#ffffff' : '#ff2a2a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x - r, z.y); ctx.lineTo(x + r, z.y); ctx.moveTo(x, z.y - r * 0.42); ctx.lineTo(x, z.y + r * 0.42); ctx.stroke();
+      // sombra do objeto caindo
+      ctx.fillStyle = 'rgba(15,5,25,0.35)';
+      ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 26 * (0.5 + 0.5 * k), 9 * (0.5 + 0.5 * k), 0, 0, Math.PI * 2); ctx.fill();
     }
   }
   TT.Projectile = Projectile;
@@ -1254,14 +1914,15 @@
     }
     update() {
       this.t++; this.r += 11;
-      if (this.r > this.maxR) this.remove = true;
+      if (this.r > this.maxR + 13) this.remove = true;
       const g = this.game;
-      const targets = this.team === 'hero' ? g.enemies : [g.player];
+      const targets = this.team === 'hero' ? g.enemies : g.heroes();
       for (const t of targets) {
         if (!t || t.dead || t.ko || this.hits.has(t) || t.z > 8) continue;
         const dx = t.x - this.x, dy = (t.y - this.y) / 0.38;
         const d = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(d - this.r) < 26) {
+        // a frente da onda acabou de passar pelo alvo (e ele está dentro da área marcada)
+        if (d <= this.maxR && d <= this.r + 13 && d > this.r - 37) {
           this.hits.add(t);
           if (t.takeHit({ x: this.x, dmgMul: 1 }, { dmg: this.dmg, kb: 7, knockdown: true, launch: 7 })) g.onHit(null, t, { dmg: this.dmg, big: true });
         }
@@ -1272,11 +1933,14 @@
       }
     }
     drawGround(ctx, camX) {
-      const k = 1 - this.r / this.maxR, x = this.x - camX;
-      ctx.strokeStyle = 'rgba(255,230,180,' + (0.8 * k) + ')'; ctx.lineWidth = 10 * k + 3;
-      ctx.beginPath(); ctx.ellipse(x, this.y, this.r, this.r * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,80,40,' + (0.6 * k) + ')'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.ellipse(x, this.y, this.r - 10, (this.r - 10) * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      const r = Math.min(this.r, this.maxR), k = 1 - r / this.maxR, x = this.x - camX;
+      // borda vermelha da área total enquanto a onda viaja
+      ctx.strokeStyle = 'rgba(255,60,60,' + (0.35 + 0.3 * ((this.t >> 2) % 2)) + ')'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, this.y, this.maxR, this.maxR * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,230,180,' + (0.3 + 0.6 * k) + ')'; ctx.lineWidth = 12 * k + 5;
+      ctx.beginPath(); ctx.ellipse(x, this.y, r, r * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(120,80,40,' + (0.3 + 0.4 * k) + ')'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, this.y, Math.max(1, r - 12), Math.max(1, r - 12) * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
     }
   }
   TT.Shockwave = Shockwave;
@@ -1311,20 +1975,53 @@
       ctx.restore();
     }
     draw(ctx, camX) {
-      // corvo de energia sobre o grupo
-      const k = this.t / 34, x = this.x - camX, y = this.y - 150 - k * 60;
-      ctx.save(); ctx.translate(x, y); ctx.scale(1 + k * 1.5, 1 + k * 1.5);
-      ctx.globalAlpha = 1 - k;
-      ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#e9dcff'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(-30, -40); ctx.lineTo(-80, -30); ctx.lineTo(-40, -6); ctx.lineTo(-60, 20); ctx.lineTo(-10, 10); ctx.lineTo(0, 30);
-      ctx.lineTo(10, 10); ctx.lineTo(60, 20); ctx.lineTo(40, -6); ctx.lineTo(80, -30); ctx.lineTo(30, -40); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -6, 3, 0, Math.PI * 2); ctx.arc(6, -6, 3, 0, Math.PI * 2); ctx.fill();
+      // corvo de energia (a "alma" da Ravena) abrindo as asas sobre o grupo
+      const k = this.t / 34, x = this.x - camX, y = this.y - 160 - k * 50;
+      ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
+      drawRavenCrow(ctx, x, y, 1, 2.2 + k * 1.6, this.t, 0, true);
       ctx.restore();
     }
     get y2() { return this.y; }
   }
   TT.RavenBlast = RavenBlast;
+
+  // Corvo de energia negra: corpo, asas com penas, contorno violeta + branco e olhos brilhantes.
+  // front = true desenha de frente (asas abertas); senão, de perfil voando.
+  function drawRavenCrow(ctx, x, y, facing, s, t, alpha, front) {
+    TT.drawGlow(ctx, DARK, x, y, 46 * s, 0.6);
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * s, s);
+    ctx.lineJoin = 'round';
+    const flap = Math.sin(t * 0.45);
+    ctx.beginPath();
+    if (front) {
+      const w = 6 * flap;
+      ctx.moveTo(0, -18);
+      // asa esquerda com 4 penas
+      ctx.lineTo(-14, -20); ctx.lineTo(-40, -34 - w); ctx.lineTo(-62, -30 - w); ctx.lineTo(-52, -20 - w * 0.5); ctx.lineTo(-70, -14 - w * 0.5);
+      ctx.lineTo(-56, -6); ctx.lineTo(-68, 4); ctx.lineTo(-48, 2); ctx.lineTo(-54, 14); ctx.lineTo(-30, 4); ctx.lineTo(-12, 8);
+      ctx.lineTo(-8, 22); ctx.lineTo(-3, 16); ctx.lineTo(0, 28); ctx.lineTo(3, 16); ctx.lineTo(8, 22); ctx.lineTo(12, 8);
+      ctx.lineTo(30, 4); ctx.lineTo(54, 14); ctx.lineTo(48, 2); ctx.lineTo(68, 4); ctx.lineTo(56, -6);
+      ctx.lineTo(70, -14 - w * 0.5); ctx.lineTo(52, -20 - w * 0.5); ctx.lineTo(62, -30 - w); ctx.lineTo(40, -34 - w); ctx.lineTo(14, -20);
+      ctx.closePath();
+    } else {
+      const f = flap * 12;
+      ctx.moveTo(30, 0); ctx.lineTo(18, -4); ctx.lineTo(8, -10);
+      ctx.lineTo(-6, -32 - f); ctx.lineTo(-10, -22 - f * 0.7); ctx.lineTo(-20, -34 - f); ctx.lineTo(-18, -18 - f * 0.4); ctx.lineTo(-30, -26 - f * 0.6); ctx.lineTo(-16, -6);
+      ctx.lineTo(-38, -8); ctx.lineTo(-30, -2); ctx.lineTo(-40, 4); ctx.lineTo(-14, 4);
+      ctx.lineTo(-18, 22 + f * 0.6); ctx.lineTo(-6, 10); ctx.lineTo(4, 8); ctx.lineTo(16, 5);
+      ctx.closePath();
+    }
+    ctx.fillStyle = '#100822'; ctx.fill();
+    ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 6; ctx.stroke();
+    ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 2; ctx.stroke();
+    // olhos brilhantes
+    const eyes = front ? [[-6, -12], [6, -12]] : [[16, -2]];
+    for (const [ex, ey] of eyes) {
+      TT.drawGlow(ctx, '#ffffff', ex, ey, 8, 0.9);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(ex, ey, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // ================================================================ Caixas e itens
   class Crate {
@@ -1375,8 +2072,8 @@
       this.t++;
       if (this.z > 0 || this.vz > 0) { this.vz -= 0.6; this.z += this.vz; if (this.z < 0) { this.z = 0; this.vz = 0; } }
       if (--this.life <= 0) this.remove = true;
-      const p = g.player;
-      if (p && !p.ko && this.t > 15 && Math.abs(p.x - this.x) < 44 && Math.abs(p.y - this.y) < 26 && p.z < 30) {
+      for (const p of g.heroes()) {
+        if (this.remove || !(this.t > 15 && Math.abs(p.x - this.x) < 44 && Math.abs(p.y - this.y) < 26 && p.z < 30)) continue;
         this.remove = true;
         A().play('pickup');
         if (this.kind === 'pizza') { p.hp = Math.min(p.maxHp, p.hp + 40); g.popText(p.x, p.y - 150, '+VIDA', '#ffe14a'); }

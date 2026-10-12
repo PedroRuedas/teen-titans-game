@@ -43,6 +43,26 @@
              80, 0, 79, 0, 77, 0, 75, 0, 74, 0, 72, 0, 71, 0, 68, 0],
       drums: 'metal',
     },
+    // Fase 3 — usina: menor, sintético e acelerado
+    stage3: {
+      bpm: 146,
+      chords: [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]],
+      lead: [74, 0, 77, 74, 0, 81, 0, 77, 76, 0, 74, 0, 72, 74, 0, 0,
+             70, 0, 74, 70, 0, 77, 0, 74, 72, 0, 70, 0, 69, 70, 0, 0,
+             72, 0, 76, 72, 0, 79, 0, 76, 74, 0, 72, 0, 76, 77, 0, 0,
+             73, 0, 76, 0, 79, 0, 81, 0, 79, 0, 76, 0, 73, 0, 69, 0],
+      drums: 'punk',
+    },
+    // Chefe Overload: rápido, com saltos de oitava "elétricos"
+    overload: {
+      bpm: 176,
+      chords: [[50, 53, 57], [51, 55, 58], [50, 53, 57], [49, 52, 56]],
+      lead: [74, 86, 0, 74, 0, 81, 0, 74, 77, 0, 76, 0, 74, 0, 72, 0,
+             75, 87, 0, 75, 0, 82, 0, 75, 79, 0, 77, 0, 75, 0, 74, 0,
+             74, 86, 0, 74, 0, 81, 0, 74, 77, 0, 79, 0, 81, 0, 82, 0,
+             85, 0, 84, 0, 82, 0, 81, 0, 79, 0, 77, 0, 76, 0, 73, 0],
+      drums: 'metal',
+    },
     victory: {
       bpm: 120,
       chords: [[60, 64, 67], [65, 69, 72], [67, 71, 74], [60, 64, 67]],
@@ -143,6 +163,8 @@
         case 'break': this.noise(0.25, 0.6, 1500); this.tone(200, 0.12, 'square', 0.15, 90); break;
         case 'drill': this.noise(0.25, 0.25, 600, 'bandpass', 0, null, 4); this.tone(55, 0.25, 'sawtooth', 0.12); break;
         case 'alarm': this.tone(880, 0.25, 'square', 0.15, 660); this.tone(880, 0.25, 'square', 0.15, 660, 0.3); break;
+        case 'zap': this.noise(0.18, 0.4, 5000, 'highpass'); this.tone(1800, 0.12, 'square', 0.1, 400); this.tone(90, 0.15, 'sawtooth', 0.15, 60); break;
+        case 'thunder': this.noise(0.7, 0.8, 1400); this.noise(0.25, 0.4, 6000, 'highpass'); this.tone(60, 0.6, 'sawtooth', 0.4, 30); break;
         case 'shockwave': this.noise(0.5, 0.7, 300); this.tone(50, 0.5, 'sine', 0.7, 25); break;
         default: break;
       }
