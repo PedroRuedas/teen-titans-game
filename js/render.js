@@ -722,6 +722,90 @@
     },
   });
 
+  // Abelha H.I.V.E. (fase 2): uniforme listrado amarelo e preto, capacete de abelha com antenas e asas.
+  S.hiveBee = mkStyle({
+    skin: '#e8b98f', torso: '#f2c12e', arm: '#1e1e24', glove: '#f2c12e', hand: '#f2c12e', leg: '#1e1e24', boot: '#f2c12e',
+    drawBack(ctx, P) { // asas translúcidas batendo
+      const [x, y] = P.rot(-P.st.shW * 0.3, -P.st.torsoH + 8), f = Math.sin((P.t || 0) * 1.6) * 0.35;
+      ctx.save(); ctx.translate(x, y);
+      for (const [a, l] of [[-2.2 + f, 34], [-2.7 + f * 0.8, 26]]) {
+        ctx.save(); ctx.rotate(a);
+        ctx.beginPath(); ctx.ellipse(l * 0.5, 0, l * 0.55, l * 0.22, 0, 0, TAU2);
+        ctx.fillStyle = FLASH ? '#ffffff' : 'rgba(210,240,255,0.55)'; ctx.fill();
+        ctx.strokeStyle = OUT; ctx.lineWidth = 1.8; ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#1e1e24';
+      for (let y = -th + 12; y < -2; y += 11) ctx.fillRect(-24, y, 48, 5); // listras
+      ctx.beginPath(); ctx.moveTo(0, -th + 2); ctx.lineTo(7, -th + 6); ctx.lineTo(7, -th + 13); ctx.lineTo(0, -th + 17); ctx.lineTo(-7, -th + 13); ctx.lineTo(-7, -th + 6); ctx.closePath();
+      ctx.fillStyle = '#1e1e24'; ctx.fill();
+      ctx.fillStyle = '#f2c12e'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', 0, -th + 10);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e8b98f');
+      ctx.beginPath(); ctx.arc(0, -r * 0.05, r * 1.08, Math.PI * 0.8, Math.PI * 2.08); ctx.closePath();
+      ctx.fillStyle = C('#f2c12e'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#1e1e24'; ctx.fillRect(-r * 0.9, -r * 0.7, r * 1.6, r * 0.22);
+        // antenas
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(r * 0.1, -r * 1.0); ctx.quadraticCurveTo(r * 0.3, -r * 1.7, r * 0.75, -r * 1.75);
+        ctx.moveTo(-r * 0.3, -r * 1.0); ctx.quadraticCurveTo(-r * 0.3, -r * 1.75, r * 0.05, -r * 1.9); ctx.stroke();
+        ctx.fillStyle = '#1e1e24'; ctx.beginPath(); ctx.arc(r * 0.75, -r * 1.75, 3.5, 0, TAU2); ctx.arc(r * 0.05, -r * 1.9, 3.5, 0, TAU2); ctx.fill();
+        // olhos compostos grandes (visor)
+        ctx.beginPath(); ctx.ellipse(r * 0.55, -r * 0.08, r * 0.48, r * 0.36, -0.1, 0, TAU2);
+        ctx.fillStyle = '#c0301e'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(r * 0.45, -r * 0.2, r * 0.16, r * 0.08, -0.3, 0, TAU2); ctx.fill();
+      }
+      mouth(ctx, r, pose, r * 0.5, r * 0.6);
+    },
+  });
+
+  // Soldado da fábrica química (fase 4): roupa anti-contaminação amarela, máscara de gás e tanque nas costas.
+  S.hazmat = mkStyle({
+    skin: '#e8b98f', torso: '#e6c43a', arm: '#e6c43a', glove: '#2f3a2e', hand: '#2f3a2e', leg: '#d9b632', boot: '#2f3a2e',
+    shW: 32, hipW: 25,
+    drawBack(ctx, P) { // tanque de gosma nas costas
+      const [x, y] = P.rot(-P.st.shW * 0.55, -P.st.torsoH * 0.55);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(P.lean || 0);
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-10, -18, 20, 36, 8) : ctx.rect(-10, -18, 20, 36);
+      ctx.fillStyle = C('#6c7a86'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!FLASH) { ctx.fillStyle = '#e06ab8'; ctx.fillRect(-5, -6, 10, 18); ctx.strokeRect(-5, -6, 10, 18); }
+      ctx.restore();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#2f3a2e'; ctx.fillRect(-22, -9, 44, 6);
+      ctx.fillStyle = '#c99f22'; ctx.fillRect(-2, -th + 4, 4, th - 14); // zíper
+      // símbolo de risco biológico
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(9, -th + 16, 6, 0, TAU2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(9, -th + 16, 2, 0, TAU2); ctx.fillStyle = OUT; ctx.fill();
+    },
+    drawHead(ctx, r, pose) {
+      // capuz amarelo fechado
+      ctx.beginPath(); ctx.arc(0, -r * 0.02, r * 1.12, 0, TAU2);
+      ctx.fillStyle = C('#e6c43a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.arc(-r * 0.3, 0, r * 0.95, Math.PI * 0.5, Math.PI * 1.5); ctx.fill();
+        // visor de acrílico
+        ctx.beginPath(); ctx.ellipse(r * 0.48, -r * 0.2, r * 0.55, r * 0.42, 0, 0, TAU2);
+        ctx.fillStyle = '#9fd8d0'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.fillStyle = '#1b2422'; ctx.beginPath(); ctx.arc(r * 0.38, -r * 0.2, r * 0.13, 0, TAU2); ctx.arc(r * 0.78, -r * 0.2, r * 0.11, 0, TAU2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(r * 0.2, -r * 0.45, r * 0.35, r * 0.08);
+        // filtro da máscara de gás
+        ctx.beginPath(); ctx.arc(r * 0.72, r * 0.45, r * 0.28, 0, TAU2);
+        ctx.fillStyle = '#2f3a2e'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = '#6c7a86'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(r * 0.55, r * 0.45); ctx.lineTo(r * 0.9, r * 0.45); ctx.moveTo(r * 0.72, r * 0.28); ctx.lineTo(r * 0.72, r * 0.62); ctx.stroke();
+      }
+    },
+  });
+
   S.slade = mkStyle({
     skin: '#1f2126', torso: '#1f2126', arm: '#2a2d33', glove: '#80868f', hand: '#80868f', leg: '#2a2d33', boot: '#80868f',
     shW: 32, hipW: 24, armW: 9, legW: 10,

@@ -1,7 +1,7 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
 Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): quatro fases
-(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia** e **Fábrica Química**), os 5 Titãs jogáveis com troca
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia** e **Fábrica de Gosma**), os 5 Titãs jogáveis com troca
 em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
 ## Como jogar
@@ -78,33 +78,38 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
 
 ## Fases
 
-1. **Torre Titã**: a H.I.V.E. invade a ilha e a torre. Você enfrenta Soldados H.I.V.E., Robôs do Slade
-   e Drones do Gizmo. O chefe é o **Cinderblock**, com soco giratório, onda de choque (pule!),
-   investida (desvie e ele fica tonto ao bater na parede) e arremesso de pedras.
+Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil para testar.
+
+1. **Torre Titã**: a H.I.V.E. invade a ilha e a torre. Inimigos: **Soldados H.I.V.E.** e os
+   **Robôs do Slade** (máscara laranja). O chefe é o **Cinderblock**, com soco giratório, onda de
+   choque (pule!), investida (desvie e ele fica tonto ao bater na parede) e arremesso de pedras.
 2. **Perfuratriz do Terror**: túneis sob Jump City, com uma **perseguição** contra uma
-   perfuratriz gigante da H.I.V.E. O chefe é o **Gizmo** num robô-aranha, com broca, chuva de
-   mísseis (fuja dos círculos vermelhos), invocação de drones e, na fase 2, um laser.
+   perfuratriz gigante da H.I.V.E. Inimigos: **Soldados H.I.V.E.** e **Abelhas H.I.V.E.** (listradas,
+   com asas; dão uma ferroada em voo rasante e recuam). O chefe é o **Gizmo** num robô-aranha, com
+   broca, chuva de mísseis (fuja dos círculos vermelhos), invocação de drones e, na fase 2, um laser.
 3. **Usina de Energia**: pátio de transformadores, galpão de turbinas e o núcleo com bobinas de Tesla.
-   Novo inimigo: o **Soldado Elétrico** da H.I.V.E. (bastão elétrico, bate e recua). O chefe é o
+   Inimigos: só **Soldados Elétricos** (bastão elétrico, bate e recua). O chefe é o
    **Overload**: raio em linha, poças elétricas, teleporte com descarga e, abaixo de 50% de vida,
    anel de descarga e raio duplo. **Fraqueza:** depois do teleporte ele superaquece e fica com o
    **chip exposto** — dano dobrado!
-4. **Fábrica Química**: pátio de tanques e barris tóxicos, galpão de tonéis borbulhando e o
-   laboratório de contenção. O chefe é o **Plasmus**, o monstro de lodo: soco esticado em linha,
-   cusparada de lodo (fuja dos círculos), onda de lodo (pule!) e, abaixo de 50% de vida, mergulho
-   no chão para emergir embaixo de você. **Fraqueza:** depois do soco esticado o braço fica
-   **grudado no chão** — ele trava no lugar e leva dano dobrado!
+4. **Fábrica de Gosma**: linha de envase com esteiras e potes, salão dos misturadores de vidro e a
+   câmara de contenção estourada — tudo em azulejo verde-água e gosma rosa. Inimigos: **Gosmas**
+   (pulam em cima de você; as grandes se dividem em duas pequenas) e **Soldados Químicos** (roupa
+   amarela e máscara de gás; jato de gosma). O chefe é o **Plasmus**, um gigante musculoso de
+   lodo: soco esticado em linha, cusparada de lodo (fuja dos círculos), onda de lodo (pule!) e,
+   abaixo de 50% de vida, mergulho no chão para emergir embaixo de você. **Fraqueza:** depois do
+   soco esticado o braço fica **grudado no chão** — ele trava no lugar e leva dano dobrado!
 
 ## Música e vozes
 
 - A trilha das fases e do título é a **abertura de Teen Titans**, num arranjo sintetizado feito de
   memória. Os chefes têm músicas próprias.
-- Os Titãs **falam** as falas dos golpes ("Azarath Metrion Zinthos!", "BOOYAH!", "Raios
-  oculares!"…) com a voz sintetizada do navegador, cada um com seu tom.
-- Para usar a **música original** e **falas reais** dos episódios, coloque seus próprios arquivos
-  (mp3/ogg/wav) na pasta `audio/` e escreva os caminhos em `audio/arquivos.js` (há exemplos
-  comentados lá). O jogo usa esses arquivos no lugar dos sons sintetizados; se algum não for
-  encontrado, volta sozinho para a versão sintetizada.
+- Por enquanto só a **Ravena fala**: "Azarath Metrion Zinthos!" no especial. O jogo toca
+  `audio/vozes/ravena-azarath.mp3`; se o arquivo não existir, usa a voz sintetizada do navegador.
+  Os outros Titãs só mostram o balão de fala.
+- Para usar a **música original** ou mais falas reais, coloque os arquivos (mp3/ogg/wav) na pasta
+  `audio/` e escreva os caminhos em `audio/arquivos.js`. Se algum não for encontrado, o jogo volta
+  sozinho para o som sintetizado.
 
 ## Tecnologia
 
@@ -147,7 +152,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 91 verificações e todas passam:
+página e chame a função serve.) A suíte tem 92 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -155,7 +160,7 @@ página e chame a função serve.) A suíte tem 91 verificações e todas passam
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
   fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload e do Plasmus.
-- Vozes dos Titãs nos golpes e a abertura tocando em todas as fases.
+- Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante! e regressões.
 - 3 partidas completas (4 fases) do início ao fim com um bot.
 - Os quatro chefes vencidos pelo bot **sem trapaça** no NORMAL.

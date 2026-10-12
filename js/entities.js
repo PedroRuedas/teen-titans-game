@@ -875,6 +875,34 @@
         zone(f) { return [{ k: 'ell', x: f.x + f.facing * 30, y: f.y, rx: 125, ry: 50 }]; } },
     ],
   };
+
+  // Abelha H.I.V.E. (fase 2): bate e recua como o soldado elétrico; a ferroada é um voo rasante em linha.
+  ENEMIES.bee = {
+    name: 'Abelha H.I.V.E.', style: 'hiveBee', hp: 48, speed: 3.0, range: 150, score: 150, aggr: 1.1,
+    attacks: [
+      { pose: 'flyKick', s: 20, a: 12, r: 18, lunge: 10, dmg: 10, reach: [0, 80], depth: 26, kb: 6, knockdown: true, launch: 5, sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 220, y: f.y, d: 26 }]; },
+        onFrame(f, t) { if (t > this.s && t < this.s + this.a) f.z = Math.max(f.z, 18); } },
+      { pose: 'jab', s: 14, a: 4, r: 16, dmg: 7, reach: [0, 66], kb: 2 },
+    ],
+  };
+  // Soldado da fábrica química (fase 4): jato de gosma em cone (marcado no chão) e soco curto.
+  ENEMIES.hazmat = {
+    name: 'Soldado Químico', style: 'hazmat', hp: 58, speed: 2.4, range: 150, score: 170, aggr: 1,
+    attacks: [
+      { pose: 'beam', s: 26, a: 10, r: 20, dmg: 9, zoneHit: true, kb: 4, stun: 30, sound0: 'drill',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 190, y: f.y, d: 30 }]; } },
+      { pose: 'jab', s: 14, a: 4, r: 16, dmg: 8, reach: [0, 64], kb: 3 },
+    ],
+  };
+  // Gosminha (fase 4): pedaço do Plasmus que pula em cima dos Titãs. As grandes se dividem em duas pequenas.
+  ENEMIES.goo = {
+    name: 'Gosma', style: 'hive', hp: 38, speed: 2.1, range: 64, score: 90, aggr: 1.2,
+    attacks: [
+      { pose: 'jab', s: 22, a: 8, r: 22, lunge: 8, dmg: 8, reach: [0, 70], depth: 30, kb: 4, sound0: 'land' },
+      { pose: 'jab', s: 26, a: 4, r: 24, dmg: 10, reach: [-50, 80], depth: 40, kb: 6, knockdown: true, launch: 4, sound0: 'land' },
+    ],
+  };
   TT.ENEMIES = ENEMIES;
 
   class Enemy extends Fighter {
@@ -1029,8 +1057,8 @@
   // Soldado elétrico da H.I.V.E. (fase 3): bastão elétrico, ataca e recua (bate e corre).
   // Dois golpes, ambos com aviso no chão: estocada em investida (faixa) e descarga no chão (círculo).
   class ShockTrooper extends Enemy {
-    constructor(game, x, y) {
-      super(game, 'shock', x, y);
+    constructor(game, x, y, kind) {
+      super(game, kind || 'shock', x, y);
       this.backoff = 0;
     }
     think() {
@@ -1082,6 +1110,108 @@
     }
   }
   TT.ShockTrooper = ShockTrooper;
+
+  // Abelha H.I.V.E. (fase 2): mesma tática de bate e recua, com zumbido das asas.
+  class BeeSoldier extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'bee'); }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      if (a && this.state === 'attack' && a.def === this.def.attacks[0] && a.t > a.def.s && a.t < a.def.s + a.def.a) {
+        const x = this.x - camX, y = this.y - this.z - 70; // rastro do voo rasante
+        ctx.strokeStyle = 'rgba(255,225,80,0.6)'; ctx.lineWidth = 4;
+        for (const dy of [-14, 0, 14]) { ctx.beginPath(); ctx.moveTo(x - this.facing * 20, y + dy); ctx.lineTo(x - this.facing * 90, y + dy); ctx.stroke(); }
+      }
+    }
+  }
+  TT.BeeSoldier = BeeSoldier;
+
+  // Soldado químico (fase 4): jato de gosma rosa saindo da mangueira.
+  class HazmatSoldier extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'hazmat'); }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.def !== this.def.attacks[0]) return;
+      const x = this.x - camX + this.facing * 30, y = this.y - this.z - 74, d = a.def;
+      if (a.t < d.s) { // gotejando enquanto carrega
+        if (a.t % 4 === 0) this.game.particles.spawn('debris', this.x + this.facing * 34, this.y - 74, { vx: this.facing, vy: 0, grav: 0.5, color: '#e06ab8', size: 5, life: 22, floor: this.y });
+        return;
+      }
+      if (a.t >= d.s + d.a) return;
+      const k = (a.t - d.s) / d.a, len = 170 * Math.min(1, k * 3);
+      ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+      ctx.fillStyle = '#c2569b'; ctx.strokeStyle = '#2a0f2a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.quadraticCurveTo(len * 0.6, -14, len, 64); ctx.lineTo(len - 40, 74); ctx.quadraticCurveTo(len * 0.5, 10, 0, 6); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,190,235,0.7)'; ctx.beginPath(); ctx.ellipse(len * 0.4, -4, 26, 4, 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+  TT.HazmatSoldier = HazmatSoldier;
+
+  // Gosma (fase 4): bolha que pula; as grandes se dividem em duas pequenas ao morrer.
+  class GooBlob extends Enemy {
+    constructor(game, x, y, small) {
+      super(game, 'goo', x, y);
+      this.small = !!small;
+      this.size = small ? 0.62 : 1;
+      if (small) { this.hp = this.maxHp = Math.round(16 * game.diff.enemyHp); this.def = Object.assign({}, this.def, { score: 40, speed: 2.6 }); }
+      this.radius = 30 * this.size; this.height = 70 * this.size; this.shadowW = 34 * this.size;
+      this.hue = TT.choice(['#c2569b', '#b44fa0', '#d0609e']);
+    }
+    die(dir, d) {
+      super.die(dir, d);
+      const g = this.game;
+      for (let i = 0; i < 8; i++) g.particles.spawn('debris', this.x, this.y - 20, { vx: TT.rand(-5, 5), vy: -TT.rand(3, 8), grav: 0.5, color: this.hue, size: TT.rand(5, 9), life: 26, floor: this.y });
+      if (!this.small) for (const s of [-1, 1]) {
+        const c = new GooBlob(g, this.x + s * 30, TT.clamp(this.y + s * 14, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), true);
+        c.entering = false; c.vx = s * 3; c.cool = 40; g.addEnemy(c);
+      }
+    }
+    draw(ctx, camX) {
+      const dying = this.dead && this.state === 'down';
+      if (dying && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk, sz = this.size, fl = this.flash > 3;
+      const x = this.x - camX, y = this.y - this.z;
+      // pulo do ataque: agacha na preparação e salta no golpe
+      let sq = Math.sin(t * 0.15) * 0.06, hop = 0;
+      if (a && this.state === 'attack') {
+        const d = a.def;
+        if (a.t < d.s) sq = -0.25 * (a.t / d.s);
+        else if (a.t < d.s + d.a) { const u = (a.t - d.s) / d.a; hop = Math.sin(u * Math.PI) * (d === this.def.attacks[1] ? 70 : 36); sq = 0.18; }
+      }
+      if (this.state === 'down') sq = -0.4;
+      const w = 34 * sz * (1 - sq * 0.8), h = 42 * sz * (1 + sq), cy = y - hop;
+      ctx.save(); ctx.translate(x, cy); ctx.scale(this.facing, 1);
+      ctx.beginPath();
+      ctx.moveTo(-w, 0);
+      ctx.bezierCurveTo(-w * 1.1, -h * 0.9, -w * 0.4, -h * 1.5, w * 0.1, -h * 1.45);
+      ctx.bezierCurveTo(w * 0.8, -h * 1.4, w * 1.15, -h * 0.7, w, 0);
+      for (let k = 0; k <= 4; k++) ctx.lineTo(w - k * w / 2, 4 + (k % 2) * 5 + Math.sin(t * 0.2 + k) * 2);
+      ctx.closePath();
+      ctx.fillStyle = fl ? '#ffffff' : this.hue; ctx.fill();
+      if (!fl) {
+        ctx.save(); ctx.clip();
+        ctx.fillStyle = 'rgba(70,10,60,0.35)'; ctx.beginPath(); ctx.ellipse(-w * 0.7, -h * 0.4, w * 0.6, h * 1.2, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,210,240,0.7)'; ctx.beginPath(); ctx.ellipse(w * 0.2, -h * 1.15, w * 0.3, h * 0.12, -0.3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = '#2a0f2a'; ctx.lineWidth = 3.5; ctx.stroke();
+      if (!fl) { // olhos amarelos e bocão
+        const ey = -h * 0.85;
+        ctx.fillStyle = '#ffe14a';
+        ctx.beginPath(); ctx.ellipse(w * 0.15, ey, 6 * sz, 7 * sz, 0, 0, Math.PI * 2); ctx.ellipse(w * 0.6, ey, 5 * sz, 6 * sz, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2a0f2a'; ctx.beginPath(); ctx.arc(w * 0.2, ey, 2.5 * sz, 0, Math.PI * 2); ctx.arc(w * 0.63, ey, 2.2 * sz, 0, Math.PI * 2); ctx.fill();
+        const open = a && this.state === 'attack' ? 9 : 4;
+        ctx.fillStyle = '#3a0a2a'; ctx.beginPath(); ctx.ellipse(w * 0.4, -h * 0.45, 12 * sz, open * sz, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      const tell = a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', x, cy - h, 14 + 20 * tell, 0.35 + 0.5 * tell);
+    }
+  }
+  TT.GooBlob = GooBlob;
 
   // Raio em zigue-zague entre dois pontos (para efeitos elétricos).
   function drawArc(ctx, x0, y0, x1, y1, col, w, segs) {
@@ -1862,7 +1992,7 @@
       super(game, x, y);
       this.name = 'PLASMUS';
       this.hp = this.maxHp = 1250;
-      this.radius = 70; this.height = 250; this.shadowW = 110;
+      this.radius = 70; this.height = 270; this.shadowW = 110;
       this.poiseMax = 180;
       this.def = { score: 8000 };
       this.stuck = 0; this.rise = 1; this.melt = 0; this.atkCount = 0; this.p2Said = false; this.armX = 0;
@@ -2003,18 +2133,18 @@
     // Ponta dos braços (x, y) relativa aos pés, conforme o golpe.
     fists() {
       const a = this.atk, t = this.animT, w = Math.sin(t * 0.09) * 6;
-      const idle = [[104, -96 + w], [-100, -100 - w]];
-      if (this.state === 'stuck') return [[this.armX * this.facing, -14], [-90, -70]];
+      const idle = [[118, -110 + w], [-112, -116 - w]];
+      if (this.state === 'stuck') return [[this.armX * this.facing, -14], [-104, -96]];
       if (!a || this.state !== 'attack') return idle;
       const d = a.def, k = a.t < d.s ? TT.easeOut(a.t / d.s) : 1, hit = a.t >= d.s;
       const L = (p, q, u) => [TT.lerp(p[0], q[0], u), TT.lerp(p[1], q[1], u)];
       if (d === this.ATK.punch) {
-        if (!hit) return [L(idle[0], [-40, -180], k), L(idle[1], [-120, -120], k)];
+        if (!hit) return [L(idle[0], [-50, -230], k), L(idle[1], [-130, -150], k)];
         const u = Math.min(1, (a.t - d.s + 1) / 3);
-        return [[TT.lerp(60, 490, u), TT.lerp(-120, -14, u)], [-110, -90]];
+        return [[TT.lerp(120, 490, u), TT.lerp(-180, -14, u)], [-112, -110]];
       }
-      if (d === this.ATK.wave) return hit ? [[120, -10], [-110, -10]] : [L(idle[0], [50, -300], k), L(idle[1], [-50, -300], k)];
-      return [L(idle[0], [70, -230], k), L(idle[1], [-70, -230], k)];
+      if (d === this.ATK.wave) return hit ? [[130, -14], [-120, -14]] : [L(idle[0], [50, -330], k), L(idle[1], [-50, -330], k)];
+      return [L(idle[0], [90, -300], k), L(idle[1], [-80, -300], k)];
     }
     draw(ctx, camX) {
       const t = this.animT, a = this.atk, tk = this.tellK();
@@ -2034,62 +2164,92 @@
         ctx.save();
         ctx.translate(x, y); ctx.scale(this.facing * sx, sy);
         ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        const wob = (i) => Math.sin(t * 0.12 + i * 1.9) * 4 + Math.sin(t * 0.31 + i * 0.7) * 2;
+        const wob = (i) => Math.sin(t * 0.12 + i * 1.9) * 2.5 + Math.sin(t * 0.31 + i * 0.7) * 1.2;
         const [fF, fB] = this.fists();
+        const ink = (fillCol, lw) => { ctx.fillStyle = fl ? '#ffffff' : fillCol; ctx.fill(); ctx.strokeStyle = OUTL; ctx.lineWidth = lw || 5; ctx.stroke(); };
+        const muscle = (d, w) => { if (fl) return; ctx.strokeStyle = dark; ctx.lineWidth = w || 3.5; ctx.stroke(new Path2D(d)); };
+        // braço de lodo musculoso: ombro -> cotovelo -> punho (estica além do comprimento normal no soco)
         const arm = (sx0, sy0, f, front) => {
-          const mx = (sx0 + f[0]) / 2, my = Math.min(sy0, f[1]) - 20 + wob(front ? 3 : 5);
-          ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.quadraticCurveTo(mx, my, f[0], f[1]);
-          ctx.strokeStyle = OUTL; ctx.lineWidth = 46; ctx.stroke();
-          ctx.strokeStyle = fl ? '#ffffff' : (front ? body : dark); ctx.lineWidth = 38; ctx.stroke();
-          if (!fl) { ctx.strokeStyle = front ? light : body; ctx.lineWidth = 10; ctx.globalAlpha = 0.6; ctx.stroke(); ctx.globalAlpha = 1; }
-          ctx.beginPath(); ctx.arc(f[0], f[1], 30, 0, Math.PI * 2);
-          ctx.fillStyle = fl ? '#ffffff' : (front ? body : dark); ctx.fill(); ctx.strokeStyle = OUTL; ctx.lineWidth = 4; ctx.stroke();
-          if (!fl) { ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(f[0] - 8, f[1] - 10, 10, 6, -0.4, 0, Math.PI * 2); ctx.fill(); }
+          const col = front ? body : dark, L = 82;
+          const dx = f[0] - sx0, dy = f[1] - sy0, d = Math.hypot(dx, dy) || 1;
+          const bend = d < L * 2 ? Math.sqrt(L * L - (d / 2) * (d / 2)) : 0;
+          let px = -dy / d, py = dx / d;
+          if (px * sx0 < 0) { px = -px; py = -py; } // cotovelo para fora do corpo
+          const ex = (sx0 + f[0]) / 2 + px * bend + wob(front ? 3 : 5), ey = (sy0 + f[1]) / 2 + py * bend;
+          const seg = (ax, ay, bx, by, w0, w1) => { // segmento grosso com contorno
+            const w = (w0 + w1);
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+            ctx.strokeStyle = OUTL; ctx.lineWidth = w + 9; ctx.stroke();
+            ctx.strokeStyle = fl ? '#ffffff' : col; ctx.lineWidth = w; ctx.stroke();
+          };
+          seg(ex, ey, f[0], f[1], 24, 19); // antebraço
+          seg(sx0, sy0, ex, ey, 34, 25); // braço com bíceps
+          if (!fl) { // bíceps e brilho
+            const bx = (sx0 + ex) / 2, by = (sy0 + ey) / 2;
+            ctx.fillStyle = front ? light : body; ctx.globalAlpha = 0.55;
+            ctx.beginPath(); ctx.ellipse(bx + 4, by - 6, 15, 9, Math.atan2(ey - sy0, ex - sx0), 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+          ctx.beginPath(); ctx.arc(sx0, sy0, 36, 0, Math.PI * 2); ink(col, 4.5); // deltoide
+          ctx.beginPath(); ctx.arc(f[0], f[1], 31, 0, Math.PI * 2); ink(col, 4.5); // punho
+          if (!fl) {
+            ctx.strokeStyle = dark; ctx.lineWidth = 3;
+            for (const k of [-12, 0, 12]) { ctx.beginPath(); ctx.moveTo(f[0] + 10, f[1] + k - 4); ctx.lineTo(f[0] + 22, f[1] + k); ctx.stroke(); } // dedos
+            ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(f[0] - 9, f[1] - 12, 10, 6, -0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = light; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.ellipse(sx0 + 6, sy0 - 14, 16, 8, -0.3, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+          }
         };
-        arm(-62, -160, fB, false);
-        // corpo: monte de lodo com ombros largos e cabeça afundada
-        const SIL = [[-120, 0], [-112, -40], [-96, -90], [-100, -140], [-84, -180], [-50, -206], [-26, -240], [14, -252], [52, -236], [70, -204], [98, -176], [108, -132], [96, -86], [112, -38], [124, 0]];
+        // pernas: colunas grossas de lodo que escorrem na poça
+        const walk = this.anim === 'walk' ? Math.sin(t * 0.2) * 10 : 0;
+        ctx.beginPath(); ctx.moveTo(-78, -112); ctx.bezierCurveTo(-88, -70, -80 - walk, -24, -92 - walk, 6); ctx.lineTo(-18 - walk, 8); ctx.bezierCurveTo(-18, -30, -10, -70, -4, -112); ctx.closePath(); ink(dark);
+        ctx.beginPath(); ctx.moveTo(0, -112); ctx.bezierCurveTo(8, -70, 18 + walk, -28, 14 + walk, 8); ctx.lineTo(94 + walk, 6); ctx.bezierCurveTo(84 + walk, -26, 88, -70, 78, -112); ctx.closePath(); ink(body);
+        muscle('M 30 -90 Q 44 -60 38 -30 M 52 -96 Q 64 -66 60 -40', 3);
+        arm(-74, -214, fB, false);
+        // tronco em V: cintura fina, peito largo e trapézio alto em volta da cabeça afundada
         ctx.beginPath();
-        const pt = (i) => [SIL[i][0] + wob(i), SIL[i][1] + (i && i < SIL.length - 1 ? wob(i + 9) : 0)];
-        let [px, py] = pt(0); ctx.moveTo(px, py);
-        for (let i = 1; i < SIL.length; i++) {
-          const [qx, qy] = pt(i), [nx, ny] = i + 1 < SIL.length ? pt(i + 1) : pt(i);
-          ctx.quadraticCurveTo(qx, qy, (qx + nx) / 2, (qy + ny) / 2);
-        }
-        // base com escorridos
-        for (let k = 0; k <= 6; k++) { const bx = 124 - k * 41; ctx.lineTo(bx, 6 + (k % 2) * 8 + Math.sin(t * 0.2 + k) * 3); }
+        ctx.moveTo(-62 + wob(1), -96);
+        ctx.bezierCurveTo(-70, -140, -112 + wob(2), -164, -114, -204);
+        ctx.bezierCurveTo(-116, -234, -86, -250, -54, -246);
+        ctx.bezierCurveTo(-30, -276 + wob(3), 62, -280, 80, -248);
+        ctx.bezierCurveTo(110, -248, 122 + wob(4), -226, 118, -198);
+        ctx.bezierCurveTo(112, -164, 74, -140, 68 + wob(5), -96);
+        ctx.quadraticCurveTo(4, -84, -62 + wob(1), -96);
         ctx.closePath();
-        ctx.fillStyle = fl ? '#ffffff' : body; ctx.fill();
+        ink(body);
         if (!fl) {
           ctx.save(); ctx.clip();
-          ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(-110, -110, 70, 170, 0.15, 0, Math.PI * 2); ctx.fill(); // lado na sombra
-          ctx.fillStyle = light; ctx.globalAlpha = 0.7;
-          ctx.beginPath(); ctx.ellipse(40, -200, 26, 12, -0.5, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.ellipse(70, -120, 10, 30, 0.2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(-112, -170, 54, 110, 0.1, 0, Math.PI * 2); ctx.fill(); // lado na sombra
+          ctx.fillStyle = light; ctx.globalAlpha = 0.6;
+          ctx.beginPath(); ctx.ellipse(46, -206, 30, 13, -0.3, 0, Math.PI * 2); ctx.fill(); // brilho no peitoral
+          ctx.beginPath(); ctx.ellipse(-20, -212, 22, 10, -0.2, 0, Math.PI * 2); ctx.fill();
           ctx.globalAlpha = 1;
-          for (let k = 0; k < 5; k++) { // bolhas internas
-            const bx = -60 + k * 30 + Math.sin(t * 0.05 + k) * 10, by = -40 - ((t * 0.8 + k * 47) % 200);
-            ctx.strokeStyle = 'rgba(255,200,240,0.6)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(bx, by, 5 + (k % 3) * 2, 0, Math.PI * 2); ctx.stroke();
+          for (let k = 0; k < 4; k++) { // bolhas internas
+            const bx = -40 + k * 30 + Math.sin(t * 0.05 + k) * 8, by = -100 - ((t * 0.7 + k * 41) % 130);
+            ctx.strokeStyle = 'rgba(255,200,240,0.55)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(bx, by, 4 + (k % 3) * 2, 0, Math.PI * 2); ctx.stroke();
           }
           ctx.restore();
+          // peitoral e abdômen definidos
+          muscle('M -40 -222 Q 0 -230 12 -196 Q 0 -180 -34 -186 M 22 -196 Q 40 -232 92 -214 Q 92 -186 56 -180 Q 34 -182 22 -196', 4);
+          muscle('M 6 -176 L 10 -104 M -16 -166 Q -4 -160 6 -164 M 12 -164 Q 26 -160 40 -166 M -16 -142 Q -4 -136 7 -140 M 11 -140 Q 26 -136 38 -142 M -14 -118 Q -4 -114 8 -116 M 10 -116 Q 24 -112 36 -118', 3);
         }
-        ctx.strokeStyle = OUTL; ctx.lineWidth = 5; ctx.stroke();
-        // rosto: olhos amarelos brilhantes e bocarra
+        // cabeça pequena afundada entre os ombros
         const roar = (a && this.state === 'attack') || this.state === 'stuck';
+        ctx.beginPath(); ctx.ellipse(24, -250, 36, 30, 0, 0, Math.PI * 2); ink(body, 4.5);
         if (!fl) {
+          ctx.fillStyle = dark; ctx.beginPath(); ctx.moveTo(-6, -262); ctx.quadraticCurveTo(26, -276, 58, -262); ctx.lineTo(56, -256); ctx.quadraticCurveTo(26, -268, -4, -255); ctx.closePath(); ctx.fill(); // sobrancelha pesada
           ctx.fillStyle = '#ffe14a';
-          ctx.beginPath(); ctx.moveTo(10, -214); ctx.quadraticCurveTo(30, -224, 46, -212); ctx.quadraticCurveTo(30, -204, 10, -214); ctx.fill();
-          ctx.beginPath(); ctx.moveTo(-26, -210); ctx.quadraticCurveTo(-12, -218, 0, -210); ctx.quadraticCurveTo(-12, -203, -26, -210); ctx.fill();
-          TT.drawGlow(ctx, '#ffe14a', 18, -212, 26, 0.8);
-          ctx.fillStyle = OUTL; ctx.beginPath(); ctx.arc(30, -213, 3.5, 0, Math.PI * 2); ctx.arc(-12, -210, 3, 0, Math.PI * 2); ctx.fill();
-          const mo = roar ? 26 + Math.sin(t * 0.5) * 4 : 12;
-          ctx.fillStyle = '#3a0a2a'; ctx.strokeStyle = OUTL; ctx.lineWidth = 3.5;
-          ctx.beginPath(); ctx.ellipse(14, -170, 40, mo, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#ffeaf6'; // dentes tortos
-          for (let k = -3; k <= 3; k++) { const tx = 14 + k * 11; ctx.beginPath(); ctx.moveTo(tx - 5, -170 - mo + 3); ctx.lineTo(tx + 5, -170 - mo + 3); ctx.lineTo(tx, -170 - mo + 14); ctx.closePath(); ctx.fill(); }
-          if (roar) { ctx.fillStyle = '#e47cc4'; ctx.fillRect(-4, -170, 8, mo + 12); ctx.beginPath(); ctx.arc(0, -158 + mo, 6, 0, Math.PI * 2); ctx.fill(); } // baba
+          ctx.beginPath(); ctx.moveTo(30, -256); ctx.quadraticCurveTo(44, -264, 54, -254); ctx.quadraticCurveTo(42, -248, 30, -256); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(0, -254); ctx.quadraticCurveTo(10, -261, 20, -254); ctx.quadraticCurveTo(10, -248, 0, -254); ctx.fill();
+          TT.drawGlow(ctx, '#ffe14a', 28, -255, 24, 0.8);
+          ctx.fillStyle = OUTL; ctx.beginPath(); ctx.arc(44, -256, 3, 0, Math.PI * 2); ctx.arc(11, -255, 2.5, 0, Math.PI * 2); ctx.fill();
+          const mo = roar ? 14 + Math.sin(t * 0.5) * 3 : 5;
+          ctx.fillStyle = '#3a0a2a'; ctx.strokeStyle = OUTL; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(30, -232, 24, mo, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffeaf6';
+          for (let k = -2; k <= 2; k++) { const tx = 30 + k * 9; ctx.beginPath(); ctx.moveTo(tx - 4, -232 - mo + 2); ctx.lineTo(tx + 4, -232 - mo + 2); ctx.lineTo(tx, -232 - mo + 10); ctx.closePath(); ctx.fill(); }
+          if (roar) { ctx.fillStyle = '#e47cc4'; ctx.fillRect(18, -232, 6, mo + 14); ctx.beginPath(); ctx.arc(21, -218 + mo, 5, 0, Math.PI * 2); ctx.fill(); } // baba
         }
-        arm(66, -164, fF, true);
+        arm(82, -212, fF, true);
         ctx.restore();
       } else if (!fl) { // derretido: só bolhas na poça
         for (let k = 0; k < 3; k++) { ctx.strokeStyle = 'rgba(255,200,240,0.8)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x - 40 + k * 40, y - 8 - ((t + k * 9) % 18), 6, 0, Math.PI * 2); ctx.stroke(); }
@@ -2112,7 +2272,7 @@
           ctx.fillStyle = light; ctx.beginPath(); ctx.arc(bx - 5, by - 5, 5, 0, Math.PI * 2); ctx.fill();
         }
       }
-      this.drawTell(ctx, x, y, y - 270 * vis);
+      this.drawTell(ctx, x, y, y - 290 * vis);
       if (this.state === 'stuck') {
         Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - 270);
         if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'BRAÇO GRUDADO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#ffb0e6', OUT, 'center', 5);

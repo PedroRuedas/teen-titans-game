@@ -22,9 +22,10 @@ async page => {
   await ev(() => { TT.game.setDifficulty('normal'); TT.game.menuIdx = 0; });
   await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowRight'); await sleep(60);
   const dTitle = await ev(() => ({ d: TT.game.difficulty, idx: TT.game.menuIdx, saved: localStorage.getItem('jovensTitas.dificuldade') }));
-  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 2 && dTitle.saved === 'hard', dTitle);
+  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 3 && dTitle.saved === 'hard', dTitle);
   await page.reload(); await page.waitForFunction(() => window.TT && TT.debug); await sleep(300);
   const dReload = await ev(() => TT.game.difficulty);
   ok('dificuldade: escolha persiste ao recarregar', dReload === 'hard', dReload);
@@ -39,8 +40,9 @@ async page => {
     return { err, d, fallback: (() => { Storage.prototype.getItem = () => { throw 1; }; const v = TT.store.get('x', 'def'); Storage.prototype.getItem = origGet; return v; })() };
   });
   ok('dificuldade: jogo funciona com storage bloqueado', !dFail.err && dFail.d === 'easy' && dFail.fallback === 'def', dFail);
-  await ev(() => { TT.game.menuIdx = 2; });
+  await ev(() => { TT.game.menuIdx = 3; });
   await page.keyboard.press('ArrowRight'); await sleep(60); // fácil -> normal
+  await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   ok('dificuldade: volta para NORMAL e cursor em JOGAR', await ev(() => TT.game.difficulty === 'normal' && TT.game.menuIdx === 0));
@@ -49,6 +51,20 @@ async page => {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
+
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 4) e ENTER começa nela
+  const pick = await ev(() => {
+    const g = TT.game;
+    g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
+    const press = (k) => { g.input.pressed.add(k); g.step(); };
+    press('down'); press('left');
+    const sel = g.stageSel, label = g.menuLabel('stage').value;
+    press('up'); press('menu');
+    const res = { sel, label, st: g.state, stage: g.stageIdx };
+    g.stageSel = 0; TT.debug.start(0);
+    return res;
+  });
+  ok('menu: escolher a fase 4 no título e começar nela', pick.sel === 3 && /GOSMA/.test(pick.label) && pick.st === 'play' && pick.stage === 3, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -274,21 +290,19 @@ async page => {
   });
   ok('Plasmus: braço grudado após o soco (parado, dano dobrado) e depois se solta', sticky.st === 'stuck' && sticky.stuckDmg === sticky.normal * 2 && sticky.moved < 1 && sticky.after !== 'stuck', sticky);
 
-  // 4b5) Vozes: os Titãs falam as falas dos golpes (ex.: Ravena -> "Azarath Metrion Zinthos!")
+  // 4b5) Vozes: só a Ravena fala ("Azarath Metrion Zinthos!"); os outros Titãs ficam só no balão
   const voices = await ev(() => {
     const g = TT.game, A = TT.audio, calls = [], orig = A.voice;
     A.voice = (k, t) => calls.push(k + ':' + t);
     TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
-    for (const i of [3, 2]) {
+    for (const i of [3, 2, 0, 4]) {
       g.switchCool = 0; g.switchTo(i, true); TT.debug.step(60);
       g.energy = 100; g.input.pressed.add('special'); TT.debug.step(30);
     }
-    g.say(g.enemies[0] || {}, 'GRRR', '#fff'); // inimigos não usam voz de Titã
     A.voice = orig;
     return calls;
   });
-  ok('vozes: Ravena diz "Azarath Metrion Zinthos!" e Ciborgue "BOOYAH!" (só Titãs falam)',
-    voices.includes('raven:Azarath Metrion Zinthos!') && voices.includes('cyborg:BOOYAH!') && voices.every((c) => /^(robin|starfire|cyborg|raven|beastboy):/.test(c)), voices);
+  ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
   ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 4 && songs.every((s) => s === 'theme'), songs);
 
@@ -432,8 +446,10 @@ async page => {
   };
   await page.waitForFunction(() => TT.game.frame > 30, null, { timeout: 8000 }).catch(() => {});
   await tap('ArrowDown');
+  await tap('ArrowDown');
   await tap('ArrowRight');
   const coopSel = await ev(() => TT.game.numPlayers);
+  await tap('ArrowUp');
   await tap('ArrowUp');
   await tap('Enter'); await sleep(100);
   const coopStart = await ev(() => ({ st: TT.game.state, n: TT.game.players().length, keys: TT.game.players().map((t) => t.key) }));

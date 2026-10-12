@@ -8,13 +8,9 @@ window.TT_AUDIO_FILES = {
   // Outras trilhas por nome: boss, overload, plasmus, victory. Ex.: boss: 'audio/chefe.mp3'
   musica: {},
 
-  // Falas dos Titãs: 'titã:texto exato da fala' -> arquivo. 'titã:*' vale para todas as falas daquele Titã.
-  // Titãs: robin, starfire, cyborg, raven, beastboy.
+  // Falas: 'titã:texto exato da fala' -> arquivo. 'titã:*' vale para todas as falas daquele Titã.
+  // Por enquanto só a Ravena fala (lista TT.VOICED em js/audio.js).
   vozes: {
-    // 'raven:Azarath Metrion Zinthos!': 'audio/vozes/azarath.mp3',
-    // 'cyborg:BOOYAH!': 'audio/vozes/booyah.mp3',
-    // 'robin:Titãs, AVANTE!': 'audio/vozes/titas-ao-ataque.mp3',
-    // 'starfire:Raios oculares!': 'audio/vozes/estelar.mp3',
-    // 'beastboy:Rinoceronte!': 'audio/vozes/mutano.mp3',
+    'raven:Azarath Metrion Zinthos!': 'audio/vozes/ravena-azarath.mp3',
   },
 };

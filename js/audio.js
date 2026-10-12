@@ -62,21 +62,15 @@
     },
   };
 
-  // Vozes sintetizadas: tom e velocidade de cada personagem.
+  // Titãs que falam nos golpes (teste com a Ravena; os outros só mostram o balão).
+  TT.VOICED = ['raven'];
+  // Voz sintetizada usada se o arquivo da fala não existir.
   const VOICES = {
-    robin: { pitch: 1.05, rate: 1.12 },
-    beastboy: { pitch: 1.55, rate: 1.22 },
-    cyborg: { pitch: 0.55, rate: 1.0 },
     raven: { pitch: 0.75, rate: 0.82, female: true },
-    starfire: { pitch: 1.5, rate: 1.05, female: true },
-    _intro: { pitch: 1.6, rate: 1.1, female: true, lang: 'en-US' },
   };
   // Grafia para o sintetizador pronunciar como na série.
   const SPEAK = {
-    'BOOYAH!': 'Buiá!',
     'Azarath Metrion Zinthos!': 'Ázarath... Métrion... Zíntos!',
-    'RAAAWR!': 'Ráuuurr!',
-    'Birdarangues!': 'Bérdarangues!',
   };
   const FEMALE = /maria|francisca|thalita|luciana|leila|zira|aria|jenny|michelle|female|feminin/i;
   const voiceCache = {};
@@ -230,10 +224,7 @@
 
     stopSong() { this.song = null; this.pendingSong = null; this.songName = null; this.stopTrack(); }
 
-    // A abertura vem de arquivo próprio? (aí o grito "Teen Titans, let's go!" já está na música)
-    hasThemeFile() { return !!musicFile('theme'); }
-
-    // Fala de um personagem. key = Titã ('robin', 'raven'...) ou '_intro'. Arquivo próprio > voz sintetizada.
+    // Fala de um personagem (key = 'raven'...). Arquivo próprio > voz sintetizada.
     voice(key, text) {
       if (this.muted || !text || !this.ctx) return;
       const files = (window.TT_AUDIO_FILES && window.TT_AUDIO_FILES.vozes) || {};

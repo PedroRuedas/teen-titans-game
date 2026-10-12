@@ -663,213 +663,228 @@
     });
   }
 
-  // =============================================================== FASE 4 — Fábrica Química
-  const S4_PLANT = 2700, S4_LAB = 5850;
+  // =============================================================== FASE 4 — Fábrica de Gosma
+  // Tudo dentro da fábrica, iluminada pelas clarabóias: azulejos verde-água, gosma rosa por toda parte.
+  const S4_MIX = 2700, S4_LAB = 5850;
+  const GOO = '#e0569f', GOO_D = '#a8317a', GOO_L = '#ff9ccf', TEAL = '#5fb8a8', TEAL_D = '#3e8a80';
 
-  // Tanque cilíndrico com faixa de perigo e visor do líquido.
-  function chemTank(g, x, base, w, h, liquid) {
-    g.fillStyle = '#5d6b78'; g.strokeStyle = OUT; g.lineWidth = 4;
-    g.fillRect(x, base - h, w, h); g.strokeRect(x, base - h, w, h);
-    g.beginPath(); g.ellipse(x + w / 2, base - h, w / 2, w * 0.14, 0, 0, Math.PI * 2); g.fillStyle = '#7d8b98'; g.fill(); g.stroke();
-    g.fillStyle = 'rgba(255,255,255,0.16)'; g.fillRect(x + w * 0.12, base - h + 8, w * 0.1, h - 16); // brilho
-    g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x + w * 0.72, base - h + 4, w * 0.28 - 2, h - 6); // sombra
-    for (let y = base - h + 30; y < base - 10; y += 46) { g.fillStyle = '#45515e'; g.fillRect(x, y, w, 5); } // cintas
-    // visor com o líquido brilhante
-    const vx = x + w * 0.38, vw = w * 0.2, vy = base - h * 0.85, vh = h * 0.7;
-    g.fillStyle = '#1a2026'; g.fillRect(vx, vy, vw, vh);
-    g.fillStyle = liquid; g.fillRect(vx + 2, vy + vh * 0.35, vw - 4, vh * 0.65 - 2);
-    g.strokeStyle = OUT; g.lineWidth = 2.5; g.strokeRect(vx, vy, vw, vh);
-    // placa de risco químico
-    const px = x + w * 0.5, py = base - h * 0.22, s = Math.min(18, w * 0.12);
-    g.beginPath(); g.moveTo(px, py - s); g.lineTo(px + s, py); g.lineTo(px, py + s); g.lineTo(px - s, py); g.closePath();
-    g.fillStyle = '#f2c12e'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
-    g.fillStyle = OUT; g.beginPath(); g.arc(px, py, s * 0.28, 0, Math.PI * 2); g.fill();
+  // Gosma escorrendo de uma borda (pingos arredondados).
+  function drips(g, x0, x1, y, r, maxL) {
+    g.fillStyle = GOO;
+    g.fillRect(x0, y - 6, x1 - x0, 10);
+    for (let x = x0 + 8; x < x1 - 8; x += 18 + r() * 26) {
+      const l = 8 + r() * maxL, w = 6 + r() * 6;
+      g.fillRect(x - w / 2, y, w, l);
+      g.beginPath(); g.arc(x, y + l, w * 0.75, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = 'rgba(255,220,240,0.6)'; g.fillRect(x0, y - 4, x1 - x0, 2);
   }
 
-  // Barril de lixo tóxico (com escorrido verde).
-  function barrel(g, x, base, tipped) {
-    g.save(); g.translate(x, base);
-    if (tipped) g.rotate(-Math.PI / 2);
-    g.fillStyle = '#c2862a'; g.strokeStyle = OUT; g.lineWidth = 3;
-    g.fillRect(-20, -56, 40, 56); g.strokeRect(-20, -56, 40, 56);
-    g.fillStyle = '#9a6a1e'; g.fillRect(-20, -42, 40, 5); g.fillRect(-20, -18, 40, 5);
-    g.fillStyle = 'rgba(255,255,255,0.2)'; g.fillRect(-14, -54, 6, 52);
-    g.fillStyle = '#8cff4a'; g.beginPath(); g.moveTo(-20, -56); g.lineTo(20, -56); g.lineTo(14, -44); g.quadraticCurveTo(10, -30, 6, -44); g.lineTo(-6, -48); g.quadraticCurveTo(-10, -36, -14, -48); g.closePath(); g.fill();
-    g.restore();
+  // Pote de gosma na esteira.
+  function jar(g, x, base, col) {
+    g.fillStyle = 'rgba(230,250,255,0.55)'; g.strokeStyle = OUT; g.lineWidth = 2.5;
+    g.fillRect(x - 14, base - 34, 28, 34); g.strokeRect(x - 14, base - 34, 28, 34);
+    g.fillStyle = col; g.fillRect(x - 12, base - 22, 24, 21);
+    g.fillStyle = '#d83a3a'; g.fillRect(x - 15, base - 42, 30, 9); g.strokeRect(x - 15, base - 42, 30, 9);
+    g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(x - 10, base - 31, 4, 26);
+  }
+
+  // Tanque misturador de vidro com pás girando a gosma.
+  function mixer(g, cx, base, r) {
+    const w = 210, top = 150;
+    g.fillStyle = '#c9d6dc'; g.strokeStyle = OUT; g.lineWidth = 5;
+    g.fillRect(cx - w / 2 - 14, base - 46, w + 28, 46); g.strokeRect(cx - w / 2 - 14, base - 46, w + 28, 46);
+    g.fillRect(cx - w / 2 - 14, top - 26, w + 28, 30); g.strokeRect(cx - w / 2 - 14, top - 26, w + 28, 30);
+    // vidro com gosma em espiral
+    g.fillStyle = 'rgba(210,240,255,0.25)'; g.fillRect(cx - w / 2, top + 4, w, base - 50 - top);
+    const lv = top + 60 + r() * 40;
+    const gr = g.createLinearGradient(0, lv, 0, base - 46);
+    gr.addColorStop(0, GOO_L); gr.addColorStop(1, GOO_D);
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(cx - w / 2, lv + 10);
+    for (let k = 0; k <= 8; k++) g.quadraticCurveTo(cx - w / 2 + k * w / 8 - w / 16, lv + (k % 2 ? -10 : 14), cx - w / 2 + k * w / 8, lv + 6);
+    g.lineTo(cx + w / 2, base - 46); g.lineTo(cx - w / 2, base - 46); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,220,240,0.6)'; g.lineWidth = 4;
+    for (let k = 0; k < 3; k++) { g.beginPath(); g.ellipse(cx, lv + 60 + k * 60, 70 - k * 10, 14, 0, 0.2, Math.PI - 0.2); g.stroke(); }
+    // eixo e pás do misturador
+    g.fillStyle = '#7d8a94'; g.fillRect(cx - 5, top + 4, 10, base - 120 - top);
+    g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(cx - 5, top + 4, 10, base - 120 - top);
+    g.fillStyle = '#7d8a94'; g.fillRect(cx - 60, base - 128, 120, 10); g.strokeRect(cx - 60, base - 128, 120, 10);
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(cx - w / 2 + 14, top + 12); g.lineTo(cx - w / 2 + 14, base - 60); g.stroke(); // reflexo
+    g.strokeStyle = OUT; g.lineWidth = 5; g.beginPath(); g.moveTo(cx - w / 2, top + 4); g.lineTo(cx - w / 2, base - 46); g.moveTo(cx + w / 2, top + 4); g.lineTo(cx + w / 2, base - 46); g.stroke();
+    // motor em cima e mostrador
+    g.fillStyle = '#3e4a54'; g.fillRect(cx - 30, top - 64, 60, 40); g.strokeRect(cx - 30, top - 64, 60, 40);
+    g.fillStyle = '#4cff9a'; g.fillRect(cx - 20, top - 54, 10, 8); g.fillStyle = '#ffd23a'; g.fillRect(cx - 4, top - 54, 10, 8);
+    drips(g, cx - w / 2 - 14, cx - w / 2 + 50, top + 4, r, 40);
   }
 
   function s4Far(g, x0, x1) {
-    const sky = g.createLinearGradient(0, 0, 0, 430);
-    sky.addColorStop(0, '#0b0a1a'); sky.addColorStop(0.45, '#22183e'); sky.addColorStop(0.8, '#3d3a52'); sky.addColorStop(1, '#5a6a48');
-    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
-    cells(x0, x1, 80, 111, (cx, r) => {
-      g.fillStyle = 'rgba(220,230,255,' + (0.2 + r() * 0.5) + ')';
-      g.fillRect(cx + r() * 80, r() * 220, 2, 2);
+    // parede alta da fábrica com clarabóias de fim de tarde
+    const wall = g.createLinearGradient(0, 0, 0, 440);
+    wall.addColorStop(0, '#2c5452'); wall.addColorStop(1, '#3f7a72');
+    g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 300, 111, (cx) => {
+      const sx = cx + 60, sw = 180;
+      const sky = g.createLinearGradient(0, 20, 0, 200);
+      sky.addColorStop(0, '#ffb36b'); sky.addColorStop(1, '#ffe2a6');
+      g.fillStyle = sky; g.fillRect(sx, 24, sw, 170);
+      g.strokeStyle = '#1f3c3a'; g.lineWidth = 6; g.strokeRect(sx, 24, sw, 170);
+      g.lineWidth = 3; for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(sx + k * sw / 4, 24); g.lineTo(sx + k * sw / 4, 194); g.stroke(); }
+      g.beginPath(); g.moveTo(sx, 110); g.lineTo(sx + sw, 110); g.stroke();
+      // fachos de luz entrando
+      g.fillStyle = 'rgba(255,230,170,0.09)';
+      g.beginPath(); g.moveTo(sx, 194); g.lineTo(sx + sw, 194); g.lineTo(sx + sw + 140, 440); g.lineTo(sx + 100, 440); g.closePath(); g.fill();
     });
-    // névoa tóxica esverdeada no horizonte
-    const hz = g.createLinearGradient(0, 280, 0, 430);
-    hz.addColorStop(0, 'rgba(150,255,90,0)'); hz.addColorStop(1, 'rgba(150,255,90,0.22)');
-    g.fillStyle = hz; g.fillRect(x0, 280, x1 - x0, 150);
-    // silhueta da cidade
-    cells(x0, x1, 90, 113, (cx, r) => {
-      const w = 50 + r() * 50, h = 60 + r() * 110;
-      g.fillStyle = '#1a1830'; g.fillRect(cx, 430 - h, w, h);
-      g.fillStyle = 'rgba(255,220,140,0.45)';
-      for (let y = 430 - h + 10; y < 420; y += 16) for (let x = cx + 6; x < cx + w - 8; x += 12) if (r() > 0.7) g.fillRect(x, y, 4, 6);
+    // silos de gosma ao fundo
+    cells(x0, x1, 520, 113, (cx, r) => {
+      const x = cx + 80 + r() * 200, w = 110 + r() * 40, h = 190 + r() * 60, base = 440;
+      g.fillStyle = '#27494a'; g.fillRect(x, base - h, w, h);
+      g.beginPath(); g.ellipse(x + w / 2, base - h, w / 2, 16, 0, Math.PI, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(224,86,159,0.55)'; g.fillRect(x + w * 0.42, base - h + 20, w * 0.16, h - 30); // visor rosa
+      g.fillStyle = '#1f3c3a'; for (let y = base - h + 30; y < base; y += 40) g.fillRect(x, y, w, 4);
     });
-    // chaminés soltando fumaça verde
-    cells(x0, x1, 460, 115, (cx, r) => {
-      const x = cx + 120 + r() * 200, h = 150 + r() * 70;
-      g.fillStyle = '#231f38'; g.fillRect(x, 430 - h, 26, h);
-      g.fillStyle = '#c83a3a'; g.fillRect(x, 430 - h + 12, 26, 7);
-      g.fillStyle = 'rgba(140,220,110,0.16)';
-      for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(x + 13 + k * 22, 430 - h - 18 - k * 20, 22 + k * 9, 11 + k * 4, 0, 0, Math.PI * 2); g.fill(); }
-    });
-    g.fillStyle = '#131226'; g.fillRect(x0, 430, x1 - x0, H - 430);
+    g.fillStyle = '#224241'; g.fillRect(x0, 440, x1 - x0, H - 440);
   }
 
   function s4Mid(g, x0, x1) {
-    // galpões da fábrica com tanques e canos entre eles
-    cells(x0, x1, 400, 121, (cx, r) => {
-      const x = cx + r() * 50, w = 220 + r() * 120, h = 140 + r() * 80, base = 475;
-      g.fillStyle = '#2b2c48'; g.fillRect(x, base - h, w, h);
-      g.fillStyle = '#34365a'; g.beginPath(); g.moveTo(x - 8, base - h); g.lineTo(x + w / 2, base - h - 40); g.lineTo(x + w + 8, base - h); g.closePath(); g.fill();
-      g.fillStyle = 'rgba(160,255,120,0.4)';
-      for (let k = x + 16; k < x + w - 30; k += 38) g.fillRect(k, base - h + 26, 22, 14);
-      if (r() > 0.35) { // tanque esférico
-        const tx = x + w + 40, ty = base - 70;
-        g.fillStyle = '#3c4462'; g.fillRect(tx - 34, ty, 8, 70); g.fillRect(tx + 26, ty, 8, 70);
-        g.beginPath(); g.arc(tx, ty, 54, 0, Math.PI * 2); g.fillStyle = '#4a5476'; g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.arc(tx - 18, ty - 18, 18, 0, Math.PI * 2); g.fill();
-      }
+    // passarelas com corrimão e tubos transparentes cheios de gosma
+    g.fillStyle = '#2f5e5a'; g.fillRect(x0, 250, x1 - x0, 12);
+    g.strokeStyle = '#2f5e5a'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x0, 222); g.lineTo(x1, 222); g.stroke();
+    for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) { g.beginPath(); g.moveTo(x, 222); g.lineTo(x, 250); g.stroke(); }
+    cells(x0, x1, 340, 121, (cx, r) => {
+      const y = 300 + r() * 60;
+      g.fillStyle = 'rgba(200,240,240,0.35)'; g.fillRect(cx - 10, y, 360, 26);
+      g.fillStyle = 'rgba(224,86,159,0.8)'; g.fillRect(cx - 10, y + 10, 360, 14);
+      g.fillStyle = 'rgba(255,200,230,0.7)';
+      for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(cx + r() * 340, y + 16, 3 + r() * 3, 0, Math.PI * 2); g.fill(); } // bolhas
+      g.fillStyle = '#2f5e5a'; g.fillRect(cx + 150, y - 4, 14, 34);
     });
-    g.fillStyle = '#272a46'; g.fillRect(x0, 400, x1 - x0, 14); // cano comprido
-    g.fillStyle = '#3a3f66'; g.fillRect(x0, 402, x1 - x0, 3);
-    cells(x0, x1, 190, 123, (cx) => { g.fillStyle = '#1e2038'; g.fillRect(cx, 396, 12, 22); });
+    cells(x0, x1, 600, 123, (cx, r) => { // engrenagens grandes na parede
+      const gx = cx + 300, gy = 380 + r() * 30, R = 46 + r() * 20;
+      g.fillStyle = '#2f5e5a';
+      g.beginPath(); for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12, rr = k % 2 ? R : R + 10; g.lineTo(gx + Math.cos(a) * rr, gy + Math.sin(a) * rr); } g.closePath(); g.fill();
+      g.fillStyle = '#3f7a72'; g.beginPath(); g.arc(gx, gy, R * 0.35, 0, Math.PI * 2); g.fill();
+    });
   }
 
   function s4Near(g, x0, x1) {
-    // --- pátio externo: cerca, barris e tanques
-    if (x0 < S4_PLANT) clipX(g, x0, Math.min(x1, S4_PLANT), () => {
-      g.fillStyle = '#1b1c30'; g.fillRect(x0, 340, x1 - x0, FT - 340);
-      g.strokeStyle = 'rgba(160,190,150,0.3)'; g.lineWidth = 1.5;
-      for (let x = Math.floor(x0 / 18) * 18 - 200; x < x1 + 200; x += 18) { g.beginPath(); g.moveTo(x, 310); g.lineTo(x + 140, FT - 16); g.moveTo(x + 140, 310); g.lineTo(x, FT - 16); g.stroke(); }
-      cells(x0, x1, 170, 131, (cx) => { g.fillStyle = '#525a6c'; g.fillRect(cx, 300, 8, FT - 308); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(cx, 300, 8, FT - 308); });
-      cells(x0, x1, 600, 133, (cx, r) => {
-        if (cx + 560 > S4_PLANT) return;
-        chemTank(g, cx + 60, FT - 4, 120, 210, '#8cff4a');
-        chemTank(g, cx + 200, FT - 4, 90, 160, '#d65bb0');
-        barrel(g, cx + 360, FT - 4); barrel(g, cx + 410, FT - 4);
-        if (r() > 0.5) barrel(g, cx + 470, FT - 4, true);
-        if (r() > 0.4) { g.fillStyle = '#f2c12e'; g.fillRect(cx + 330, 330, 190, 46); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 330, 330, 190, 46); TT.drawText(g, 'PERIGO QUÍMICO', cx + 425, 354, 18, OUT); }
-      });
-    });
-    // --- interior da fábrica: tonéis borbulhando, canos e passarela
-    if (x1 > S4_PLANT && x0 < S4_LAB) clipX(g, Math.max(x0, S4_PLANT), Math.min(x1, S4_LAB), () => {
-      const wall = g.createLinearGradient(0, 0, 0, FT);
-      wall.addColorStop(0, '#12141f'); wall.addColorStop(1, '#2a3040');
-      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
-      g.fillStyle = '#1b1f2e'; for (let x = Math.floor(x0 / 280) * 280; x < x1; x += 280) g.fillRect(x, 0, 26, FT);
-      // canos horizontais coloridos
-      for (const [y, c] of [[110, '#3f7a4a'], [150, '#7a3f6c'], [190, '#56607a']]) {
-        g.fillStyle = c; g.fillRect(x0, y, x1 - x0, 16); g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(x0, y + 2, x1 - x0, 4);
-      }
-      cells(x0, x1, 240, 141, (cx) => { g.fillStyle = '#2a2f40'; for (const y of [106, 146, 186]) g.fillRect(cx, y, 12, 24); });
-      // luzes verdes de emergência
-      cells(x0, x1, 360, 143, (cx) => {
-        const gl = g.createRadialGradient(cx + 180, 240, 4, cx + 180, 300, 200);
-        gl.addColorStop(0, 'rgba(160,255,120,0.3)'); gl.addColorStop(1, 'rgba(160,255,120,0)');
-        g.fillStyle = gl; g.fillRect(cx - 40, 220, 440, 260);
-      });
-      // tonéis abertos de produto químico
-      cells(x0, x1, 520, 145, (cx, r) => {
-        if (cx < S4_PLANT || cx + 480 > S4_LAB) return;
-        const vx = cx + 80, vw = 220, top = 330;
-        g.fillStyle = '#4b5566'; g.strokeStyle = OUT; g.lineWidth = 4;
-        g.fillRect(vx, top, vw, FT - top - 4); g.strokeRect(vx, top, vw, FT - top - 4);
-        g.beginPath(); g.ellipse(vx + vw / 2, top, vw / 2, 18, 0, 0, Math.PI * 2); g.fillStyle = '#8cff4a'; g.fill(); g.stroke();
-        g.fillStyle = 'rgba(220,255,200,0.6)';
-        for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(vx + 30 + r() * (vw - 60), top - 2 + r() * 6, 4 + r() * 6, 0, Math.PI * 2); g.fill(); } // bolhas
-        const gl = g.createRadialGradient(vx + vw / 2, top, 10, vx + vw / 2, top, 170);
-        gl.addColorStop(0, 'rgba(140,255,80,0.35)'); gl.addColorStop(1, 'rgba(140,255,80,0)');
-        g.fillStyle = gl; g.fillRect(vx - 60, top - 170, vw + 120, 240);
-        g.fillStyle = '#8cff4a'; g.fillRect(vx + 30, top + 8, 10, 30 + r() * 40); g.fillRect(vx + vw - 60, top + 8, 10, 20 + r() * 30); // escorrido
-        // painel com medidores
-        const px = cx + 340;
-        g.fillStyle = '#5a6278'; g.fillRect(px, 300, 110, 150); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(px, 300, 110, 150);
-        for (const [mx, my] of [[px + 30, 340], [px + 80, 340]]) {
-          g.fillStyle = '#e8edf2'; g.beginPath(); g.arc(mx, my, 18, 0, Math.PI * 2); g.fill(); g.stroke();
-          g.strokeStyle = '#d83a3a'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + 12 * Math.cos(-0.6 - r() * 2), my + 12 * Math.sin(-0.6 - r() * 2)); g.stroke();
-          g.strokeStyle = OUT; g.lineWidth = 3;
+    // parede de azulejos verde-água em todas as áreas
+    g.fillStyle = TEAL; g.fillRect(x0, 0, x1 - x0, FT);
+    g.strokeStyle = TEAL_D; g.lineWidth = 2;
+    for (let y = 20; y < FT; y += 34) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+    for (let y = 20, row = 0; y < FT; y += 34, row++) for (let x = Math.floor(x0 / 34) * 34 + (row % 2) * 17; x < x1; x += 34) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 34); g.stroke(); }
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x0, 0, x1 - x0, 60);
+    g.fillStyle = '#2f5e5a'; g.fillRect(x0, FT - 70, x1 - x0, 70); // rodapé escuro
+    // --- linha de envase: esteiras com potes de gosma
+    if (x0 < S4_MIX) clipX(g, x0, Math.min(x1, S4_MIX), () => {
+      cells(x0, x1, 560, 131, (cx, r) => {
+        if (cx + 520 > S4_MIX) return;
+        const by = 380, bx = cx + 30, bw = 470;
+        // bico dosador soltando gosma
+        g.fillStyle = '#c9d6dc'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.fillRect(bx + 170, 170, 90, 80); g.strokeRect(bx + 170, 170, 90, 80);
+        g.beginPath(); g.moveTo(bx + 190, 250); g.lineTo(bx + 240, 250); g.lineTo(bx + 222, 290); g.lineTo(bx + 208, 290); g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = GOO; g.fillRect(bx + 211, 290, 8, by - 330);
+        g.fillStyle = '#d83a3a'; g.fillRect(bx + 182, 190, 66, 22); g.strokeRect(bx + 182, 190, 66, 22);
+        TT.drawText(g, 'GOSMA', bx + 215, 202, 15, '#ffffff');
+        // esteira
+        g.fillStyle = '#3e4a54'; g.fillRect(bx, by, bw, 22); g.strokeRect(bx, by, bw, 22);
+        g.fillStyle = '#5c6a76'; for (let k = bx + 8; k < bx + bw; k += 22) { g.beginPath(); g.arc(k, by + 11, 7, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = '#2f3a42'; for (const lx of [bx + 20, bx + bw - 34]) { g.fillRect(lx, by + 22, 14, FT - by - 26); g.strokeRect(lx, by + 22, 14, FT - by - 26); }
+        for (let k = 0; k < 6; k++) jar(g, bx + 40 + k * 74, by, k % 3 === 2 ? '#8cff4a' : GOO);
+        // caixas prontas empilhadas
+        const kx = cx + 520 - 20;
+        if (r() > 0.4 && kx + 60 < S4_MIX) {
+          g.fillStyle = '#c99a5b'; g.strokeStyle = OUT; g.lineWidth = 3;
+          for (const [ox, oy] of [[0, 0], [62, 0], [30, -50]]) { g.fillRect(kx + ox, FT - 54 + oy, 58, 50); g.strokeRect(kx + ox, FT - 54 + oy, 58, 50); }
         }
-        g.fillStyle = '#4cff9a'; g.fillRect(px + 14, 400, 10, 8); g.fillStyle = '#ff4a3a'; g.fillRect(px + 34, 400, 10, 8);
       });
+      drips(g, x0, Math.min(x1, S4_MIX), 60, TT.seeded(Math.floor(x0) + 7), 50);
     });
-    // --- laboratório de contenção (arena do Plasmus): tanque gigante quebrado e lodo nas paredes
+    // --- salão dos misturadores
+    if (x1 > S4_MIX && x0 < S4_LAB) clipX(g, Math.max(x0, S4_MIX), Math.min(x1, S4_LAB), () => {
+      cells(x0, x1, 480, 141, (cx, r) => {
+        if (cx < S4_MIX - 100 || cx + 380 > S4_LAB) return;
+        mixer(g, cx + 200, FT - 6, r);
+        // painel de controle
+        const px = cx + 340;
+        g.fillStyle = '#c9d6dc'; g.strokeStyle = OUT; g.lineWidth = 3;
+        g.fillRect(px, 300, 90, 140); g.strokeRect(px, 300, 90, 140);
+        g.fillStyle = '#222b30'; g.fillRect(px + 10, 312, 70, 44);
+        g.strokeStyle = '#8cff4a'; g.lineWidth = 2; g.beginPath(); for (let k = 0; k <= 10; k++) g.lineTo(px + 12 + k * 6.6, 334 + Math.sin(k * 1.3 + r() * 3) * 12); g.stroke();
+        for (let k = 0; k < 3; k++) { g.fillStyle = ['#d83a3a', '#ffd23a', '#4cff9a'][k]; g.beginPath(); g.arc(px + 22 + k * 23, 380, 7, 0, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke(); }
+      });
+      // tubos rosa no teto ligando os tanques
+      g.fillStyle = 'rgba(200,240,240,0.5)'; g.fillRect(x0, 70, x1 - x0, 30);
+      g.fillStyle = GOO; g.fillRect(x0, 82, x1 - x0, 16);
+      g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x0 - 4, 70, x1 - x0 + 8, 30);
+    });
+    // --- câmara de contenção do Plasmus: tanque gigante estourado
     if (x1 > S4_LAB) clipX(g, Math.max(x0, S4_LAB), x1, () => {
-      const wall = g.createLinearGradient(0, 0, 0, FT);
-      wall.addColorStop(0, '#160c1c'); wall.addColorStop(1, '#3a2240');
-      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
-      // azulejos do laboratório
-      g.strokeStyle = 'rgba(255,170,230,0.08)'; g.lineWidth = 2;
-      for (let y = 40; y < FT; y += 44) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
-      for (let x = Math.floor(x0 / 44) * 44; x < x1; x += 44) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FT); g.stroke(); }
+      g.fillStyle = 'rgba(80,20,60,0.35)'; g.fillRect(x0, 0, x1 - x0, FT); // luz de alarme rosada
       cells(x0, x1, 620, 151, (cx, r) => {
         if (cx < S4_LAB - 200) return;
-        // tanque de contenção com o vidro estilhaçado
-        const tx = cx + 180, tw = 200, top = 120;
-        g.fillStyle = '#4a5268'; g.strokeStyle = OUT; g.lineWidth = 5;
-        g.fillRect(tx - 14, FT - 50, tw + 28, 46); g.strokeRect(tx - 14, FT - 50, tw + 28, 46);
-        g.fillRect(tx - 14, top - 30, tw + 28, 34); g.strokeRect(tx - 14, top - 30, tw + 28, 34);
-        g.fillStyle = 'rgba(200,120,220,0.18)'; g.fillRect(tx, top + 4, tw, FT - 54 - top);
-        g.fillStyle = 'rgba(214,91,176,0.75)'; g.fillRect(tx, FT - 130, tw, 80); // resto do lodo no fundo
-        g.strokeStyle = 'rgba(230,240,255,0.7)'; g.lineWidth = 3;
-        g.beginPath(); g.moveTo(tx, top + 4); g.lineTo(tx + 40, top + 90); g.lineTo(tx + 20, top + 170); g.moveTo(tx + tw, top + 4); g.lineTo(tx + tw - 50, top + 120); g.lineTo(tx + tw - 20, top + 210); g.stroke();
-        g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(tx, top + 4); g.lineTo(tx, FT - 50); g.moveTo(tx + tw, top + 4); g.lineTo(tx + tw, FT - 50); g.stroke();
-        // lodo escorrendo da parede
-        g.fillStyle = '#c2569b';
-        for (let k = 0; k < 4; k++) { const dx = cx + 420 + r() * 160, dl = 40 + r() * 120; g.fillRect(dx, 0, 14, dl); g.beginPath(); g.arc(dx + 7, dl, 9, 0, Math.PI * 2); g.fill(); }
-        if (r() > 0.4) { g.fillStyle = '#d83a3a'; g.fillRect(cx + 420, 60, 150, 40); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 420, 60, 150, 40); TT.drawText(g, 'CONTENÇÃO', cx + 495, 81, 18, '#ffffff'); }
+        const tx = cx + 180, tw = 220, top = 110;
+        g.fillStyle = '#c9d6dc'; g.strokeStyle = OUT; g.lineWidth = 5;
+        g.fillRect(tx - 16, FT - 52, tw + 32, 48); g.strokeRect(tx - 16, FT - 52, tw + 32, 48);
+        g.fillRect(tx - 16, top - 34, tw + 32, 38); g.strokeRect(tx - 16, top - 34, tw + 32, 38);
+        g.fillStyle = 'rgba(224,86,159,0.25)'; g.fillRect(tx, top + 4, tw, FT - 56 - top);
+        g.fillStyle = GOO_D; g.fillRect(tx, FT - 120, tw, 68);
+        // buraco estourado no vidro com gosma escorrendo para fora
+        g.fillStyle = TEAL; g.beginPath();
+        g.moveTo(tx + 50, top + 120); g.lineTo(tx + 90, top + 80); g.lineTo(tx + 120, top + 110); g.lineTo(tx + 170, top + 70); g.lineTo(tx + 160, top + 160); g.lineTo(tx + 190, top + 210); g.lineTo(tx + 110, top + 230); g.lineTo(tx + 60, top + 200); g.closePath();
+        g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1;
+        g.strokeStyle = 'rgba(240,250,255,0.9)'; g.lineWidth = 3; g.stroke();
+        g.fillStyle = GOO; g.beginPath(); g.moveTo(tx + 110, top + 230); g.quadraticCurveTo(tx + 120, FT - 40, tx + 60, FT + 30); g.lineTo(tx + 170, FT + 30); g.quadraticCurveTo(tx + 140, FT - 40, tx + 150, top + 225); g.closePath(); g.fill();
+        g.strokeStyle = OUT; g.lineWidth = 5; g.beginPath(); g.moveTo(tx, top + 4); g.lineTo(tx, FT - 52); g.moveTo(tx + tw, top + 4); g.lineTo(tx + tw, FT - 52); g.stroke();
+        // sirene giratória
+        g.fillStyle = '#d83a3a'; g.beginPath(); g.arc(cx + 500, 60, 20, Math.PI, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+        const gl = g.createRadialGradient(cx + 500, 60, 4, cx + 500, 60, 150);
+        gl.addColorStop(0, 'rgba(255,80,80,0.4)'); gl.addColorStop(1, 'rgba(255,80,80,0)');
+        g.fillStyle = gl; g.fillRect(cx + 350, -90, 300, 300);
+        if (r() > 0.3) { g.fillStyle = '#d83a3a'; g.fillRect(cx + 430, 110, 150, 40); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 430, 110, 150, 40); TT.drawText(g, 'CONTENÇÃO', cx + 505, 131, 18, '#ffffff'); }
       });
+      drips(g, Math.max(x0, S4_LAB), x1, 30, TT.seeded(Math.floor(x0) + 11), 90);
     });
-    // portões entre as áreas
-    for (const bx of [S4_PLANT, S4_LAB]) if (x0 < bx + 30 && x1 > bx - 30) {
-      g.fillStyle = '#3e4256'; g.fillRect(bx - 16, 0, 32, FT);
-      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(bx - 16, -4, 32, FT + 4);
-      g.fillStyle = '#f2c12e'; for (let y = 20; y < FT; y += 60) g.fillRect(bx - 16, y, 32, 14);
+    // portas de correr entre as áreas
+    for (const bx of [S4_MIX, S4_LAB]) if (x0 < bx + 40 && x1 > bx - 40) {
+      g.fillStyle = '#c9d6dc'; g.fillRect(bx - 24, 0, 48, FT);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(bx - 24, -4, 48, FT + 4);
+      g.fillStyle = GOO; g.fillRect(bx - 24, 0, 48, 40); g.fillRect(bx - 8, 40, 12, 60);
     }
-    // piso de concreto com faixas e poças tóxicas
-    const fl = g.createLinearGradient(0, FT, 0, H);
-    fl.addColorStop(0, '#5a5e66'); fl.addColorStop(0.5, '#43474f'); fl.addColorStop(1, '#2c2f36');
-    g.fillStyle = fl; g.fillRect(x0, FT, x1 - x0, H - FT);
-    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0, FT, x1 - x0, 8);
-    for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) {
-      g.fillStyle = (x / 40) % 2 ? '#f2c12e' : '#1c1a1e';
-      g.beginPath(); g.moveTo(x, FT + 8); g.lineTo(x + 20, FT + 8); g.lineTo(x + 40, FT + 20); g.lineTo(x + 20, FT + 20); g.fill();
-    }
-    g.strokeStyle = 'rgba(20,22,30,0.5)'; g.lineWidth = 2;
-    for (let x = Math.floor(x0 / 200) * 200; x < x1 + 200; x += 200) { g.beginPath(); g.moveTo(x, FT + 20); g.lineTo(x - 70, H); g.stroke(); }
-    for (const y of [560, 640]) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
-    cells(x0, x1, 210, 161, (cx, r) => {
-      if (r() > 0.5) { // poça tóxica
-        const px = cx + r() * 150, py = 530 + r() * 150, rx = 30 + r() * 40, pink = cx > S4_LAB;
-        g.fillStyle = pink ? 'rgba(214,91,176,0.55)' : 'rgba(140,255,80,0.4)';
-        g.beginPath(); g.ellipse(px, py, rx, rx * 0.3, 0, 0, Math.PI * 2); g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(px - rx * 0.3, py - 2, rx * 0.25, 2.5, 0, 0, Math.PI * 2); g.fill();
+    // piso quadriculado branco e verde-água coberto de gosma
+    for (let y = FT, row = 0; y < H; y += 32, row++) {
+      for (let x = Math.floor(x0 / 48) * 48; x < x1; x += 48) {
+        g.fillStyle = ((x / 48) + row) % 2 ? '#dfeeea' : '#9fd1c6';
+        g.fillRect(x, y, 48, 32);
       }
-      if (r() > 0.7) { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(cx + r() * 200, 600 + r() * 80, 10, 0, Math.PI * 2); g.fill(); } // ralo
+    }
+    const shade = g.createLinearGradient(0, FT, 0, H);
+    shade.addColorStop(0, 'rgba(20,50,50,0.35)'); shade.addColorStop(1, 'rgba(20,50,50,0.05)');
+    g.fillStyle = shade; g.fillRect(x0, FT, x1 - x0, H - FT);
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0, FT, x1 - x0, 6);
+    cells(x0, x1, 190, 161, (cx, r) => {
+      if (r() > 0.35) { // poça de gosma brilhante
+        const px = cx + r() * 140, py = 520 + r() * 170, rx = 34 + r() * 50;
+        g.fillStyle = GOO_D; g.beginPath(); g.ellipse(px, py + 3, rx, rx * 0.3, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = GOO; g.beginPath(); g.ellipse(px, py, rx * 0.95, rx * 0.27, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,230,245,0.75)'; g.beginPath(); g.ellipse(px - rx * 0.35, py - 3, rx * 0.25, 3, 0, 0, Math.PI * 2); g.fill();
+      }
+      if (r() > 0.6) { g.fillStyle = '#4a6a66'; g.beginPath(); g.arc(cx + r() * 180, 600 + r() * 80, 11, 0, Math.PI * 2); g.fill(); } // ralo
     });
   }
 
-  // Primeiro plano: canos verticais com válvulas
+  // Primeiro plano: cano rosa vertical pingando gosma
   function s4Fg(g, x0, x1) {
-    cells(x0, x1, 1500, 171, (cx) => {
+    cells(x0, x1, 1500, 171, (cx, r) => {
       const x = cx + 750;
-      g.fillStyle = '#2c3a34'; g.fillRect(x, 0, 40, H);
-      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 40, H + 8);
-      g.fillStyle = 'rgba(140,255,80,0.16)'; g.fillRect(x + 6, 0, 6, H);
-      g.fillStyle = '#c83a3a'; g.beginPath(); g.arc(x + 20, 300, 26, 0, Math.PI * 2); g.fill(); g.stroke();
-      g.strokeStyle = '#8a1e1e'; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 2, 300); g.lineTo(x + 42, 300); g.moveTo(x + 20, 278); g.lineTo(x + 20, 322); g.stroke();
+      g.fillStyle = 'rgba(200,240,240,0.55)'; g.fillRect(x, 0, 46, H);
+      g.fillStyle = GOO; g.fillRect(x + 8, 0, 30, H);
+      g.fillStyle = 'rgba(255,220,240,0.6)'; g.fillRect(x + 12, 0, 6, H);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 46, H + 8);
+      g.fillStyle = '#c9d6dc'; for (let y = 140; y < H; y += 260) { g.fillRect(x - 6, y, 58, 16); g.strokeRect(x - 6, y, 58, 16); }
     });
   }
 

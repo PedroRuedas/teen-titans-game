@@ -118,7 +118,8 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const e = kind === 'drone' ? new TT.Drone(this, x, y) : kind === 'shock' ? new TT.ShockTrooper(this, x, y) : new TT.Enemy(this, kind, x, y);
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob }[kind];
+      const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
       return e;
@@ -518,7 +519,7 @@
       this.particles.spawn('text', x, y, { text, size: big ? 38 : 26, color, vy: -0.8, life: 70 });
     }
     say(f, text, color) {
-      if (f && f.key && TT.TITANS[f.key]) A().voice(f.key, text); // os Titãs falam as próprias falas
+      if (f && TT.VOICED.includes(f.key)) A().voice(f.key, text); // por enquanto só a Ravena fala
       this.bubbles = this.bubbles.filter((b) => b.f !== f);
       this.bubbles.push({ f, text, color: color || '#ffffff', t: 0, dur: 85 });
     }
@@ -556,7 +557,9 @@
     }
 
     // Itens do menu do título.
-    titleItems() { return ['play', 'players', 'diff', 'controls']; }
+    titleItems() { return ['play', 'stage', 'players', 'diff', 'controls']; }
+    // Fase inicial escolhida no título (para testar qualquer fase direto).
+    cycleStage(d) { const n = TT.STAGES.length; this.stageSel = ((this.stageSel || 0) + d + n) % n; A().play('select'); }
 
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
@@ -573,16 +576,17 @@
       const it = items[this.menuIdx] || 'play';
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
+      if (lr && it === 'stage') this.cycleStage(lr);
       if (lr && it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
+        if (it === 'stage') { this.cycleStage(1); return; }
         if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
         A().play('select');
-        if (!A().hasThemeFile()) A().voice('_intro', "Teen Titans, let's go!");
         this.score = 0;
-        this.startStage(0);
+        this.startStage(this.stageSel || 0);
       }
     }
 
@@ -1072,7 +1076,7 @@
         TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 584, 29);
+      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 572, 27);
       TT.drawText(ctx, '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som', W / 2, 706, 16, '#bfc4e8', OUT, 'center', 4);
     }
 
@@ -1084,6 +1088,7 @@
         case 'resume': return { text: 'CONTINUAR' };
         case 'players': return { text: 'JOGADORES:', value: this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
+        case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
         default: return { text: String(it) };
       }
