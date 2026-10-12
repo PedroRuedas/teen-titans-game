@@ -532,10 +532,11 @@ async page => {
     const atk = (key, i) => pose(key, (t) => { t.anim = 'attack'; t.atk = { def: t.def.light[i], t: t.def.light[i].s, hits: new Set() }; });
     const rv = atk('raven', 0), sf = atk('starfire', 0), cy = atk('cyborg', 0);
     const ravenIdle = pose('raven', (t) => { t.anim = 'idle'; t.animT = 0; t.atk = null; });
-    return { forms: [...forms], robinFlip: robinJump.spin, robinRoll: robinRoll.spin, ravenAura: rv.auraF, ravenCircle: rv.circleF, starAura: sf.auraF, cyPiston: cy.piston, ravenHover: ravenIdle.bob };
+    const robinCombo = g.team.find((x) => x.key === 'robin').def.light.map((d) => d.anim);
+    return { forms: [...forms], robinCombo, robinFlip: robinJump.spin, robinRoll: robinRoll.spin, ravenAura: rv.auraF, ravenCircle: rv.circleF, starAura: sf.auraF, cyPiston: cy.piston, ravenHover: ravenIdle.bob };
   });
   ok('Mutano vira animais aleatórios no fim do combo', anims.forms.length >= 3, anims.forms);
-  ok('Robin faz mortal no pulo e rolamento na esquiva', anims.robinFlip > 2 && anims.robinRoll > 2, anims);
+  ok('Robin: combo no chão, sem piruetas (pulo e esquiva sem giro)', Math.abs(anims.robinFlip) < 0.01 && Math.abs(anims.robinRoll) < 0.01 && anims.robinCombo.length === 3 && new Set(anims.robinCombo).size === 3, anims);
   ok('Ravena e Estelar atacam com aura nas mãos e círculo mágico', anims.ravenAura > 0.9 && anims.ravenCircle > 0.5 && anims.starAura > 0.9, anims);
   ok('Ciborgue usa o punho-pistão e Ravena flutua', anims.cyPiston > 0.9 && anims.ravenHover < -8, anims);
 

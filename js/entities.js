@@ -274,10 +274,16 @@
     twirl: { x: 46, y: 96, r: 52, a0: -3.1, a1: 3.1 },
   };
 
+  // Altura da mão da frente acima do chão, medida no último desenho (fallback se ainda não desenhou).
+  function handZ(f, fb) {
+    const R = f.rigOut;
+    return R && R.fy != null ? TT.clamp(f.y - f.z - R.fy, 25, 140) : fb;
+  }
+
   function spawnBolt(f, g, big) {
     g.addProjectile(new Projectile(g, {
       kind: big ? 'bigbolt' : 'starbolt', team: 'hero', owner: f,
-      x: f.x + f.facing * 48, y: f.y, z: f.z > 0 ? f.z + 40 : 72, vx: f.facing * (big ? 11 : 13),
+      x: f.x + f.facing * 48, y: f.y, z: f.z + handZ(f, 62), vx: f.facing * (big ? 11 : 13),
       r: big ? 24 : 14, dmg: big ? 17 : 8, kb: big ? 8 : 3, knockdown: big, launch: 6, life: 70, color: GREEN,
       vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
     }));
@@ -292,20 +298,21 @@
       dashAtk: { anim: 'robinDashKick', smear: 'flyKick', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 76], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
       light: [
         { anim: 'robinJab', smear: 'jab', weapon: 'staff', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 96], kb: 1.5, sound0: 'whoosh' },
-        { anim: 'robinTwirl', smear: 'twirl', weapon: 'staff', s: 5, a: 6, r: 8, dmg: 5, rehit: 3, reach: [0, 100], kb: 2, sound0: 'whoosh' },
+        { anim: 'robinSwing', smear: 'swipe', weapon: 'staff', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 106], kb: 2.5, sound0: 'whoosh' },
         {
-          anim: 'robinFlip', smear: 'slam', weapon: 'staff', s: 12, a: 4, r: 14, dmg: 14, reach: [0, 118], kb: 7, knockdown: true, launch: 7, big: true, sound0: 'jump',
-          onFrame(f, t, g) { if (t === this.s) { g.dust(f.x + f.facing * 80, f.y, 6, '#d9cbbb'); g.shake = Math.max(g.shake, 6); A().play('whoosh'); } },
+          anim: 'robinSlam', smear: 'slam', weapon: 'staff', s: 9, a: 4, r: 14, dmg: 14, reach: [0, 118], kb: 7, knockdown: true, launch: 7, big: true, sound0: 'whoosh',
+          onFrame(f, t, g) { if (t === this.s) { g.dust(f.x + f.facing * 80, f.y, 6, '#d9cbbb'); g.shake = Math.max(g.shake, 6); } },
         },
       ],
-      heavy: { anim: 'robinBackflip', smear: 'uppercut', s: 9, a: 6, r: 17, dmg: 15, reach: [0, 84], zr: 130, knockdown: true, launch: 11, kb: 5, big: true, sound0: 'whoosh' },
+      heavy: { anim: 'robinKick', smear: 'kick', s: 7, a: 6, r: 11, dmg: 15, reach: [0, 84], knockdown: true, launch: 8, kb: 10, big: true, sound0: 'whoosh' },
       air: { anim: 'robinAir', smear: 'dive', s: 3, a: 14, r: 6, dmg: 9, reach: [-10, 64], kb: 3, lunge: 5, zr: 130 },
       special: {
         cost: 25, anim: 'robinThrow', s: 14, a: 1, r: 14, shout: 'Birdarangues!',
         onFrame(f, t, g) {
           if (t !== this.s) return;
+          const hz = handZ(f, 70);
           for (const dy of [-34, 0, 34]) g.addProjectile(new Projectile(g, {
-            kind: 'birdarang', team: 'hero', owner: f, x: f.x + f.facing * 40, y: f.y, z: f.z + 70,
+            kind: 'birdarang', team: 'hero', owner: f, x: f.x + f.facing * 40, y: f.y, z: f.z + hz,
             vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true, trailN: 7,
           }));
           A().play('birdarang');
@@ -383,7 +390,7 @@
         anim: 'rvHeavy', hands: 'open', s: 11, a: 1, r: 18,
         onFrame(f, t, g) {
           if (t !== this.s) return;
-          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 84, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
+          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + handZ(f, 60), vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
           A().play('dark');
         },
       },
@@ -679,7 +686,7 @@
       } else if (this.state === 'dash' && this.key === 'beastboy') {
         TT.drawCheetah(ctx, sx, sy, this.facing, this.animT, fl);
       } else if (this.state === 'dash' && this.key === 'raven') {
-        TT.drawSoulRaven(ctx, sx, sy - 70, this.facing, this.animT);
+        TT.drawSoulRaven(ctx, sx, sy - 48, this.facing, this.animT);
       } else {
         if (this.state === 'dash' && this.key === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
@@ -707,14 +714,15 @@
 
     // Rastro de movimento (smear) em arco na cor do Titã.
     drawSmear(ctx, sx, sy, a) {
-      const d = a.def, k = (a.t - d.s) / (d.a + 5), sc = this.style.scale;
+      const d = a.def, k = (a.t - d.s) / (d.a + 5), sc = this.style.scale, st = this.style;
+      const hk = (st.legL[0] + st.legL[1] + st.torsoH * 0.7) * sc / 90; // altura do peito em relação ao modelo antigo
       const P = SMEAR[d.smear || d.pose] || SMEAR.jab;
       const col = this.def.fx || '#ffffff';
       const grow = Math.min(1, (a.t - d.s + 1) / 3);
       const a0 = P.a0, a1 = P.a0 + (P.a1 - P.a0) * grow;
-      const R = P.r * (d.weapon === 'staff' ? 1.25 : 1) * (d.big ? 1.12 : 1);
+      const R = P.r * (d.weapon === 'staff' ? 1.25 : 1) * (d.big ? 1.12 : 1) * TT.clamp(hk * 1.25, 0.72, 1);
       ctx.save();
-      ctx.translate(sx + this.facing * P.x * sc, sy - P.y * sc); ctx.scale(this.facing * sc, sc);
+      ctx.translate(sx + this.facing * P.x * sc, sy - P.y * hk); ctx.scale(this.facing * sc, sc);
       ctx.globalAlpha = 0.85 * (1 - k);
       if (P.line) {
         // golpes retos: linhas de velocidade
@@ -780,7 +788,7 @@
     drawClaw(ctx, sx, sy, a) {
       const fc = this.facing, k = (a.t - a.def.s) / a.def.a;
       const r = a.def.reach[1];
-      const cx = sx + fc * r * 0.55, cy = sy - 70;
+      const cx = sx + fc * r * 0.55, cy = this.rigOut.fy != null ? this.rigOut.fy : sy - 70;
       TT.drawGlow(ctx, DARK, cx, cy, r * 0.9, 0.55 * (1 - k * 0.5));
       ctx.save();
       ctx.translate(cx, cy);

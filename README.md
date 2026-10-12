@@ -59,14 +59,14 @@ Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
 
 | Titã | Correr / pular / esquivar | Combo (J J J) | Forte | Especial |
 |---|---|---|---|---|
-| **Robin** | corrida atlética, **mortal** no pulo, **rolamento** | bastão: estocada, **bastão girando**, **mortal com bastão** descendo | **mortal para trás** com chute | mortal + 3 birdarangues |
+| **Robin** | corrida atlética, arrancada baixa na esquiva | bastão: **estocada → golpe lateral → golpe por cima** | **chute lateral** | 3 birdarangues |
 | **Mutano** | corrida agitada, vira **guepardo** na esquiva | socos e chute giratório, e no fim vira um **animal aleatório** (gorila, rinoceronte, canguru ou carneiro) | **gorila** | **T-Rex** |
 | **Ciborgue** | passada pesada, **propulsores** na esquiva e no pulo | **punho-pistão**, gancho, **canhão à queima-roupa** | martelo duplo no chão | canhão sônico |
 | **Ravena** | **flutua** e desliza, levita no pulo, vira **corvo de alma** na esquiva | **mãos de energia negra com círculo mágico**, e no fim abre um **portal** de onde sai a garra | corvo de energia | *"Azarath Metrion Zinthos!"* |
 | **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
 
-Os modelos seguem o visual do jogo de PS2: proporções realistas, volume sombreado (luz e sombra
-em cada membro) e contorno fino.
+Os modelos seguem o visual de **Jovens Titãs em Ação!**: cabeças grandes, corpos pequenos,
+cores chapadas e contorno grosso.
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.

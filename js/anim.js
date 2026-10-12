@@ -100,45 +100,43 @@
       [9, { lean: 0.26, armF: [1.42, 1.55], armB: [0.15, 1.3], legF: [0.6, 0.3], legB: [-0.56, -0.7], staffLen: 1 }],
       [15, M(STANCE, { staffLen: 0.6 })],
     ],
-    robinTwirl: [ // bastão girando à frente (2 acertos)
-      [0, M(STANCE, { staffLen: 0.6 })],
-      [5, { lean: 0.2, armF: [1.2, 1.6], armB: [0.85, 1.45], legF: [0.5, 0.2], legB: [-0.5, -0.62], staff: 0, staffLen: 0 }, 'lin'],
-      [11, { lean: 0.26, armF: [1.28, 1.55], armB: [0.9, 1.4], legF: [0.55, 0.22], legB: [-0.52, -0.66], staff: TAU * 2, staffLen: 0 }],
-      [19, M(STANCE, { staff: TAU * 2, staffLen: 0.5 })],
+    robinSwing: [ // golpe lateral com o bastão (de trás do ombro para a frente)
+      [0, M(STANCE, { staffLen: 0.7 })],
+      [4, { lean: -0.18, bob: 1, armF: [-1.7, -1.1], armB: [0.5, 1.6], legF: [0.42, 0.12], legB: [-0.38, -0.5], staffLen: 1 }, 'out'],
+      [5, { lean: 0.3, armF: [1.35, 1.75], armB: [0.7, 1.4], legF: [0.62, 0.28], legB: [-0.55, -0.72], staffLen: 1 }],
+      [10, { lean: 0.28, armF: [1.3, 1.85], armB: [0.7, 1.4], legF: [0.6, 0.28], legB: [-0.54, -0.7], staffLen: 1 }],
+      [18, M(STANCE, { staffLen: 0.8 })],
     ],
-    robinFlip: [ // mortal para a frente e bastão descendo
-      [0, M(STANCE, { staffLen: 0.5 })],
-      [4, { bob: 8, lean: 0.35, squash: 0.12, legF: [0.95, -0.35], legB: [-0.2, -1.05], armF: [-0.7, 0.2], armB: [-0.9, 0], staffLen: 0.5 }, 'out'],
-      [8, { bob: -50, spin: PI * 0.95, legF: [1.95, -0.5], legB: [1.75, -0.65], armF: [2.6, 3.0], armB: [2.4, 2.8], staffLen: 0.5 }, 'lin'],
-      [12, { bob: 0, spin: TAU, lean: 0.48, armF: [1.25, 1.0], armB: [1.1, 0.9], legF: [0.75, 0.2], legB: [-0.62, -0.95], staffLen: 1, squash: 0.08 }],
-      [17, { bob: 0, spin: TAU, lean: 0.46, armF: [1.22, 1.0], armB: [1.1, 0.9], legF: [0.72, 0.2], legB: [-0.6, -0.92], staffLen: 1 }],
-      [30, M(STANCE, { spin: TAU, staffLen: 1 })],
+    robinSlam: [ // passo à frente e bastão de cima para baixo
+      [0, M(STANCE, { staffLen: 0.8 })],
+      [6, { lean: -0.22, bob: -2, armF: [2.95, 3.1], armB: [2.75, 2.95], legF: [0.3, 0.05], legB: [-0.32, -0.45], staffLen: 1 }, 'out'],
+      [9, { lean: 0.45, bob: 4, armF: [1.15, 1.0], armB: [1.0, 0.9], legF: [0.78, 0.25], legB: [-0.66, -0.95], staffLen: 1, squash: 0.05 }],
+      [15, { lean: 0.42, bob: 4, armF: [1.12, 1.0], armB: [1.0, 0.9], legF: [0.76, 0.25], legB: [-0.64, -0.92], staffLen: 1 }],
+      [27, M(STANCE, { staffLen: 1 })],
     ],
-    robinBackflip: [ // chute em mortal para trás (lança para cima)
+    robinKick: [ // chute lateral forte
       [0, STANCE],
-      [5, { bob: 7, lean: -0.1, squash: 0.1, legF: [0.45, 0.2], legB: [-0.4, -0.75], armF: [0.2, 1.6], armB: [0.1, 1.5] }, 'out'],
-      [9, { bob: -30, spin: -1.0, legF: [2.85, 2.95], legB: [0.3, -0.4], armF: [-0.6, -0.3], armB: [-0.9, -0.5] }],
-      [13, { bob: -40, spin: -3.7, legF: [1.85, -0.4], legB: [1.65, -0.55], armF: [2.4, 2.8], armB: [2.2, 2.6] }],
-      [18, { bob: 0, spin: -TAU, squash: 0.08, legF: [0.45, 0.1], legB: [-0.4, -0.55], armF: [0.8, 2.4], armB: [0.6, 2.2] }],
-      [32, M(STANCE, { spin: -TAU })],
+      [5, { lean: -0.2, legF: [1.25, -0.6], legB: [-0.15, -0.3], armF: [0.6, 2.4], armB: [0.2, 2.0] }, 'out'],
+      [7, { lean: -0.38, legF: [1.66, 1.6], legB: [-0.1, -0.25], armF: [-0.4, 0.5], armB: [0.9, 1.9] }],
+      [13, { lean: -0.36, legF: [1.62, 1.56], legB: [-0.1, -0.25], armF: [-0.4, 0.5], armB: [0.9, 1.9] }],
+      [24, STANCE],
     ],
     robinAir: [
       [0, { legF: [0.9, -0.2], legB: [0.3, -0.7], armF: [2.4, 2.7], armB: [-0.6, 0.2] }],
       [3, { lean: 0.38, legF: [0.8, 0.8], legB: [-0.2, -0.95], armF: [2.5, 2.8], armB: [-2.4, -2.7] }],
       [23, { lean: 0.38, legF: [0.8, 0.8], legB: [-0.2, -0.95], armF: [2.5, 2.8], armB: [-2.4, -2.7] }],
     ],
-    robinDashKick: [ // voadora em parafuso
+    robinDashKick: [ // voadora reta
       [0, { lean: 0.4, legF: [1.0, 0.3], legB: [-0.6, -1.2] }],
-      [3, { bob: -10, lean: -0.15, legF: [1.65, 1.65], legB: [-0.4, -1.0], armF: [-0.9, -0.5], armB: [-1.1, -0.7] }, 'lin'],
-      [15, { bob: -10, spin: TAU, lean: -0.15, legF: [1.65, 1.65], legB: [-0.4, -1.0], armF: [-0.9, -0.5], armB: [-1.1, -0.7] }],
-      [27, M(STANCE, { spin: TAU })],
+      [3, { bob: -8, lean: -0.15, legF: [1.65, 1.65], legB: [-0.4, -1.0], armF: [-0.9, -0.5], armB: [-1.1, -0.7] }],
+      [15, { bob: -8, lean: -0.15, legF: [1.65, 1.65], legB: [-0.4, -1.0], armF: [-0.9, -0.5], armB: [-1.1, -0.7] }],
+      [27, STANCE],
     ],
-    robinThrow: [ // mortal para trás e três birdarangues
+    robinThrow: [ // arremesso de três birdarangues
       [0, STANCE],
-      [4, { bob: 7, squash: 0.1, legF: [0.6, -0.1], legB: [-0.3, -0.9], armF: [0.4, 1.8] }, 'out'],
-      [10, { bob: -36, spin: -PI * 1.5, legF: [1.7, -0.5], legB: [1.5, -0.6], armF: [-2.2, -2.6], armB: [0.8, 1.6] }, 'lin'],
-      [14, { bob: -6, spin: -TAU, lean: 0.28, armF: [1.45, 1.55], armB: [-0.4, 0.2], legF: [0.5, 0.3], legB: [-0.45, -0.6] }],
-      [29, M(STANCE, { spin: -TAU })],
+      [8, { lean: -0.25, armF: [-2.2, -2.6], armB: [0.8, 1.7], legF: [0.42, 0.15], legB: [-0.4, -0.55] }, 'out'],
+      [14, { lean: 0.3, armF: [1.45, 1.55], armB: [-0.4, 0.2], legF: [0.55, 0.3], legB: [-0.5, -0.65] }],
+      [29, STANCE],
     ],
 
     // ===== Mutano
@@ -329,16 +327,15 @@
     robin: {
       idle(out, f, t) { setPose(out, STANCE); out.bob = Math.sin(t * 0.08) * 1.2; out.armF[1] += Math.sin(t * 0.08) * 0.05; },
       walk(out, f, t) { runCycle(out, t, { rate: 0.23, stride: 0.78, knee: 1.05, arm: 0.75, elbow: 1.35, lean: 0.22, bounce: 4 }); out.cape = 1; },
-      dash(out, f, t) { // rolamento para a frente
-        const k = TT.clamp(t / 14, 0, 1);
-        setPose(out, { spin: k * TAU, bob: 26 * Math.sin(k * PI), lean: 0.2, legF: [1.9, -0.55], legB: [1.7, -0.7], armF: [1.3, 3.0], armB: [1.1, 2.9] });
+      dash(out) { // arrancada baixa e rápida
+        setPose(out, { lean: 0.55, bob: 5, legF: [1.05, 0.35], legB: [-0.85, -1.45], armF: [-0.9, -0.3], armB: [-1.1, -0.5] });
         out.cape = 1;
       },
-      jump(out, f) { // mortal para a frente
-        const k = jumpK(f), fl = TT.clamp((k - 0.06) / 0.72, 0, 1), tuck = Math.sin(fl * PI);
-        blendPose(out, { legF: [0.5, 0.1], legB: [-0.3, -0.5], armF: [2.2, 2.6], armB: [-0.6, 0.3] },
-          { legF: [1.95, -0.5], legB: [1.8, -0.65], armF: [1.4, 3.0], armB: [1.2, 2.9] }, tuck);
-        out.spin = TT.easeInOut(fl) * TAU; out.cape = 1;
+      jump(out, f) { // pulo atlético (sem mortal)
+        setPose(out, f.vz > 0
+          ? { lean: 0.08, legF: [1.05, -0.35], legB: [0.25, -0.85], armF: [2.5, 2.8], armB: [-0.7, 0.2] }
+          : { lean: 0.12, legF: [0.55, 0.1], legB: [-0.25, -0.6], armF: [1.3, 1.9], armB: [-1.2, -0.8] });
+        out.cape = 1;
       },
       victory(out, f, t) { setPose(out, { lean: -0.06, bob: -Math.abs(Math.sin(t * 0.15)) * 5, armF: [2.0, 2.5], armB: [0.4, 1.8], legF: [0.35, 0.1], legB: [-0.35, -0.45] }); out.mouth = 'smile'; },
     },
