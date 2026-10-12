@@ -137,12 +137,32 @@ async page => {
       tryMove('forte', [['heavy', 70]]);
       tryMove('especial', [['special', 110]]);
       tryMove('aereo', [['jump', 8], ['light', 50]]);
+      tryMove('corrida', [['dash', 3], ['light', 45]]);
       out[p.key] = res;
     }
     g.enemies.length = 0;
     return out;
   });
   for (const k in moves) ok('todos os golpes acertam: ' + k, Object.values(moves[k]).every((d) => d > 0), moves[k]);
+
+  // 3b) Nova forma do Mutano: rinoceronte no ataque em corrida (esquiva + ataque)
+  const rhino = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    g.switchCool = 0; g.switchTo(1, true); TT.debug.step(100);
+    const p = g.player; p.invul = 0; p.facing = 1; p.y = 590;
+    g.enemies.length = 0;
+    const e = new TT.Enemy(g, 'hive', p.x + 160, p.y);
+    e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+    g.addEnemy(e);
+    g.input.pressed.add('dash'); TT.debug.step(3);
+    g.input.pressed.add('light'); TT.debug.step(4);
+    const form = p.atk && p.atk.def.form;
+    TT.debug.step(40);
+    g.enemies.length = 0;
+    return { form, dmg: Math.round(9999 - e.hp), knocked: e.state === 'down' || e.z > 0 };
+  });
+  ok('Mutano: rinoceronte (ataque em corrida) acerta', rhino.form === 'rhino' && rhino.dmg > 0, rhino);
 
   // 4) Especial "Titãs, avante!"
   const sup = await ev(() => {

@@ -691,69 +691,241 @@
   });
 
   // ------------------------------------------------------------ Formas animais do Mutano
-  TT.drawGorilla = function (ctx, x, y, facing, k, flash) {
-    FLASH = !!flash;
-    ctx.save(); ctx.translate(x, y); ctx.scale(facing * 1.25, 1.25);
-    const sm = k > 0.5 ? (k - 0.5) * 2 : 0; // golpe
-    const raise = k < 0.5 ? k * 2 : 1 - sm;
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    // corpo
-    ctx.beginPath(); ctx.ellipse(-4, -60, 42, 40, -0.2, 0, Math.PI * 2);
-    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(10, -54, 22, 26, -0.1, 0, Math.PI * 2); ctx.fillStyle = C('#79c64c'); ctx.fill();
-    // pernas
-    for (const lx of [-22, 12]) { ctx.beginPath(); ctx.ellipse(lx, -14, 13, 16, 0, 0, Math.PI * 2); ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.stroke(); }
-    // cabeça
-    ctx.beginPath(); ctx.arc(26, -94, 18, 0, Math.PI * 2); ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(33, -88, 12, 10, 0, 0, Math.PI * 2); ctx.fillStyle = C('#8fd463'); ctx.fill(); ctx.stroke();
+  // Paleta verde em 4 tons (sombra, base, luz, peito/rosto) — volume com sombreamento em camadas.
+  const BB = { D: '#2b6418', M: '#4f9d2d', L: '#86d257', F: '#b4e48c', X: '#1d4710' };
+
+  // Traço grosso de membro: contorno + cor + filete de luz.
+  function fatStroke(ctx, pts, w, col, hi) {
+    ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+    ctx.strokeStyle = OUT; ctx.lineWidth = w + 7; ctx.stroke();
+    ctx.strokeStyle = C(col); ctx.lineWidth = w; ctx.stroke();
+    if (hi && !FLASH) {
+      ctx.save(); ctx.translate(-w * 0.14, -w * 0.18);
+      ctx.strokeStyle = hi; ctx.lineWidth = w * 0.28; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // Pelos/escamas sugeridos: pequenos traços em "v" ao longo de uma curva.
+  function furMarks(ctx, pts, col, size) {
+    if (FLASH) return;
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i += 2) {
+      const x = pts[i], y = pts[i + 1];
+      ctx.moveTo(x - size, y - size * 0.4); ctx.lineTo(x, y + size * 0.5); ctx.lineTo(x + size * 0.6, y - size * 0.6);
+    }
+    ctx.stroke();
+  }
+  // Olho expressivo e bravo (branco, íris, brilho e sobrancelha).
+  function beastEye(ctx, x, y, r, iris, browCol, slit) {
+    if (FLASH) return;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = iris ? '#fff8d0' : '#ffffff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = iris || OUT;
+    ctx.beginPath(); ctx.ellipse(x + r * 0.25, y + r * 0.05, r * 0.5, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    if (slit) { ctx.fillStyle = OUT; ctx.fillRect(x + r * 0.15, y - r * 0.5, r * 0.22, r); }
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + r * 0.05, y - r * 0.3, r * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = browCol || OUT; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x - r * 1.2, y - r * 1.25); ctx.lineTo(x + r * 1.1, y - r * 0.55); ctx.stroke();
+  }
+  // Preenche um caminho com volume: base, sombra embaixo/atrás, luz em cima, contorno.
+  // se/le = elipses [x, y, rx, ry, rot] da sombra e da luz.
+  function volume(ctx, path, base, shadow, light, se, le) {
+    path(); ctx.fillStyle = C(base); ctx.fill();
     if (!FLASH) {
-      ctx.fillStyle = OUT; ctx.fillRect(28, -102, 12, 3);
-      ctx.beginPath(); ctx.arc(34, -97, 2.2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(36, -86, 6, 4, 0, 0, Math.PI * 2); ctx.fillStyle = '#4a1020'; ctx.fill();
+      ctx.save(); path(); ctx.clip();
+      ctx.fillStyle = shadow; ctx.beginPath(); ctx.ellipse(se[0], se[1], se[2], se[3], se[4] || 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(le[0], le[1], le[2], le[3], le[4] || 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     }
-    // braços erguidos -> esmagando
-    const ay = -100 - raise * 50 + sm * 90, ax = 30 + sm * 30;
-    for (const off of [-10, 6]) {
-      ctx.beginPath(); ctx.moveTo(8 + off, -82); ctx.quadraticCurveTo(ax + off - 10, (ay - 82) / 2 - 40, ax + off, ay);
-      ctx.strokeStyle = OUT; ctx.lineWidth = 22; ctx.stroke(); ctx.strokeStyle = C(off < 0 ? '#3f8424' : '#4f9a2f'); ctx.lineWidth = 16; ctx.stroke();
-      ctx.beginPath(); ctx.arc(ax + off, ay, 12, 0, Math.PI * 2); ctx.fillStyle = C('#3f8424'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    path(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
+  }
+
+  // Gorila: t = quadro do golpe, s = quadro do impacto. Braços sobem, descem esmagando o chão e voltam.
+  TT.drawGorilla = function (ctx, x, y, facing, t, s, flash) {
+    FLASH = !!flash;
+    const { D, M, L, F, X } = BB;
+    const up = TT.clamp(t / (s - 4), 0, 1), down = TT.clamp((t - (s - 4)) / 4, 0, 1);
+    const rec = TT.clamp((t - s - 5) / 14, 0, 1), pop = TT.clamp(t / 5, 0, 1);
+    // squash-and-stretch
+    let sx = 1, sy = 1;
+    if (t < s - 4) { sx = 1 - 0.08 * TT.easeOut(up); sy = 1 + 0.1 * TT.easeOut(up); }
+    else if (t < s + 5) { const k = TT.clamp((t - s) / 5, 0, 1); sx = t < s ? 1.0 : 1.2 - 0.06 * k; sy = t < s ? 1.04 : 0.82 + 0.05 * k; }
+    else { sx = TT.lerp(1.14, 1, rec); sy = TT.lerp(0.87, 1, rec); }
+    const ps = 0.55 + 0.45 * TT.easeOut(pop) + Math.sin(pop * Math.PI) * 0.12;
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * 1.12 * sx * ps, 1.12 * sy * ps);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // mãos: repouso -> acima da cabeça -> chão à frente -> repouso
+    let hx, hy;
+    if (down <= 0) { const e = TT.easeOut(up); hx = TT.lerp(64, 4, e); hy = TT.lerp(-36, -210, e); }
+    else { hx = TT.lerp(4, 112, down); hy = TT.lerp(-210, -10, down * down); }
+    if (t > s + 5) { hx = TT.lerp(112, 64, rec); hy = TT.lerp(-10, -36, rec); }
+    const bend = 26 * (1 - down * 0.7 + rec * 0.7);
+    const armPts = (shx, shy, off) => {
+      const ex = hx + off, dx = ex - shx, dy = hy - shy, l = Math.hypot(dx, dy) || 1;
+      const mx = (shx + ex) / 2 + (-dy / l) * bend, my = (shy + hy) / 2 + (dx / l) * bend;
+      return [shx, shy, mx, my, ex, hy];
+    };
+    const fist = (fx, fy, col) => {
+      ctx.beginPath(); ctx.ellipse(fx, fy, 17, 15, 0, 0, Math.PI * 2);
+      ctx.fillStyle = C(col); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+      if (!FLASH) { ctx.strokeStyle = X; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx + 4, fy - 9); ctx.lineTo(fx + 4, fy + 8); ctx.moveTo(fx + 10, fy - 6); ctx.lineTo(fx + 10, fy + 6); ctx.stroke(); }
+    };
+    // braço e perna de trás (tom escuro)
+    fatStroke(ctx, armPts(-6, -124, -14), 24, D, null);
+    fist(hx - 14, hy, D);
+    fatStroke(ctx, [-24, -46, -36, -22, -26, -4], 22, D, null);
+    ctx.beginPath(); ctx.ellipse(-20, -3, 20, 9, 0, 0, Math.PI * 2); ctx.fillStyle = C(X); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    // tronco curvado (corcunda) com volume
+    const torso = () => {
+      ctx.beginPath();
+      ctx.moveTo(-36, -40);
+      ctx.bezierCurveTo(-62, -72, -56, -128, -22, -144);
+      ctx.bezierCurveTo(10, -158, 46, -146, 50, -114);
+      ctx.bezierCurveTo(54, -84, 40, -50, 24, -36);
+      ctx.quadraticCurveTo(-6, -24, -36, -40);
+      ctx.closePath();
+    };
+    volume(ctx, torso, M, D, L, [-34, -52, 40, 52, 0.3], [6, -140, 34, 14, -0.15]);
+    if (!FLASH) {
+      ctx.beginPath(); ctx.ellipse(28, -86, 20, 28, -0.15, 0, Math.PI * 2); ctx.fillStyle = F; ctx.fill();
+      ctx.strokeStyle = D; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, -92); ctx.quadraticCurveTo(28, -86, 40, -92); ctx.moveTo(16, -76); ctx.quadraticCurveTo(28, -72, 38, -78); ctx.stroke();
+      furMarks(ctx, [-50, -84, -50, -104, -42, -122, -28, -136, -10, -146], X, 6);
     }
+    // perna da frente
+    fatStroke(ctx, [10, -44, 24, -22, 22, -4], 24, M, L);
+    ctx.beginPath(); ctx.ellipse(28, -3, 22, 9, 0, 0, Math.PI * 2); ctx.fillStyle = C(D); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    // cabeça: crista, sobrancelha, focinho e boca
+    const roar = t >= s - 3 && t < s + 10;
+    ctx.save(); ctx.translate(44, -130); ctx.rotate(roar ? -0.12 : 0.05);
+    const head = () => { ctx.beginPath(); ctx.moveTo(-18, 8); ctx.bezierCurveTo(-24, -14, -8, -30, 6, -28); ctx.bezierCurveTo(22, -26, 28, -12, 28, 4); ctx.bezierCurveTo(26, 18, -14, 22, -18, 8); ctx.closePath(); };
+    volume(ctx, head, M, D, L, [-14, 6, 14, 18], [2, -24, 14, 6]);
+    ctx.beginPath(); ctx.ellipse(16, 6, 16, 14, 0, 0, Math.PI * 2); ctx.fillStyle = C(F); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    if (!FLASH) {
+      ctx.fillStyle = X; ctx.beginPath(); ctx.ellipse(10, -11, 18, 5, 0.12, 0, Math.PI * 2); ctx.fill(); // sobrancelha
+      beastEye(ctx, 13, -5, 4.2, null, X);
+      ctx.fillStyle = X; ctx.beginPath(); ctx.arc(24, 2, 2, 0, Math.PI * 2); ctx.arc(19, 3, 2, 0, Math.PI * 2); ctx.fill();
+      if (roar) {
+        ctx.beginPath(); ctx.ellipse(18, 13, 10, 7, 0, 0, Math.PI * 2); ctx.fillStyle = '#5a1020'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff'; for (const fx of [11, 24]) { ctx.beginPath(); ctx.moveTo(fx - 3, 7); ctx.lineTo(fx + 3, 7); ctx.lineTo(fx, 13); ctx.fill(); }
+      } else { ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(8, 13); ctx.quadraticCurveTo(18, 10, 28, 13); ctx.stroke(); }
+    }
+    ctx.restore();
+    // braço da frente
+    fatStroke(ctx, armPts(20, -120, 0), 26, M, L);
+    if (!FLASH) furMarks(ctx, [14, -128, 26, -128], X, 5);
+    fist(hx, hy, M);
     ctx.restore(); FLASH = false;
   };
 
-  TT.drawTRex = function (ctx, x, y, facing, t, flash) {
+  // T-Rex: preparação com rugido (t < s), corrida mordendo e freada no fim (t > end).
+  TT.drawTRex = function (ctx, x, y, facing, t, s, end, flash) {
     FLASH = !!flash;
-    ctx.save(); ctx.translate(x, y); ctx.scale(facing * 1.35, 1.35);
-    const step = Math.sin(t * 0.35), jaw = 0.25 + Math.abs(Math.sin(t * 0.18)) * 0.4;
+    const { D, M, L, F, X } = BB;
+    const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 10, 0, 1);
+    const ph = t * 0.45, step = run ? Math.sin(ph) : 0;
+    const bob = run ? -Math.abs(Math.cos(ph)) * 7 : 0;
+    const tilt = t < s ? -0.28 * TT.easeOut(pre) : run ? 0.06 : -0.12 * (1 - stop);
+    const jaw = t < s ? 0.15 + 0.55 * pre : run ? 0.2 + Math.abs(Math.sin(t * 0.32)) * 0.45 : 0.15;
+    const pop = TT.clamp(t / 5, 0, 1), ps = 0.55 + 0.45 * TT.easeOut(pop) + Math.sin(pop * Math.PI) * 0.12;
+    const sq = run ? 1 + Math.cos(ph * 2) * 0.03 : 1;
+    ctx.save(); ctx.translate(x, y + bob); ctx.scale(facing * 1.2 * ps / sq, 1.2 * ps * sq);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.translate(0, -62); ctx.rotate(tilt); ctx.translate(0, 62);
     // cauda
-    ctx.beginPath(); ctx.moveTo(-20, -70); ctx.quadraticCurveTo(-80, -80 + step * 4, -120, -50 + step * 6); ctx.quadraticCurveTo(-70, -48, -10, -40); ctx.closePath();
-    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
-    // pernas
-    for (const [lx, ph] of [[-12, step], [12, -step]]) {
-      ctx.beginPath(); ctx.moveTo(lx, -50); ctx.lineTo(lx + ph * 12, -22); ctx.lineTo(lx + ph * 6 + 8, 0);
-      ctx.strokeStyle = OUT; ctx.lineWidth = 20; ctx.stroke(); ctx.strokeStyle = C(ph > 0 ? '#3f8424' : '#4f9a2f'); ctx.lineWidth = 14; ctx.stroke();
-    }
+    const wag = Math.sin(t * 0.25) * 8;
+    const tail = () => { ctx.beginPath(); ctx.moveTo(-26, -104); ctx.bezierCurveTo(-80, -112, -130, -96 + wag, -168, -78 + wag * 1.6); ctx.bezierCurveTo(-120, -66 + wag, -76, -60, -28, -58); ctx.closePath(); };
+    volume(ctx, tail, M, D, L, [-90, -64, 80, 12], [-80, -104, 70, 8, 0.12]);
+    if (!FLASH) { ctx.fillStyle = D; for (let i = 0; i < 6; i++) { const tx = -40 - i * 21, ty = -106 + i * 4 + wag * i / 6; ctx.beginPath(); ctx.moveTo(tx - 7, ty + 2); ctx.lineTo(tx, ty - 8 + i); ctx.lineTo(tx + 7, ty + 2); ctx.fill(); } }
+    // perna de trás
+    const leg = (hx, phs, col, hi) => {
+      const kx = hx - 18 + phs * 16, fx = hx + 6 + phs * 22, lift = Math.max(0, -phs) * 14;
+      ctx.beginPath(); ctx.ellipse(hx, -66, 22, 30, 0.3, 0, Math.PI * 2); ctx.fillStyle = C(col); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+      fatStroke(ctx, [hx + 4, -50, kx, -26 - lift, fx, -4 - lift], 15, col, hi);
+      ctx.beginPath(); ctx.ellipse(fx + 8, -3 - lift, 16, 6, 0, 0, Math.PI * 2); ctx.fillStyle = C(col); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!FLASH) { ctx.fillStyle = '#f4f0d8'; for (const cx of [18, 25]) { ctx.beginPath(); ctx.moveTo(fx + cx - 3, -6 - lift); ctx.lineTo(fx + cx + 4, -3 - lift); ctx.lineTo(fx + cx - 3, 0 - lift); ctx.fill(); } }
+    };
+    leg(-14, -step, D, null);
     // corpo
-    ctx.beginPath(); ctx.ellipse(0, -72, 45, 30, -0.35, 0, Math.PI * 2);
-    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(12, -68, 22, 16, -0.4, 0, Math.PI * 2); ctx.fillStyle = C('#8fd463'); ctx.fill();
-    // bracinhos
-    ctx.beginPath(); ctx.moveTo(30, -76); ctx.lineTo(44, -66); ctx.lineTo(48, -72); ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = C('#4f9a2f'); ctx.lineWidth = 4; ctx.stroke();
-    // cabeça + mandíbula
-    ctx.save(); ctx.translate(36, -104);
-    ctx.beginPath(); ctx.moveTo(-12, 10); ctx.quadraticCurveTo(-14, -20, 22, -18); ctx.lineTo(48, -10); ctx.lineTo(48, 2); ctx.lineTo(0, 8); ctx.closePath();
-    ctx.fillStyle = C('#4f9a2f'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
-    ctx.save(); ctx.translate(0, 8); ctx.rotate(jaw);
-    ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(44, -6); ctx.lineTo(40, 6); ctx.lineTo(-4, 10); ctx.closePath();
-    ctx.fillStyle = C('#3f8424'); ctx.fill(); ctx.stroke();
-    if (!FLASH) { ctx.fillStyle = '#fff'; for (let i = 6; i < 40; i += 8) { ctx.beginPath(); ctx.moveTo(i, -5); ctx.lineTo(i + 4, -5); ctx.lineTo(i + 2, -10); ctx.fill(); } }
-    ctx.restore();
+    const body = () => { ctx.beginPath(); ctx.moveTo(-40, -102); ctx.bezierCurveTo(-6, -124, 36, -122, 56, -100); ctx.bezierCurveTo(64, -82, 50, -58, 26, -54); ctx.bezierCurveTo(0, -48, -30, -52, -42, -62); ctx.bezierCurveTo(-52, -76, -50, -94, -40, -102); ctx.closePath(); };
+    volume(ctx, body, M, D, L, [-10, -50, 60, 18], [6, -116, 44, 10, -0.1]);
     if (!FLASH) {
-      ctx.fillStyle = '#fff'; for (let i = 8; i < 44; i += 8) { ctx.beginPath(); ctx.moveTo(i, 2); ctx.lineTo(i + 4, 2); ctx.lineTo(i + 2, 8); ctx.fill(); }
-      ctx.beginPath(); ctx.arc(12, -8, 4, 0, Math.PI * 2); ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
-      ctx.beginPath(); ctx.arc(13, -8, 1.8, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill();
+      ctx.save(); body(); ctx.clip();
+      ctx.fillStyle = F; ctx.beginPath(); ctx.ellipse(28, -64, 32, 14, -0.35, 0, Math.PI * 2); ctx.fill(); // barriga clara
+      ctx.strokeStyle = D; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 9; i++) { const sx2 = -30 + (i % 5) * 16 + (i > 4 ? 8 : 0), sy2 = -104 + (i > 4 ? 14 : 0); ctx.beginPath(); ctx.arc(sx2, sy2, 5, 0.2, Math.PI - 0.2); ctx.stroke(); } // escamas
+      ctx.restore();
     }
+    leg(8, step, M, L);
+    // bracinhos agitados
+    const fl = Math.sin(t * 0.6) * 0.4;
+    fatStroke(ctx, [44, -86, 56 + fl * 6, -74, 66, -78 + fl * 8], 7, M, null);
+    // cabeça grande com mandíbula
+    ctx.save(); ctx.translate(54, -112); ctx.rotate(t < s ? -0.3 * pre : run ? Math.sin(t * 0.32) * 0.06 : 0);
+    // boca (interior)
+    if (!FLASH) {
+      ctx.save(); ctx.rotate(jaw * 0.5);
+      ctx.beginPath(); ctx.moveTo(2, 6); ctx.lineTo(66, -4); ctx.lineTo(62, 22); ctx.closePath(); ctx.fillStyle = '#5a1020'; ctx.fill();
+      ctx.restore();
+    }
+    // mandíbula inferior
+    ctx.save(); ctx.translate(2, 8); ctx.rotate(jaw);
+    ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(56, -4); ctx.quadraticCurveTo(60, 4, 52, 8); ctx.lineTo(0, 12); ctx.closePath();
+    ctx.fillStyle = C(D); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    if (!FLASH) { ctx.fillStyle = '#ffffff'; for (let i = 8; i < 52; i += 8) { ctx.beginPath(); ctx.moveTo(i, -3); ctx.lineTo(i + 5, -3); ctx.lineTo(i + 2.5, -10); ctx.fill(); } }
+    ctx.restore();
+    const skull = () => { ctx.beginPath(); ctx.moveTo(-14, 12); ctx.bezierCurveTo(-20, -18, 4, -32, 30, -28); ctx.bezierCurveTo(52, -26, 70, -18, 74, -6); ctx.quadraticCurveTo(76, 4, 68, 6); ctx.lineTo(2, 10); ctx.closePath(); };
+    volume(ctx, skull, M, D, L, [0, 8, 26, 10], [30, -26, 34, 6, 0.05]);
+    if (!FLASH) {
+      ctx.fillStyle = '#ffffff'; for (let i = 10; i < 66; i += 8) { ctx.beginPath(); ctx.moveTo(i, 7); ctx.lineTo(i + 5, 7); ctx.lineTo(i + 2.5, 14); ctx.fill(); }
+      ctx.fillStyle = X; ctx.beginPath(); ctx.ellipse(66, -14, 3, 2, 0, 0, Math.PI * 2); ctx.fill(); // narina
+      beastEye(ctx, 22, -14, 6, '#ffd23a', X, true);
+      ctx.strokeStyle = D; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(34, -6); ctx.quadraticCurveTo(46, -2, 58, -6); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore(); FLASH = false;
+  };
+
+  // Rinoceronte (ataque em corrida): cabeça baixa, chifre à frente, galope.
+  TT.drawRhino = function (ctx, x, y, facing, t, s, end, flash) {
+    FLASH = !!flash;
+    const { D, M, L, F, X } = BB;
+    const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 8, 0, 1);
+    const ph = t * 0.55, gal = run ? Math.sin(ph) : 0;
+    const bob = run ? -Math.abs(Math.sin(ph)) * 6 : 0;
+    const tilt = t < s ? -0.18 * TT.easeOut(pre) : run ? 0.08 : -0.1 * (1 - stop);
+    const pop = TT.clamp(t / 4, 0, 1), ps = 0.55 + 0.45 * TT.easeOut(pop) + Math.sin(pop * Math.PI) * 0.12;
+    const st = run ? 1.08 : t < s ? 0.94 : 1; // estica correndo, encolhe preparando
+    ctx.save(); ctx.translate(x, y + bob); ctx.scale(facing * 1.1 * ps * st, 1.1 * ps / st);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.translate(0, -40); ctx.rotate(tilt); ctx.translate(0, 40);
+    const leg = (lx, p, col, hi) => fatStroke(ctx, [lx, -42, lx + p * 12, -20 - Math.max(0, p) * 8, lx + p * 18, -4 - Math.max(0, p) * 6], 15, col, hi);
+    leg(-40, -gal, D, null); leg(26, gal, D, null);
+    // cauda curtinha
+    ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-62, -66); ctx.quadraticCurveTo(-74, -60, -72, -48 + Math.sin(t * 0.8) * 4); ctx.stroke();
+    // corpo em barril com dobras de couraça
+    const body = () => { ctx.beginPath(); ctx.moveTo(-62, -58); ctx.bezierCurveTo(-64, -92, -20, -104, 14, -98); ctx.bezierCurveTo(44, -94, 58, -78, 56, -58); ctx.bezierCurveTo(54, -36, 20, -30, -10, -32); ctx.bezierCurveTo(-40, -32, -62, -40, -62, -58); ctx.closePath(); };
+    volume(ctx, body, M, D, L, [-6, -34, 64, 16], [-6, -96, 44, 9]);
+    if (!FLASH) {
+      ctx.strokeStyle = D; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(-28, -98); ctx.quadraticCurveTo(-38, -66, -26, -36); ctx.moveTo(22, -97); ctx.quadraticCurveTo(14, -66, 24, -36); ctx.stroke();
+      furMarks(ctx, [-50, -84, -6, -100, 36, -92], X, 4);
+    }
+    leg(-30, gal, M, L); leg(36, -gal, M, L);
+    // cabeça baixa com chifre
+    ctx.save(); ctx.translate(48, -66); ctx.rotate(run ? 0.12 + Math.sin(ph) * 0.05 : t < s ? -0.2 * pre : 0);
+    const head = () => { ctx.beginPath(); ctx.moveTo(-10, -26); ctx.bezierCurveTo(10, -32, 34, -22, 46, -6); ctx.quadraticCurveTo(50, 8, 40, 14); ctx.bezierCurveTo(22, 20, 0, 18, -12, 8); ctx.closePath(); };
+    volume(ctx, head, M, D, L, [10, 14, 30, 8], [14, -24, 22, 6]);
+    // chifres
+    ctx.beginPath(); ctx.moveTo(34, -12); ctx.quadraticCurveTo(62, -24, 70, -48); ctx.quadraticCurveTo(58, -18, 46, -2); ctx.closePath();
+    ctx.fillStyle = C('#eef6dc'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(18, -22); ctx.quadraticCurveTo(28, -34, 30, -42); ctx.quadraticCurveTo(30, -28, 28, -18); ctx.closePath();
+    ctx.fillStyle = C('#d6e6bd'); ctx.fill(); ctx.stroke();
+    // orelha e olho
+    ctx.beginPath(); ctx.moveTo(-6, -24); ctx.lineTo(-14, -42); ctx.lineTo(2, -28); ctx.closePath(); ctx.fillStyle = C(D); ctx.fill(); ctx.stroke();
+    beastEye(ctx, 14, -12, 4, null, X);
+    if (!FLASH) { ctx.fillStyle = X; ctx.beginPath(); ctx.arc(42, 6, 2, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
     ctx.restore(); FLASH = false;
   };

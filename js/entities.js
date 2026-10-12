@@ -69,6 +69,14 @@
             TT.drawBurst(ctx, x, y, p.size, 4, p.color, null, p.rot);
             ctx.globalAlpha = 1;
             break;
+          case 'cloud': {
+            // nuvem cartoon da transformação do Mutano (cresce e encolhe, com contorno)
+            const g = 1 - k, r = p.size * (0.45 + 0.75 * TT.easeOut(Math.min(1, g * 2.4))) * Math.min(1, k * 3.5);
+            ctx.fillStyle = p.color; ctx.strokeStyle = p.color2 || OUT; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.32, r * 0.34, 0, Math.PI * 2); ctx.fill();
+            break;
+          }
           case 'feather':
             ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = k;
             ctx.fillStyle = p.color; ctx.beginPath(); ctx.ellipse(0, 0, p.size, p.size * 0.35, 0, 0, Math.PI * 2); ctx.fill();
@@ -249,20 +257,36 @@
 
   // ================================================================ Titãs
   const GREEN = '#5dff8a', DARK = '#a77bff', SONIC = '#5fc2ff';
+  // Rastros (smear) por pose: pivô (x à frente, y acima do pé), raio e ângulos (0 = à frente, + = para baixo).
+  const SMEAR = {
+    jab: { x: 10, y: 84, r: 70, line: true },
+    cross: { x: 10, y: 84, r: 78, line: true },
+    cast: { x: 10, y: 84, r: 84, line: true },
+    flyKick: { x: 0, y: 52, r: 76, line: true },
+    swing: { x: 6, y: 92, r: 104, a0: -2.2, a1: 0.9 },
+    swipe: { x: 6, y: 86, r: 96, a0: -1.2, a1: 0.7 },
+    claw: { x: 8, y: 84, r: 88, a0: -1.4, a1: 0.9 },
+    uppercut: { x: 10, y: 80, r: 74, a0: 1.1, a1: -1.4 },
+    castUp: { x: 8, y: 84, r: 90, a0: 1.0, a1: -1.5 },
+    kick: { x: 0, y: 52, r: 78, a0: 0.9, a1: -0.4 },
+    dive: { x: 0, y: 40, r: 70, a0: -0.4, a1: 1.0 },
+    slam: { x: 10, y: 96, r: 96, a0: -1.6, a1: 0.8 },
+  };
 
   function spawnBolt(f, g, big) {
     g.addProjectile(new Projectile(g, {
       kind: big ? 'bigbolt' : 'starbolt', team: 'hero', owner: f,
       x: f.x + f.facing * 48, y: f.y, z: f.z > 0 ? f.z + 40 : 72, vx: f.facing * (big ? 11 : 13),
       r: big ? 24 : 14, dmg: big ? 17 : 8, kb: big ? 8 : 3, knockdown: big, launch: 6, life: 70, color: GREEN,
-      vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, // no ar: tiro diagonal para baixo
+      vz: f.z > 0 ? -f.z / 8 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
     }));
     A().play('starbolt');
   }
 
   const TITANS = {
     robin: {
-      name: 'Robin', hp: 120, speed: 4.7, jump: 15.5, color: '#d7262e',
+      name: 'Robin', hp: 120, speed: 4.7, jump: 15.5, color: '#d7262e', fx: '#ff5a3a',
+      dashAtk: { pose: 'flyKick', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 76], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, sound0: 'whoosh' },
         { pose: 'swipe', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 100], kb: 2, weapon: 'staff', sound0: 'whoosh' },
@@ -276,14 +300,15 @@
           if (t !== 8) return;
           for (const dy of [-34, 0, 34]) g.addProjectile(new Projectile(g, {
             kind: 'birdarang', team: 'hero', owner: f, x: f.x + f.facing * 40, y: f.y, z: f.z + 70,
-            vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true,
+            vx: f.facing * 14, vy: dy / 22, r: 14, dmg: 11, kb: 5, knockdown: true, launch: 5, life: 75, pierce: true, trailN: 7,
           }));
           A().play('birdarang');
         },
       },
     },
     starfire: {
-      name: 'Estelar', hp: 105, speed: 4.6, jump: 16, floaty: true, color: '#f3a35a',
+      name: 'Estelar', hp: 105, speed: 4.6, jump: 16, floaty: true, color: '#f3a35a', fx: GREEN,
+      dashAtk: { pose: 'cross', s: 3, a: 12, r: 12, dmg: 11, reach: [0, 74], lunge: 11, knockdown: true, launch: 6, kb: 8, glow: GREEN, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 8, dmg: 6, reach: [0, 64], kb: 1.5, glow: GREEN, sound0: 'whoosh' },
         { pose: 'cross', s: 4, a: 3, r: 9, dmg: 7, reach: [0, 70], kb: 2, glow: GREEN, sound0: 'whoosh' },
@@ -297,7 +322,8 @@
       },
     },
     cyborg: {
-      name: 'Ciborgue', hp: 150, speed: 4.0, jump: 14, color: '#5f8fe0',
+      name: 'Ciborgue', hp: 150, speed: 4.0, jump: 14, color: '#5f8fe0', fx: SONIC,
+      dashAtk: { pose: 'cross', s: 4, a: 12, r: 14, dmg: 13, reach: [0, 78], lunge: 10, knockdown: true, launch: 7, kb: 9, big: true, sound0: 'whoosh' },
       light: [
         { pose: 'jab', s: 5, a: 3, r: 9, dmg: 8, reach: [0, 70], kb: 2, sound0: 'whoosh' },
         { pose: 'cross', s: 5, a: 3, r: 10, dmg: 9, reach: [0, 74], kb: 2.5, sound0: 'whoosh' },
@@ -315,7 +341,8 @@
       },
     },
     raven: {
-      name: 'Ravena', hp: 100, speed: 4.4, jump: 14.5, floaty: true, color: '#7b55c9',
+      name: 'Ravena', hp: 100, speed: 4.4, jump: 14.5, floaty: true, color: '#7b55c9', fx: '#b98cff',
+      dashAtk: { pose: 'swipe', s: 3, a: 10, r: 12, dmg: 10, reach: [0, 98], lunge: 9, knockdown: true, launch: 6, kb: 7, glow: DARK, claw: true, big: true, sound: 'dark' },
       light: [
         { pose: 'swipe', s: 4, a: 4, r: 8, dmg: 6, reach: [0, 92], kb: 1.5, glow: DARK, sound0: 'whoosh', claw: true },
         { pose: 'cast', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 98], kb: 2, glow: DARK, sound0: 'whoosh', claw: true },
@@ -325,7 +352,7 @@
         pose: 'cast', s: 11, a: 1, r: 18, glow: DARK,
         onFrame(f, t, g) {
           if (t !== 11) return;
-          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 70, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true }));
+          g.addProjectile(new Projectile(g, { kind: 'raven', team: 'hero', owner: f, x: f.x + f.facing * 50, y: f.y, z: f.z + 70, vx: f.facing * 9.5, r: 30, dmg: 14, kb: 7, knockdown: true, launch: 7, life: 85, pierce: true, trailN: 8 }));
           A().play('dark');
         },
       },
@@ -339,7 +366,17 @@
       },
     },
     beastboy: {
-      name: 'Mutano', hp: 115, speed: 5.1, jump: 15.5, color: '#79c64c',
+      name: 'Mutano', hp: 115, speed: 5.1, jump: 15.5, color: '#79c64c', fx: '#8dff5a',
+      // investida de rinoceronte (ataque em corrida: esquiva + ataque)
+      dashAtk: {
+        form: 'rhino', pose: 'jab', s: 6, a: 18, r: 14, lunge: 12, dmg: 13, reach: [0, 120], depth: 42, knockdown: true, launch: 7, kb: 10, big: true,
+        shout: 'Rinoceronte!', shoutColor: '#8fd463', sound0: 'roar',
+        onFrame(f, t, g) {
+          if (t === 1) g.morph(f.x, f.y - 50);
+          if (t > this.s && t < this.s + this.a && t % 3 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 3); }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 50, true);
+        },
+      },
       light: [
         { pose: 'jab', s: 4, a: 3, r: 7, dmg: 6, reach: [0, 62], kb: 1.5, sound0: 'whoosh' },
         { pose: 'kick', s: 5, a: 4, r: 9, dmg: 7, reach: [0, 82], kb: 2, sound0: 'whoosh' },
@@ -348,9 +385,13 @@
       heavy: {
         form: 'gorilla', pose: 'slam', s: 16, a: 5, r: 16, dmg: 20, reach: [0, 140], depth: 45, knockdown: true, launch: 8, kb: 9, big: true,
         onFrame(f, t, g) {
-          if (t === 1) { g.poof(f.x, f.y - 60); A().play('roar'); }
-          if (t === 16) { g.shake = 12; g.groundRing(f.x + f.facing * 80, f.y, '#79c64c'); }
-          if (t === 36) g.poof(f.x, f.y - 60);
+          if (t === 1) { g.morph(f.x, f.y - 60); A().play('roar'); }
+          if (t === 16) {
+            g.shake = 14; g.groundRing(f.x + f.facing * 110, f.y, '#8dff5a');
+            g.debrisBurst(f.x + f.facing * 110, f.y - 10, 8, '#8e8880');
+            g.particles.spawn('text', f.x + f.facing * 110, f.y - 150, { text: 'BLAM!', size: 42, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 36, rot: TT.rand(-0.2, 0.2) });
+          }
+          if (t === 36) g.morph(f.x, f.y - 60, true);
         },
       },
       air: { pose: 'kick', s: 3, a: 12, r: 8, dmg: 9, reach: [0, 82], kb: 3, zr: 130 },
@@ -358,9 +399,9 @@
         cost: 35, form: 'trex', pose: 'jab', s: 12, a: 46, r: 12, lunge: 7, dmg: 10, rehit: 10, reach: [0, 180], depth: 55, knockdown: true, launch: 7, kb: 10,
         shout: 'RAAAWR!', shoutColor: '#8fd463', sound0: 'roar',
         onFrame(f, t, g) {
-          if (t === 1) g.poof(f.x, f.y - 60);
-          if (t > 12 && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
-          if (t === 69) g.poof(f.x, f.y - 60);
+          if (t === 1) g.morph(f.x, f.y - 70);
+          if (t > 12 && t % 6 === 0) { g.dust(f.x - f.facing * 40, f.y, 3, '#c9b9a8'); g.shake = Math.max(g.shake, 4); }
+          if (t === 69) g.morph(f.x, f.y - 70, true);
         },
       },
     },
@@ -452,6 +493,12 @@
           return;
         }
         case 'dash': {
+          // ataque em corrida
+          if ((this.buffer === 'light' || this.buffer === 'heavy') && this.def.dashAtk && this.st >= 2) {
+            this.buffer = null; this.vy = 0; this.invul = Math.min(this.invul, 4);
+            this.startAttack(this.def.dashAtk);
+            return;
+          }
           this.vx = this.facing * (13 - this.st * 0.5);
           if (this.st % 3 === 0) g.particles.spawn('dust', this.x - this.facing * 20, this.y - 6, { color: 'rgba(255,255,255,0.8)', size: 7, life: 14 });
           if (this.st > 14) { this.vy = 0; this.setState('idle'); this.setAnim('idle'); }
@@ -531,11 +578,13 @@
       const a = this.atk, f = a && a.def.form;
       const sx = this.x - camX, sy = this.y - this.z;
       if (this.invul > 0 && this.state !== 'getup' && this.state !== 'dash' && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.55;
+      const fl = this.flash > 3;
       if (f === 'gorilla' && a.t > 1 && a.t < 36) {
-        const k = TT.clamp((a.t - 2) / (a.def.s - 2 + 4), 0, 1);
-        TT.drawGorilla(ctx, sx, sy, this.facing, k, this.flash > 3);
+        TT.drawGorilla(ctx, sx, sy, this.facing, a.t, a.def.s, fl);
       } else if (f === 'trex' && a.t > 1 && a.t < 69) {
-        TT.drawTRex(ctx, sx, sy, this.facing, a.t, this.flash > 3);
+        TT.drawTRex(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
+      } else if (f === 'rhino' && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+        TT.drawRhino(ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
       } else {
         TT.computePose(this, this.pose);
         if (this.key === 'starfire' || this.key === 'raven') {
@@ -544,48 +593,105 @@
         TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3, t: this.animT });
       }
       ctx.globalAlpha = 1;
-      // efeitos de ataque (feixes, garras de energia)
+      // efeitos de ataque (feixes, garras de energia, rastros de movimento)
       if (a && a.t >= a.def.s && a.t < a.def.s + a.def.a + 2) {
         if (a.def.beam) this.drawBeam(ctx, sx, sy, a);
         if (a.def.claw) this.drawClaw(ctx, sx, sy, a);
       }
+      if (a && a.def.dmg && !a.def.beam && !a.def.form && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
+    }
+
+    // Rastro de movimento (smear) em arco na cor do Titã.
+    drawSmear(ctx, sx, sy, a) {
+      const d = a.def, k = (a.t - d.s) / (d.a + 5), sc = this.style.scale;
+      const P = SMEAR[d.pose] || SMEAR.jab;
+      const col = this.def.fx || '#ffffff';
+      const grow = Math.min(1, (a.t - d.s + 1) / 3);
+      const a0 = P.a0, a1 = P.a0 + (P.a1 - P.a0) * grow;
+      const R = P.r * (d.weapon === 'staff' ? 1.25 : 1) * (d.big ? 1.12 : 1);
+      ctx.save();
+      ctx.translate(sx + this.facing * P.x * sc, sy - P.y * sc); ctx.scale(this.facing * sc, sc);
+      ctx.globalAlpha = 0.85 * (1 - k);
+      if (P.line) {
+        // golpes retos: linhas de velocidade
+        ctx.strokeStyle = col; ctx.lineCap = 'round';
+        for (let i = 0; i < 3; i++) {
+          ctx.lineWidth = 5 - i; const yy = -8 + i * 8;
+          ctx.beginPath(); ctx.moveTo(R * (0.15 + 0.1 * i), yy); ctx.lineTo(R * (0.95 - 0.08 * i) * grow + 6, yy); ctx.stroke();
+        }
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(R * 0.3, 0); ctx.lineTo(R * 0.95 * grow, 0); ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, R, a0, a1, a1 < a0);
+        ctx.arc(R * 0.12, R * 0.04, R * 0.7, a1, a0, a1 >= a0);
+        ctx.closePath();
+        ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, 0, R, a0 + (a1 - a0) * 0.35, a1, a1 < a0); ctx.stroke();
+      }
+      ctx.restore();
     }
 
     drawBeam(ctx, sx, sy, a) {
       const d = a.def, fc = this.facing;
-      const sc = this.style.scale;
-      const ox = sx + fc * (d.beam === 'eyes' ? 20 : 66) * sc;
-      const oy = sy - (d.beam === 'eyes' ? 112 : 84) * sc;
+      const sc = this.style.scale, eyes = d.beam === 'eyes';
+      const ox = sx + fc * (eyes ? 16 : 66) * sc;
+      const oy = sy - (eyes ? 106 : 84) * sc;
       const len = d.reach[1];
-      const k = a.t - d.s, fade = Math.min(1, (d.a - k) / 6);
-      const w = (d.beam === 'sonic' ? 46 : 16) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
-      const col = d.beam === 'sonic' ? SONIC : GREEN;
+      const k = a.t - d.s, fade = Math.min(1, (d.a - k) / 6), grow = Math.min(1, (k + 1) / 4);
+      const L = len * grow;
+      const w = (eyes ? 13 : 46) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
+      const col = eyes ? GREEN : SONIC;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const gr = ctx.createLinearGradient(0, oy - w, 0, oy + w);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = gr;
-      ctx.fillRect(fc > 0 ? ox : ox - len, oy - w, len, w * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.fillRect(fc > 0 ? ox : ox - len, oy - w * 0.18, len, w * 0.36);
-      TT.drawGlow(ctx, col, ox, oy, w * 2.2, 1);
+      // raios oculares: dois feixes (um por olho); sônico: um feixe largo
+      const rows = eyes ? [-5, 5] : [0];
+      for (const off of rows) {
+        const y0 = oy + off;
+        const gr = ctx.createLinearGradient(0, y0 - w, 0, y0 + w);
+        gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(fc > 0 ? ox : ox - L, y0 - w, L, w * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(fc > 0 ? ox : ox - L, y0 - w * 0.2, L, w * 0.4);
+      }
+      if (!eyes) {
+        // ondas concêntricas viajando pelo feixe sônico
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 7; i++) {
+          const dist = ((k * 22 + i * 120) % L), q = dist / L;
+          ctx.strokeStyle = 'rgba(200,240,255,' + (0.9 * (1 - q)) + ')';
+          ctx.beginPath(); ctx.ellipse(ox + fc * dist, oy, 9 + q * 10, w * (1.05 + q * 0.5), 0, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      TT.drawGlow(ctx, col, ox, oy, w * (eyes ? 3.4 : 2.4), 1);
+      TT.drawGlow(ctx, col, ox + fc * L, oy, w * (eyes ? 4 : 2), 0.9 * grow); // clarão na ponta
       ctx.restore();
-      if (k % 3 === 0) this.game.particles.spawn('spark', this.x + fc * TT.rand(60, len), oy + TT.rand(-w, w), { vx: fc * TT.rand(4, 10), vy: TT.rand(-2, 2), color: col, size: 3, life: 10 });
+      if (k % 2 === 0) this.game.particles.spawn('spark', this.x + fc * TT.rand(60, L), oy + TT.rand(-w, w), { vx: fc * TT.rand(4, 10), vy: TT.rand(-2, 2), color: col, size: 3, life: 10 });
     }
 
+    // Garra de energia negra da Ravena: contorno violeta + filete branco e brilho.
     drawClaw(ctx, sx, sy, a) {
       const fc = this.facing, k = (a.t - a.def.s) / a.def.a;
       const r = a.def.reach[1];
+      const cx = sx + fc * r * 0.55, cy = sy - 70;
+      TT.drawGlow(ctx, DARK, cx, cy, r * 0.9, 0.55 * (1 - k * 0.5));
       ctx.save();
-      ctx.translate(sx + fc * r * 0.55, sy - 70);
+      ctx.translate(cx, cy);
       ctx.scale(fc, 1);
-      ctx.globalAlpha = 0.85 * (1 - k * 0.5);
-      ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.92 * (1 - k * 0.45);
       ctx.beginPath();
       ctx.moveTo(-r * 0.4, 30); ctx.quadraticCurveTo(-r * 0.1, -50 - k * 20, r * 0.5, -36);
-      ctx.lineTo(r * 0.2, -12); ctx.lineTo(r * 0.52, -6); ctx.lineTo(r * 0.16, 10); ctx.lineTo(r * 0.45, 26);
+      ctx.lineTo(r * 0.2, -12); ctx.lineTo(r * 0.56, -6); ctx.lineTo(r * 0.16, 10); ctx.lineTo(r * 0.48, 28);
       ctx.quadraticCurveTo(0, 26, -r * 0.4, 30);
-      ctx.fill(); ctx.stroke();
+      ctx.closePath();
+      ctx.fillStyle = '#120a22'; ctx.fill();
+      ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+      // fiapos de sombra
+      ctx.strokeStyle = 'rgba(214,194,255,0.7)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-r * 0.3, 18); ctx.quadraticCurveTo(-r * 0.6, 10 + k * 10, -r * 0.8, 24); ctx.stroke();
       ctx.restore();
       ctx.globalAlpha = 1;
     }
@@ -1334,6 +1440,12 @@
     update() {
       const g = this.game;
       this.t++;
+      // histórico curto de posições para os rastros
+      if (this.trailN) {
+        const tr = this.trail || (this.trail = []);
+        tr.push(this.x, this.y - this.z);
+        if (tr.length > this.trailN * 2) tr.splice(0, 2);
+      }
       this.x += this.vx; this.y += this.vy;
       this.vz -= this.grav; this.z += this.vz;
       if (this.minZ != null && this.z < this.minZ) { this.z = this.minZ; this.vz = 0; }
@@ -1347,8 +1459,10 @@
       }
       if (this.kind === 'starbolt' || this.kind === 'bigbolt') {
         if (this.t % 2 === 0) g.particles.spawn('glow', this.x - this.vx, this.y - this.z, { color: '#5dff8a', size: this.r * 1.2, life: 10 });
+        if (this.t % 4 === 0) g.particles.spawn('star', this.x - this.vx * 2, this.y - this.z + TT.rand(-8, 8), { color: '#d9ffe4', size: 6, life: 12, rot: Math.random() });
       } else if (this.kind === 'raven') {
         if (this.t % 3 === 0) g.particles.spawn('feather', this.x - this.vx * 3, this.y - this.z + TT.rand(-20, 20), { color: '#1a0f2e', size: 9, life: 22, vr: 0.2, vy: TT.rand(-1, 1) });
+        if (this.t % 4 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 30, life: 12 });
       } else if (this.kind === 'missile') {
         if (this.t % 2 === 0) g.particles.spawn('dust', this.x, this.y - this.z - 30, { color: 'rgba(200,200,200,0.7)', size: 8, life: 18 });
       }
@@ -1370,10 +1484,24 @@
       }
     }
     get dmgMul() { return 1; }
+    // Rastro: linha que afina e some a partir do histórico de posições.
+    drawTrail(ctx, camX, col, w) {
+      const tr = this.trail;
+      if (!tr || tr.length < 4) return;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.strokeStyle = col;
+      const n = tr.length / 2;
+      for (let i = 1; i < n; i++) {
+        const q = i / n;
+        ctx.globalAlpha = q * 0.7; ctx.lineWidth = Math.max(1, w * q);
+        ctx.beginPath(); ctx.moveTo(tr[i * 2 - 2] - camX, tr[i * 2 - 1]); ctx.lineTo(i === n - 1 ? this.x - camX : tr[i * 2] - camX, i === n - 1 ? this.y - this.z : tr[i * 2 + 1]); ctx.stroke();
+      }
+      ctx.restore();
+    }
     draw(ctx, camX) {
       const x = this.x - camX, y = this.y - this.z;
       switch (this.kind) {
         case 'birdarang': {
+          this.drawTrail(ctx, camX, '#ffe9a0', 5);
           ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin);
           ctx.fillStyle = '#2a2a33'; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
           ctx.beginPath(); ctx.moveTo(-16, -4); ctx.lineTo(0, -1); ctx.lineTo(16, -4); ctx.lineTo(4, 6); ctx.lineTo(0, 3); ctx.lineTo(-4, 6); ctx.closePath();
@@ -1382,20 +1510,21 @@
           ctx.restore();
           break;
         }
-        case 'starbolt': case 'bigbolt':
-          TT.drawGlow(ctx, '#5dff8a', x, y, this.r * 2.4, 1);
-          ctx.fillStyle = '#eaffef'; ctx.beginPath(); ctx.arc(x, y, this.r * 0.45, 0, Math.PI * 2); ctx.fill();
-          break;
-        case 'raven': {
-          ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
-          const f = Math.sin(this.t * 0.4) * 10;
-          ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.moveTo(28, 0); ctx.lineTo(8, -8); ctx.lineTo(-12, -30 - f); ctx.lineTo(-8, -6); ctx.lineTo(-32, -4); ctx.lineTo(-10, 4); ctx.lineTo(-14, 26 + f); ctx.lineTo(8, 6); ctx.closePath();
-          ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(14, -2, 3, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
+        case 'starbolt': case 'bigbolt': {
+          // brilho pulsante + rastro + núcleo branco com anel
+          const pulse = 1 + Math.sin(this.t * 0.7) * 0.18;
+          this.drawTrail(ctx, camX, '#5dff8a', this.r * 0.9);
+          TT.drawGlow(ctx, '#5dff8a', x, y, this.r * 2.6 * pulse, 1);
+          TT.drawGlow(ctx, '#c8ffd8', x, y, this.r * 1.2 * pulse, 0.9);
+          ctx.strokeStyle = 'rgba(220,255,230,0.9)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, this.r * 0.75 * pulse, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, this.r * 0.42, 0, Math.PI * 2); ctx.fill();
           break;
         }
+        case 'raven':
+          this.drawTrail(ctx, camX, '#8a5cff', 16);
+          drawRavenCrow(ctx, x, y, this.facing, 1.35, this.t, 1);
+          break;
         case 'laser':
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           ctx.strokeStyle = '#ff3030'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x - this.vx * 3, y); ctx.lineTo(x, y); ctx.stroke();
@@ -1501,20 +1630,53 @@
       ctx.restore();
     }
     draw(ctx, camX) {
-      // corvo de energia sobre o grupo
-      const k = this.t / 34, x = this.x - camX, y = this.y - 150 - k * 60;
-      ctx.save(); ctx.translate(x, y); ctx.scale(1 + k * 1.5, 1 + k * 1.5);
-      ctx.globalAlpha = 1 - k;
-      ctx.fillStyle = '#120a22'; ctx.strokeStyle = '#e9dcff'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(-30, -40); ctx.lineTo(-80, -30); ctx.lineTo(-40, -6); ctx.lineTo(-60, 20); ctx.lineTo(-10, 10); ctx.lineTo(0, 30);
-      ctx.lineTo(10, 10); ctx.lineTo(60, 20); ctx.lineTo(40, -6); ctx.lineTo(80, -30); ctx.lineTo(30, -40); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -6, 3, 0, Math.PI * 2); ctx.arc(6, -6, 3, 0, Math.PI * 2); ctx.fill();
+      // corvo de energia (a "alma" da Ravena) abrindo as asas sobre o grupo
+      const k = this.t / 34, x = this.x - camX, y = this.y - 160 - k * 50;
+      ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
+      drawRavenCrow(ctx, x, y, 1, 2.2 + k * 1.6, this.t, 0, true);
       ctx.restore();
     }
     get y2() { return this.y; }
   }
   TT.RavenBlast = RavenBlast;
+
+  // Corvo de energia negra: corpo, asas com penas, contorno violeta + branco e olhos brilhantes.
+  // front = true desenha de frente (asas abertas); senão, de perfil voando.
+  function drawRavenCrow(ctx, x, y, facing, s, t, alpha, front) {
+    TT.drawGlow(ctx, DARK, x, y, 46 * s, 0.6);
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * s, s);
+    ctx.lineJoin = 'round';
+    const flap = Math.sin(t * 0.45);
+    ctx.beginPath();
+    if (front) {
+      const w = 6 * flap;
+      ctx.moveTo(0, -18);
+      // asa esquerda com 4 penas
+      ctx.lineTo(-14, -20); ctx.lineTo(-40, -34 - w); ctx.lineTo(-62, -30 - w); ctx.lineTo(-52, -20 - w * 0.5); ctx.lineTo(-70, -14 - w * 0.5);
+      ctx.lineTo(-56, -6); ctx.lineTo(-68, 4); ctx.lineTo(-48, 2); ctx.lineTo(-54, 14); ctx.lineTo(-30, 4); ctx.lineTo(-12, 8);
+      ctx.lineTo(-8, 22); ctx.lineTo(-3, 16); ctx.lineTo(0, 28); ctx.lineTo(3, 16); ctx.lineTo(8, 22); ctx.lineTo(12, 8);
+      ctx.lineTo(30, 4); ctx.lineTo(54, 14); ctx.lineTo(48, 2); ctx.lineTo(68, 4); ctx.lineTo(56, -6);
+      ctx.lineTo(70, -14 - w * 0.5); ctx.lineTo(52, -20 - w * 0.5); ctx.lineTo(62, -30 - w); ctx.lineTo(40, -34 - w); ctx.lineTo(14, -20);
+      ctx.closePath();
+    } else {
+      const f = flap * 12;
+      ctx.moveTo(30, 0); ctx.lineTo(18, -4); ctx.lineTo(8, -10);
+      ctx.lineTo(-6, -32 - f); ctx.lineTo(-10, -22 - f * 0.7); ctx.lineTo(-20, -34 - f); ctx.lineTo(-18, -18 - f * 0.4); ctx.lineTo(-30, -26 - f * 0.6); ctx.lineTo(-16, -6);
+      ctx.lineTo(-38, -8); ctx.lineTo(-30, -2); ctx.lineTo(-40, 4); ctx.lineTo(-14, 4);
+      ctx.lineTo(-18, 22 + f * 0.6); ctx.lineTo(-6, 10); ctx.lineTo(4, 8); ctx.lineTo(16, 5);
+      ctx.closePath();
+    }
+    ctx.fillStyle = '#100822'; ctx.fill();
+    ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 6; ctx.stroke();
+    ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 2; ctx.stroke();
+    // olhos brilhantes
+    const eyes = front ? [[-6, -12], [6, -12]] : [[16, -2]];
+    for (const [ex, ey] of eyes) {
+      TT.drawGlow(ctx, '#ffffff', ex, ey, 8, 0.9);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(ex, ey, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // ================================================================ Caixas e itens
   class Crate {

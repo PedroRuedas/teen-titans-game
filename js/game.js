@@ -283,7 +283,8 @@
       this.hitstop = Math.max(this.hitstop, big ? 5 : 3);
       this.shake = Math.max(this.shake, big ? 7 : 3);
       const hy = t.y - t.z - (t.height || 80) * 0.55;
-      this.hitSpark(t.x, hy, big);
+      // faíscas na cor do Titã que acertou
+      this.hitSpark(t.x, hy, big, heroAtk && att.def ? att.def.fx : null);
       A().play(big ? 'hitHeavy' : 'hit');
       if (t.isProp) return;
       if (heroAtk) {
@@ -360,14 +361,16 @@
     }
 
     // ------------------------------------------------------------------ Efeitos visuais
-    hitSpark(x, y, big) {
-      const n = big ? 10 : 6;
+    hitSpark(x, y, big, color) {
+      const n = big ? 12 : 7;
+      const cols = color ? [color, '#ffffff', color, '#fff6b0'] : ['#fff6b0', '#ffd23a', '#ffffff'];
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2, s = TT.rand(4, big ? 13 : 9);
-        this.particles.spawn('spark', x, y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, color: TT.choice(['#fff6b0', '#ffd23a', '#ffffff']), size: 4, life: TT.randi(8, 14) });
+        const a = Math.random() * Math.PI * 2, s = TT.rand(4, big ? 14 : 9);
+        this.particles.spawn('spark', x, y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, color: TT.choice(cols), size: big ? 5 : 4, life: TT.randi(8, 14) });
       }
-      this.particles.spawn('star', x, y, { size: big ? 34 : 22, color: '#fffbe0', life: 7, rot: Math.random() });
-      this.particles.spawn('glow', x, y, { size: big ? 70 : 44, color: '#ffd36a', life: 9 });
+      this.particles.spawn('star', x, y, { size: big ? 36 : 22, color: '#fffbe0', life: 7, rot: Math.random() });
+      if (color && big) this.particles.spawn('ring', x, y, { size: 46, color, life: 10 });
+      this.particles.spawn('glow', x, y, { size: big ? 76 : 46, color: color || '#ffd36a', life: 9 });
     }
     dust(x, y, n, color) {
       for (let i = 0; i < n; i++) this.particles.spawn('dust', x + TT.rand(-20, 20), y - TT.rand(0, 8), { vx: TT.rand(-3, 3), vy: TT.rand(-1.5, 0), color: color || '#d9cbbb', size: TT.rand(6, 12), life: TT.randi(18, 30) });
@@ -377,6 +380,21 @@
         const a = (i / 12) * Math.PI * 2;
         this.particles.spawn('dust', x + Math.cos(a) * 18, y + Math.sin(a) * 26, { vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, color: 'rgba(240,240,255,0.9)', size: 14, life: 20 });
       }
+    }
+    // Transformação do Mutano: nuvem verde cartoon com brilho e estrelinhas (out = voltando ao normal).
+    morph(x, y, out) {
+      const greens = ['#8fe86a', '#6fd64e', '#b7f59a', '#9dff7a'];
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + TT.rand(-0.2, 0.2), r = TT.rand(26, 40);
+        this.particles.spawn('cloud', x + Math.cos(a) * r, y + Math.sin(a) * r * 1.3, { vx: Math.cos(a) * TT.rand(3, 5), vy: Math.sin(a) * TT.rand(2.5, 4.5) - 0.6, color: TT.choice(greens), color2: '#2b6418', size: TT.rand(11, 17), life: TT.randi(12, 17) });
+      }
+      this.particles.spawn('glow', x, y, { size: out ? 110 : 160, color: '#5dff8a', life: 14 });
+      this.particles.spawn('ring', x, y, { size: 90, color: '#c8ffb0', life: 12 });
+      for (let i = 0; i < 6; i++) {
+        const a = Math.random() * Math.PI * 2, sp = TT.rand(3, 7);
+        this.particles.spawn('star', x + Math.cos(a) * 20, y + Math.sin(a) * 20, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: TT.rand(7, 11), color: '#eaffd0', life: TT.randi(14, 22), vr: 0.2 });
+      }
+      A().play('switch');
     }
     groundRing(x, y, color) {
       this.particles.spawn('ring', x, y, { size: 120, color, life: 18, flat: 0.35 });
@@ -975,7 +993,7 @@
         ['Ataque (combo)', 'J  ou  Z'],
         ['Ataque forte', 'K  ou  X'],
         ['Especial (gasta energia)', 'L  ou  C'],
-        ['Pular / Esquivar', 'Espaço / Shift'],
+        ['Pular / Esquiva (+ataque = investida)', 'Espaço / Shift'],
         ['Trocar Titã', '1-5  ou  Q / E'],
         ['Titãs, avante! (energia cheia)', 'U  ou  V'],
         ['Pausa / Som', 'Esc / M'],
