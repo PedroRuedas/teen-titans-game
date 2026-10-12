@@ -1855,6 +1855,272 @@
   }
   TT.Overload = Overload;
 
+  // ---- Plasmus: monstro de lodo da fábrica química (fase 4)
+  // Fraqueza: depois do soco esticado o braço fica GRUDADO no chão — ele trava no lugar e leva dano dobrado.
+  class Plasmus extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'PLASMUS';
+      this.hp = this.maxHp = 1250;
+      this.radius = 70; this.height = 250; this.shadowW = 110;
+      this.poiseMax = 180;
+      this.def = { score: 8000 };
+      this.stuck = 0; this.rise = 1; this.melt = 0; this.atkCount = 0; this.p2Said = false; this.armX = 0;
+      this.taunts = ['GRRROOOAAARGH!', 'GLUB... GLUB...', 'GRAAAAH!', 'BLAAARGH!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      const splash = (g, x, y, n, col) => {
+        for (let i = 0; i < n; i++) g.particles.spawn('debris', x + TT.rand(-30, 30), y - 10, { vx: TT.rand(-6, 6), vy: -TT.rand(4, 11), grav: 0.5, color: col || TT.choice(['#c2569b', '#e47cc4', '#8a3a78']), size: TT.rand(6, 12), life: 30, floor: y + TT.rand(-6, 6) });
+      };
+      this.splash = splash;
+      this.ATK = {
+        // soco esticado: o braço de lodo cruza uma faixa à frente e gruda no chão no fim
+        punch: { pose: 'beam', s: 36, a: 8, r: 10, dmg: 16, knockdown: true, launch: 7, kb: 10, zoneHit: true, zr: 60, color: '#ff5ab4', sound0: 'roar',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 520, y: f.y, d: 36, arrows: true }]; },
+          onFrame(f, t, g) {
+            if (t === this.s) {
+              f.armX = f.facing * 490;
+              g.impact(f.x + f.facing * 480, f.y, 'SPLURT!', '#ff5ab4', 1.1);
+              splash(g, f.x + f.facing * 480, f.y, 10);
+              g.shake = Math.max(g.shake, 10); A().play('hitHeavy');
+            }
+            if (t === this.s + this.a + this.r - 1) f.getStuck();
+          } },
+        // cusparada: bolhas de lodo caem nos círculos marcados (sob os Titãs e ao redor)
+        spit: { pose: 'castUp', s: 42, a: 6, r: 28, dmg: 12, knockdown: true, launch: 6, kb: 5, zoneHit: true, zr: 40, color: '#b8ff5a',
+          zone(f, g) {
+            const zs = [], hs = g.heroes(), n = f.phase2() ? 5 : 3;
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: h.y, rx: 70, ry: 28 });
+            let guard = 0;
+            while (zs.length < n && guard++ < 20) {
+              const tp = groundTarget(g, TT.choice(hs) || f, 330, 100);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 120 || Math.abs(z.y - tp.y) > 50)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: 70, ry: 28 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === 6) A().play('roar');
+            if (t === this.s) {
+              for (const z of a.zones) { splash(g, z.x, z.y, 6); g.particles.spawn('ring', z.x, z.y, { size: 80, color: '#e47cc4', life: 14, flat: 0.42 }); }
+              g.particles.spawn('text', f.x, f.y - 290, { text: 'SPLOSH!', size: 50, color: '#ff8ad6', color2: '#5a1a4a', vy: -0.5, life: 44, rot: -0.1 });
+              A().play('boom');
+            }
+          } },
+        // pancada no chão: onda de lodo que se espalha (pule!)
+        wave: { pose: 'slam', s: 34, a: 2, r: 34, color: '#ffd23a',
+          zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 560, ry: 560 * 0.38, rings: 5, jump: true }]; },
+          onFrame(f, t, g) {
+            if (t === this.s) {
+              A().play('shockwave');
+              const w = new Shockwave(g, f.x, f.y, 560, 13, 'enemy'); w.col = '#c2569b'; g.addEffect(w);
+              splash(g, f.x, f.y, 14);
+              g.impact(f.x, f.y, 'SPLASH!', '#ff5ab4', 1.3);
+            }
+          } },
+        // mergulho (fase 2): derrete numa poça, desliza por baixo do chão e emerge sob o alvo
+        dive: { pose: 'castUp', s: 52, a: 6, r: 24, dmg: 17, knockdown: true, launch: 10, kb: 8, zoneHit: true, zr: 50, color: '#c08cff',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = clampX(g, p.x, f.radius + 20); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 125, ry: 50 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
+            if (t < this.s * 0.5) a.zones = [this.aim(f, g, a)];
+            if (t < this.s) {
+              f.melt = Math.min(1, t / (this.s * 0.3));
+              if (f.melt > 0.5) f.invul = 2;
+              if (t > this.s * 0.4) { f.x += (a.tx - f.x) * 0.12; f.y += (a.ty - f.y) * 0.12; }
+              if (t === 2) A().play('drill');
+            }
+            if (t === this.s) {
+              f.x = a.tx; f.y = a.ty; f.melt = 0; f.invul = 0;
+              splash(g, f.x, f.y, 16);
+              g.impact(f.x, f.y, 'GLORP!', '#c08cff', 1.3); A().play('roar');
+            }
+          } },
+      };
+      this.applyDifficulty();
+    }
+    // Braço grudado = dano dobrado.
+    get dmgTaken() { return this.stuck > 0 ? 2 : 1; }
+    getStuck() {
+      this.atk = null;
+      this.setState('stuck'); this.setAnim('hurt');
+      this.stuck = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.game.say(this, 'GRRR... GRUDOU!', '#ff8ad6');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'stuck') return; // não interrompe a fraqueza
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'stuck') {
+        this.vx = this.vy = 0;
+        if (this.st % 6 === 0) g.particles.spawn('debris', this.x + this.facing * TT.rand(60, this.armX * this.facing), this.y - TT.rand(20, 60), { vx: TT.rand(-1, 1), vy: -TT.rand(1, 3), grav: 0.4, color: '#e47cc4', size: 6, life: 18, floor: this.y });
+        if (--this.stuck <= 0) {
+          this.stuck = 0; this.armX = 0;
+          this.setState('idle'); this.setAnim('idle'); this.cool = 30;
+          this.splash(g, this.x + this.facing * 200, this.y, 6);
+        }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      this.melt = 0; this.armX = 0;
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y;
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'GRAAAAAAH!!!', '#ff5ab4');
+        g.impact(this.x, this.y, 'FÚRIA!', '#ff5ab4', 1);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      this.approach(this.sideTarget(p, 260), p.y, p2 ? 2.2 : 1.5);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o soco esticado (e o braço grudado logo depois)
+        if (this.atkCount % 3 === 2) pick = 'punch';
+        else {
+          const opts = ['spit', 'wave'];
+          if (Math.abs(dy) < 40) opts.push('punch');
+          if (p2) opts.push('dive', 'dive');
+          pick = TT.choice(opts);
+        }
+        this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 105);
+        if (Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ff8ad6');
+      }
+    }
+    // Ponta dos braços (x, y) relativa aos pés, conforme o golpe.
+    fists() {
+      const a = this.atk, t = this.animT, w = Math.sin(t * 0.09) * 6;
+      const idle = [[104, -96 + w], [-100, -100 - w]];
+      if (this.state === 'stuck') return [[this.armX * this.facing, -14], [-90, -70]];
+      if (!a || this.state !== 'attack') return idle;
+      const d = a.def, k = a.t < d.s ? TT.easeOut(a.t / d.s) : 1, hit = a.t >= d.s;
+      const L = (p, q, u) => [TT.lerp(p[0], q[0], u), TT.lerp(p[1], q[1], u)];
+      if (d === this.ATK.punch) {
+        if (!hit) return [L(idle[0], [-40, -180], k), L(idle[1], [-120, -120], k)];
+        const u = Math.min(1, (a.t - d.s + 1) / 3);
+        return [[TT.lerp(60, 490, u), TT.lerp(-120, -14, u)], [-110, -90]];
+      }
+      if (d === this.ATK.wave) return hit ? [[120, -10], [-110, -10]] : [L(idle[0], [50, -300], k), L(idle[1], [-50, -300], k)];
+      return [L(idle[0], [70, -230], k), L(idle[1], [-70, -230], k)];
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, tk = this.tellK();
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      const fl = this.flash > 3 || this.tellFlash();
+      let melt = this.melt, rise = this.rise;
+      if (this.state === 'dying') melt = Math.min(1, this.st / 90);
+      const body = '#c2569b', dark = '#8a3a78', light = '#ec8ccc', OUTL = '#2a0f2a';
+      // poça de lodo sob ele
+      ctx.fillStyle = 'rgba(160,60,140,0.75)';
+      ctx.beginPath(); ctx.ellipse(x, y, 120 + 60 * melt, 26 + 8 * melt, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,170,230,0.45)'; ctx.beginPath(); ctx.ellipse(x - 30, y - 6, 40, 5, 0, 0, Math.PI * 2); ctx.fill();
+      const vis = rise * (1 - melt);
+      if (vis > 0.03) {
+        const sq = tk >= 0 ? -0.07 * tk : a && this.state === 'attack' && a.t < a.def.s + a.def.a + 6 ? 0.06 : 0;
+        const sy = vis * (1 + sq), sx = (1 - sq) * (1 + 0.4 * (1 - vis));
+        ctx.save();
+        ctx.translate(x, y); ctx.scale(this.facing * sx, sy);
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        const wob = (i) => Math.sin(t * 0.12 + i * 1.9) * 4 + Math.sin(t * 0.31 + i * 0.7) * 2;
+        const [fF, fB] = this.fists();
+        const arm = (sx0, sy0, f, front) => {
+          const mx = (sx0 + f[0]) / 2, my = Math.min(sy0, f[1]) - 20 + wob(front ? 3 : 5);
+          ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.quadraticCurveTo(mx, my, f[0], f[1]);
+          ctx.strokeStyle = OUTL; ctx.lineWidth = 46; ctx.stroke();
+          ctx.strokeStyle = fl ? '#ffffff' : (front ? body : dark); ctx.lineWidth = 38; ctx.stroke();
+          if (!fl) { ctx.strokeStyle = front ? light : body; ctx.lineWidth = 10; ctx.globalAlpha = 0.6; ctx.stroke(); ctx.globalAlpha = 1; }
+          ctx.beginPath(); ctx.arc(f[0], f[1], 30, 0, Math.PI * 2);
+          ctx.fillStyle = fl ? '#ffffff' : (front ? body : dark); ctx.fill(); ctx.strokeStyle = OUTL; ctx.lineWidth = 4; ctx.stroke();
+          if (!fl) { ctx.fillStyle = light; ctx.beginPath(); ctx.ellipse(f[0] - 8, f[1] - 10, 10, 6, -0.4, 0, Math.PI * 2); ctx.fill(); }
+        };
+        arm(-62, -160, fB, false);
+        // corpo: monte de lodo com ombros largos e cabeça afundada
+        const SIL = [[-120, 0], [-112, -40], [-96, -90], [-100, -140], [-84, -180], [-50, -206], [-26, -240], [14, -252], [52, -236], [70, -204], [98, -176], [108, -132], [96, -86], [112, -38], [124, 0]];
+        ctx.beginPath();
+        const pt = (i) => [SIL[i][0] + wob(i), SIL[i][1] + (i && i < SIL.length - 1 ? wob(i + 9) : 0)];
+        let [px, py] = pt(0); ctx.moveTo(px, py);
+        for (let i = 1; i < SIL.length; i++) {
+          const [qx, qy] = pt(i), [nx, ny] = i + 1 < SIL.length ? pt(i + 1) : pt(i);
+          ctx.quadraticCurveTo(qx, qy, (qx + nx) / 2, (qy + ny) / 2);
+        }
+        // base com escorridos
+        for (let k = 0; k <= 6; k++) { const bx = 124 - k * 41; ctx.lineTo(bx, 6 + (k % 2) * 8 + Math.sin(t * 0.2 + k) * 3); }
+        ctx.closePath();
+        ctx.fillStyle = fl ? '#ffffff' : body; ctx.fill();
+        if (!fl) {
+          ctx.save(); ctx.clip();
+          ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(-110, -110, 70, 170, 0.15, 0, Math.PI * 2); ctx.fill(); // lado na sombra
+          ctx.fillStyle = light; ctx.globalAlpha = 0.7;
+          ctx.beginPath(); ctx.ellipse(40, -200, 26, 12, -0.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(70, -120, 10, 30, 0.2, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+          for (let k = 0; k < 5; k++) { // bolhas internas
+            const bx = -60 + k * 30 + Math.sin(t * 0.05 + k) * 10, by = -40 - ((t * 0.8 + k * 47) % 200);
+            ctx.strokeStyle = 'rgba(255,200,240,0.6)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(bx, by, 5 + (k % 3) * 2, 0, Math.PI * 2); ctx.stroke();
+          }
+          ctx.restore();
+        }
+        ctx.strokeStyle = OUTL; ctx.lineWidth = 5; ctx.stroke();
+        // rosto: olhos amarelos brilhantes e bocarra
+        const roar = (a && this.state === 'attack') || this.state === 'stuck';
+        if (!fl) {
+          ctx.fillStyle = '#ffe14a';
+          ctx.beginPath(); ctx.moveTo(10, -214); ctx.quadraticCurveTo(30, -224, 46, -212); ctx.quadraticCurveTo(30, -204, 10, -214); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-26, -210); ctx.quadraticCurveTo(-12, -218, 0, -210); ctx.quadraticCurveTo(-12, -203, -26, -210); ctx.fill();
+          TT.drawGlow(ctx, '#ffe14a', 18, -212, 26, 0.8);
+          ctx.fillStyle = OUTL; ctx.beginPath(); ctx.arc(30, -213, 3.5, 0, Math.PI * 2); ctx.arc(-12, -210, 3, 0, Math.PI * 2); ctx.fill();
+          const mo = roar ? 26 + Math.sin(t * 0.5) * 4 : 12;
+          ctx.fillStyle = '#3a0a2a'; ctx.strokeStyle = OUTL; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.ellipse(14, -170, 40, mo, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffeaf6'; // dentes tortos
+          for (let k = -3; k <= 3; k++) { const tx = 14 + k * 11; ctx.beginPath(); ctx.moveTo(tx - 5, -170 - mo + 3); ctx.lineTo(tx + 5, -170 - mo + 3); ctx.lineTo(tx, -170 - mo + 14); ctx.closePath(); ctx.fill(); }
+          if (roar) { ctx.fillStyle = '#e47cc4'; ctx.fillRect(-4, -170, 8, mo + 12); ctx.beginPath(); ctx.arc(0, -158 + mo, 6, 0, Math.PI * 2); ctx.fill(); } // baba
+        }
+        arm(66, -164, fF, true);
+        ctx.restore();
+      } else if (!fl) { // derretido: só bolhas na poça
+        for (let k = 0; k < 3; k++) { ctx.strokeStyle = 'rgba(255,200,240,0.8)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x - 40 + k * 40, y - 8 - ((t + k * 9) % 18), 6, 0, Math.PI * 2); ctx.stroke(); }
+      }
+      // pingos caindo do corpo
+      if (vis > 0.5 && t % 9 === 0) this.game.particles.spawn('debris', this.x + TT.rand(-90, 90), this.y - TT.rand(60, 180), { vx: 0, vy: 1, grav: 0.5, color: '#c2569b', size: 6, life: 30, floor: this.y });
+      // efeitos dos golpes ativos
+      if (a && this.state === 'attack' && a.t >= a.def.s && a.t < a.def.s + a.def.a + 2 && a.zones && a.def === this.ATK.spit) {
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - (a.t - a.def.s) / (a.def.a + 2));
+        for (const z of a.zones) TT.drawGlow(ctx, '#ff8ad6', z.x - camX, z.y - 20, z.rx * 1.3, 0.9);
+        ctx.restore();
+      }
+      // bolhas de lodo voando para os alvos durante a cusparada
+      if (a && this.state === 'attack' && a.def === this.ATK.spit && a.t < a.def.s && a.t > a.def.s * 0.35 && a.zones) {
+        const u = (a.t - a.def.s * 0.35) / (a.def.s * 0.65);
+        for (const z of a.zones) {
+          const bx = TT.lerp(x + this.facing * 20, z.x - camX, u), by = TT.lerp(y - 230, z.y, u) - Math.sin(u * Math.PI) * 220;
+          ctx.fillStyle = body; ctx.strokeStyle = OUTL; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(bx, by, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = light; ctx.beginPath(); ctx.arc(bx - 5, by - 5, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      this.drawTell(ctx, x, y, y - 270 * vis);
+      if (this.state === 'stuck') {
+        Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - 270);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'BRAÇO GRUDADO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#ffb0e6', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.Plasmus = Plasmus;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -2078,7 +2344,7 @@
       }
       if (this.t % 2 === 0) {
         const a = Math.random() * Math.PI * 2;
-        g.particles.spawn('debris', this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r * 0.38, { vy: -TT.rand(3, 7), vx: TT.rand(-1, 1), grav: 0.5, color: '#9a8f86', size: TT.rand(5, 9), life: 24, floor: this.y + Math.sin(a) * this.r * 0.38 });
+        g.particles.spawn('debris', this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r * 0.38, { vy: -TT.rand(3, 7), vx: TT.rand(-1, 1), grav: 0.5, color: this.col || '#9a8f86', size: TT.rand(5, 9), life: 24, floor: this.y + Math.sin(a) * this.r * 0.38 });
       }
     }
     drawGround(ctx, camX) {

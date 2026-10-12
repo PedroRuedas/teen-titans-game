@@ -663,9 +663,222 @@
     });
   }
 
+  // =============================================================== FASE 4 — Fábrica Química
+  const S4_PLANT = 2700, S4_LAB = 5850;
+
+  // Tanque cilíndrico com faixa de perigo e visor do líquido.
+  function chemTank(g, x, base, w, h, liquid) {
+    g.fillStyle = '#5d6b78'; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.fillRect(x, base - h, w, h); g.strokeRect(x, base - h, w, h);
+    g.beginPath(); g.ellipse(x + w / 2, base - h, w / 2, w * 0.14, 0, 0, Math.PI * 2); g.fillStyle = '#7d8b98'; g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.16)'; g.fillRect(x + w * 0.12, base - h + 8, w * 0.1, h - 16); // brilho
+    g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x + w * 0.72, base - h + 4, w * 0.28 - 2, h - 6); // sombra
+    for (let y = base - h + 30; y < base - 10; y += 46) { g.fillStyle = '#45515e'; g.fillRect(x, y, w, 5); } // cintas
+    // visor com o líquido brilhante
+    const vx = x + w * 0.38, vw = w * 0.2, vy = base - h * 0.85, vh = h * 0.7;
+    g.fillStyle = '#1a2026'; g.fillRect(vx, vy, vw, vh);
+    g.fillStyle = liquid; g.fillRect(vx + 2, vy + vh * 0.35, vw - 4, vh * 0.65 - 2);
+    g.strokeStyle = OUT; g.lineWidth = 2.5; g.strokeRect(vx, vy, vw, vh);
+    // placa de risco químico
+    const px = x + w * 0.5, py = base - h * 0.22, s = Math.min(18, w * 0.12);
+    g.beginPath(); g.moveTo(px, py - s); g.lineTo(px + s, py); g.lineTo(px, py + s); g.lineTo(px - s, py); g.closePath();
+    g.fillStyle = '#f2c12e'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+    g.fillStyle = OUT; g.beginPath(); g.arc(px, py, s * 0.28, 0, Math.PI * 2); g.fill();
+  }
+
+  // Barril de lixo tóxico (com escorrido verde).
+  function barrel(g, x, base, tipped) {
+    g.save(); g.translate(x, base);
+    if (tipped) g.rotate(-Math.PI / 2);
+    g.fillStyle = '#c2862a'; g.strokeStyle = OUT; g.lineWidth = 3;
+    g.fillRect(-20, -56, 40, 56); g.strokeRect(-20, -56, 40, 56);
+    g.fillStyle = '#9a6a1e'; g.fillRect(-20, -42, 40, 5); g.fillRect(-20, -18, 40, 5);
+    g.fillStyle = 'rgba(255,255,255,0.2)'; g.fillRect(-14, -54, 6, 52);
+    g.fillStyle = '#8cff4a'; g.beginPath(); g.moveTo(-20, -56); g.lineTo(20, -56); g.lineTo(14, -44); g.quadraticCurveTo(10, -30, 6, -44); g.lineTo(-6, -48); g.quadraticCurveTo(-10, -36, -14, -48); g.closePath(); g.fill();
+    g.restore();
+  }
+
+  function s4Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 430);
+    sky.addColorStop(0, '#0b0a1a'); sky.addColorStop(0.45, '#22183e'); sky.addColorStop(0.8, '#3d3a52'); sky.addColorStop(1, '#5a6a48');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 80, 111, (cx, r) => {
+      g.fillStyle = 'rgba(220,230,255,' + (0.2 + r() * 0.5) + ')';
+      g.fillRect(cx + r() * 80, r() * 220, 2, 2);
+    });
+    // névoa tóxica esverdeada no horizonte
+    const hz = g.createLinearGradient(0, 280, 0, 430);
+    hz.addColorStop(0, 'rgba(150,255,90,0)'); hz.addColorStop(1, 'rgba(150,255,90,0.22)');
+    g.fillStyle = hz; g.fillRect(x0, 280, x1 - x0, 150);
+    // silhueta da cidade
+    cells(x0, x1, 90, 113, (cx, r) => {
+      const w = 50 + r() * 50, h = 60 + r() * 110;
+      g.fillStyle = '#1a1830'; g.fillRect(cx, 430 - h, w, h);
+      g.fillStyle = 'rgba(255,220,140,0.45)';
+      for (let y = 430 - h + 10; y < 420; y += 16) for (let x = cx + 6; x < cx + w - 8; x += 12) if (r() > 0.7) g.fillRect(x, y, 4, 6);
+    });
+    // chaminés soltando fumaça verde
+    cells(x0, x1, 460, 115, (cx, r) => {
+      const x = cx + 120 + r() * 200, h = 150 + r() * 70;
+      g.fillStyle = '#231f38'; g.fillRect(x, 430 - h, 26, h);
+      g.fillStyle = '#c83a3a'; g.fillRect(x, 430 - h + 12, 26, 7);
+      g.fillStyle = 'rgba(140,220,110,0.16)';
+      for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(x + 13 + k * 22, 430 - h - 18 - k * 20, 22 + k * 9, 11 + k * 4, 0, 0, Math.PI * 2); g.fill(); }
+    });
+    g.fillStyle = '#131226'; g.fillRect(x0, 430, x1 - x0, H - 430);
+  }
+
+  function s4Mid(g, x0, x1) {
+    // galpões da fábrica com tanques e canos entre eles
+    cells(x0, x1, 400, 121, (cx, r) => {
+      const x = cx + r() * 50, w = 220 + r() * 120, h = 140 + r() * 80, base = 475;
+      g.fillStyle = '#2b2c48'; g.fillRect(x, base - h, w, h);
+      g.fillStyle = '#34365a'; g.beginPath(); g.moveTo(x - 8, base - h); g.lineTo(x + w / 2, base - h - 40); g.lineTo(x + w + 8, base - h); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(160,255,120,0.4)';
+      for (let k = x + 16; k < x + w - 30; k += 38) g.fillRect(k, base - h + 26, 22, 14);
+      if (r() > 0.35) { // tanque esférico
+        const tx = x + w + 40, ty = base - 70;
+        g.fillStyle = '#3c4462'; g.fillRect(tx - 34, ty, 8, 70); g.fillRect(tx + 26, ty, 8, 70);
+        g.beginPath(); g.arc(tx, ty, 54, 0, Math.PI * 2); g.fillStyle = '#4a5476'; g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.arc(tx - 18, ty - 18, 18, 0, Math.PI * 2); g.fill();
+      }
+    });
+    g.fillStyle = '#272a46'; g.fillRect(x0, 400, x1 - x0, 14); // cano comprido
+    g.fillStyle = '#3a3f66'; g.fillRect(x0, 402, x1 - x0, 3);
+    cells(x0, x1, 190, 123, (cx) => { g.fillStyle = '#1e2038'; g.fillRect(cx, 396, 12, 22); });
+  }
+
+  function s4Near(g, x0, x1) {
+    // --- pátio externo: cerca, barris e tanques
+    if (x0 < S4_PLANT) clipX(g, x0, Math.min(x1, S4_PLANT), () => {
+      g.fillStyle = '#1b1c30'; g.fillRect(x0, 340, x1 - x0, FT - 340);
+      g.strokeStyle = 'rgba(160,190,150,0.3)'; g.lineWidth = 1.5;
+      for (let x = Math.floor(x0 / 18) * 18 - 200; x < x1 + 200; x += 18) { g.beginPath(); g.moveTo(x, 310); g.lineTo(x + 140, FT - 16); g.moveTo(x + 140, 310); g.lineTo(x, FT - 16); g.stroke(); }
+      cells(x0, x1, 170, 131, (cx) => { g.fillStyle = '#525a6c'; g.fillRect(cx, 300, 8, FT - 308); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(cx, 300, 8, FT - 308); });
+      cells(x0, x1, 600, 133, (cx, r) => {
+        if (cx + 560 > S4_PLANT) return;
+        chemTank(g, cx + 60, FT - 4, 120, 210, '#8cff4a');
+        chemTank(g, cx + 200, FT - 4, 90, 160, '#d65bb0');
+        barrel(g, cx + 360, FT - 4); barrel(g, cx + 410, FT - 4);
+        if (r() > 0.5) barrel(g, cx + 470, FT - 4, true);
+        if (r() > 0.4) { g.fillStyle = '#f2c12e'; g.fillRect(cx + 330, 330, 190, 46); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 330, 330, 190, 46); TT.drawText(g, 'PERIGO QUÍMICO', cx + 425, 354, 18, OUT); }
+      });
+    });
+    // --- interior da fábrica: tonéis borbulhando, canos e passarela
+    if (x1 > S4_PLANT && x0 < S4_LAB) clipX(g, Math.max(x0, S4_PLANT), Math.min(x1, S4_LAB), () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#12141f'); wall.addColorStop(1, '#2a3040');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      g.fillStyle = '#1b1f2e'; for (let x = Math.floor(x0 / 280) * 280; x < x1; x += 280) g.fillRect(x, 0, 26, FT);
+      // canos horizontais coloridos
+      for (const [y, c] of [[110, '#3f7a4a'], [150, '#7a3f6c'], [190, '#56607a']]) {
+        g.fillStyle = c; g.fillRect(x0, y, x1 - x0, 16); g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(x0, y + 2, x1 - x0, 4);
+      }
+      cells(x0, x1, 240, 141, (cx) => { g.fillStyle = '#2a2f40'; for (const y of [106, 146, 186]) g.fillRect(cx, y, 12, 24); });
+      // luzes verdes de emergência
+      cells(x0, x1, 360, 143, (cx) => {
+        const gl = g.createRadialGradient(cx + 180, 240, 4, cx + 180, 300, 200);
+        gl.addColorStop(0, 'rgba(160,255,120,0.3)'); gl.addColorStop(1, 'rgba(160,255,120,0)');
+        g.fillStyle = gl; g.fillRect(cx - 40, 220, 440, 260);
+      });
+      // tonéis abertos de produto químico
+      cells(x0, x1, 520, 145, (cx, r) => {
+        if (cx < S4_PLANT || cx + 480 > S4_LAB) return;
+        const vx = cx + 80, vw = 220, top = 330;
+        g.fillStyle = '#4b5566'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.fillRect(vx, top, vw, FT - top - 4); g.strokeRect(vx, top, vw, FT - top - 4);
+        g.beginPath(); g.ellipse(vx + vw / 2, top, vw / 2, 18, 0, 0, Math.PI * 2); g.fillStyle = '#8cff4a'; g.fill(); g.stroke();
+        g.fillStyle = 'rgba(220,255,200,0.6)';
+        for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(vx + 30 + r() * (vw - 60), top - 2 + r() * 6, 4 + r() * 6, 0, Math.PI * 2); g.fill(); } // bolhas
+        const gl = g.createRadialGradient(vx + vw / 2, top, 10, vx + vw / 2, top, 170);
+        gl.addColorStop(0, 'rgba(140,255,80,0.35)'); gl.addColorStop(1, 'rgba(140,255,80,0)');
+        g.fillStyle = gl; g.fillRect(vx - 60, top - 170, vw + 120, 240);
+        g.fillStyle = '#8cff4a'; g.fillRect(vx + 30, top + 8, 10, 30 + r() * 40); g.fillRect(vx + vw - 60, top + 8, 10, 20 + r() * 30); // escorrido
+        // painel com medidores
+        const px = cx + 340;
+        g.fillStyle = '#5a6278'; g.fillRect(px, 300, 110, 150); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(px, 300, 110, 150);
+        for (const [mx, my] of [[px + 30, 340], [px + 80, 340]]) {
+          g.fillStyle = '#e8edf2'; g.beginPath(); g.arc(mx, my, 18, 0, Math.PI * 2); g.fill(); g.stroke();
+          g.strokeStyle = '#d83a3a'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + 12 * Math.cos(-0.6 - r() * 2), my + 12 * Math.sin(-0.6 - r() * 2)); g.stroke();
+          g.strokeStyle = OUT; g.lineWidth = 3;
+        }
+        g.fillStyle = '#4cff9a'; g.fillRect(px + 14, 400, 10, 8); g.fillStyle = '#ff4a3a'; g.fillRect(px + 34, 400, 10, 8);
+      });
+    });
+    // --- laboratório de contenção (arena do Plasmus): tanque gigante quebrado e lodo nas paredes
+    if (x1 > S4_LAB) clipX(g, Math.max(x0, S4_LAB), x1, () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#160c1c'); wall.addColorStop(1, '#3a2240');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      // azulejos do laboratório
+      g.strokeStyle = 'rgba(255,170,230,0.08)'; g.lineWidth = 2;
+      for (let y = 40; y < FT; y += 44) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+      for (let x = Math.floor(x0 / 44) * 44; x < x1; x += 44) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FT); g.stroke(); }
+      cells(x0, x1, 620, 151, (cx, r) => {
+        if (cx < S4_LAB - 200) return;
+        // tanque de contenção com o vidro estilhaçado
+        const tx = cx + 180, tw = 200, top = 120;
+        g.fillStyle = '#4a5268'; g.strokeStyle = OUT; g.lineWidth = 5;
+        g.fillRect(tx - 14, FT - 50, tw + 28, 46); g.strokeRect(tx - 14, FT - 50, tw + 28, 46);
+        g.fillRect(tx - 14, top - 30, tw + 28, 34); g.strokeRect(tx - 14, top - 30, tw + 28, 34);
+        g.fillStyle = 'rgba(200,120,220,0.18)'; g.fillRect(tx, top + 4, tw, FT - 54 - top);
+        g.fillStyle = 'rgba(214,91,176,0.75)'; g.fillRect(tx, FT - 130, tw, 80); // resto do lodo no fundo
+        g.strokeStyle = 'rgba(230,240,255,0.7)'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(tx, top + 4); g.lineTo(tx + 40, top + 90); g.lineTo(tx + 20, top + 170); g.moveTo(tx + tw, top + 4); g.lineTo(tx + tw - 50, top + 120); g.lineTo(tx + tw - 20, top + 210); g.stroke();
+        g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(tx, top + 4); g.lineTo(tx, FT - 50); g.moveTo(tx + tw, top + 4); g.lineTo(tx + tw, FT - 50); g.stroke();
+        // lodo escorrendo da parede
+        g.fillStyle = '#c2569b';
+        for (let k = 0; k < 4; k++) { const dx = cx + 420 + r() * 160, dl = 40 + r() * 120; g.fillRect(dx, 0, 14, dl); g.beginPath(); g.arc(dx + 7, dl, 9, 0, Math.PI * 2); g.fill(); }
+        if (r() > 0.4) { g.fillStyle = '#d83a3a'; g.fillRect(cx + 420, 60, 150, 40); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 420, 60, 150, 40); TT.drawText(g, 'CONTENÇÃO', cx + 495, 81, 18, '#ffffff'); }
+      });
+    });
+    // portões entre as áreas
+    for (const bx of [S4_PLANT, S4_LAB]) if (x0 < bx + 30 && x1 > bx - 30) {
+      g.fillStyle = '#3e4256'; g.fillRect(bx - 16, 0, 32, FT);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(bx - 16, -4, 32, FT + 4);
+      g.fillStyle = '#f2c12e'; for (let y = 20; y < FT; y += 60) g.fillRect(bx - 16, y, 32, 14);
+    }
+    // piso de concreto com faixas e poças tóxicas
+    const fl = g.createLinearGradient(0, FT, 0, H);
+    fl.addColorStop(0, '#5a5e66'); fl.addColorStop(0.5, '#43474f'); fl.addColorStop(1, '#2c2f36');
+    g.fillStyle = fl; g.fillRect(x0, FT, x1 - x0, H - FT);
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0, FT, x1 - x0, 8);
+    for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) {
+      g.fillStyle = (x / 40) % 2 ? '#f2c12e' : '#1c1a1e';
+      g.beginPath(); g.moveTo(x, FT + 8); g.lineTo(x + 20, FT + 8); g.lineTo(x + 40, FT + 20); g.lineTo(x + 20, FT + 20); g.fill();
+    }
+    g.strokeStyle = 'rgba(20,22,30,0.5)'; g.lineWidth = 2;
+    for (let x = Math.floor(x0 / 200) * 200; x < x1 + 200; x += 200) { g.beginPath(); g.moveTo(x, FT + 20); g.lineTo(x - 70, H); g.stroke(); }
+    for (const y of [560, 640]) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+    cells(x0, x1, 210, 161, (cx, r) => {
+      if (r() > 0.5) { // poça tóxica
+        const px = cx + r() * 150, py = 530 + r() * 150, rx = 30 + r() * 40, pink = cx > S4_LAB;
+        g.fillStyle = pink ? 'rgba(214,91,176,0.55)' : 'rgba(140,255,80,0.4)';
+        g.beginPath(); g.ellipse(px, py, rx, rx * 0.3, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(px - rx * 0.3, py - 2, rx * 0.25, 2.5, 0, 0, Math.PI * 2); g.fill();
+      }
+      if (r() > 0.7) { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(cx + r() * 200, 600 + r() * 80, 10, 0, Math.PI * 2); g.fill(); } // ralo
+    });
+  }
+
+  // Primeiro plano: canos verticais com válvulas
+  function s4Fg(g, x0, x1) {
+    cells(x0, x1, 1500, 171, (cx) => {
+      const x = cx + 750;
+      g.fillStyle = '#2c3a34'; g.fillRect(x, 0, 40, H);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 40, H + 8);
+      g.fillStyle = 'rgba(140,255,80,0.16)'; g.fillRect(x + 6, 0, 6, H);
+      g.fillStyle = '#c83a3a'; g.beginPath(); g.arc(x + 20, 300, 26, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.strokeStyle = '#8a1e1e'; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 2, 300); g.lineTo(x + 42, 300); g.moveTo(x + 20, 278); g.lineTo(x + 20, 322); g.stroke();
+    });
+  }
+
   TT.makeBackground = function (id) {
     if (id === 1) {
       return { layers: [new Layer(0.1, s1Far, 1), new Layer(0.35, s1Mid, 2), new Layer(1, s1Near, 3)], fg: null, id };
+    }
+    if (id === 4) {
+      return { layers: [new Layer(0.1, s4Far, 12), new Layer(0.38, s4Mid, 13), new Layer(1, s4Near, 14)], fg: new Layer(1.18, s4Fg, 15), id };
     }
     if (id === 3) {
       return { layers: [new Layer(0.1, s3Far, 8), new Layer(0.38, s3Mid, 9), new Layer(1, s3Near, 10)], fg: new Layer(1.18, s3Fg, 11), id };

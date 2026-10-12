@@ -254,6 +254,44 @@ async page => {
   });
   ok('Overload: chip exposto após o teleporte (dano dobrado)', weak.st === 'overheat' && weak.exposed === weak.normal * 2, weak);
 
+  // 4b4) Fraqueza do Plasmus: o soco esticado gruda o braço no chão — fica parado e leva dano dobrado
+  const sticky = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(3); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const normal = h - b.hp;
+    b.startAttack(b.ATK.punch);
+    for (let t = 0; t < 120 && b.state !== 'stuck'; t++) g.step();
+    const st = b.state, x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const stuckDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    const moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'stuck'; t++) g.step();
+    TT.debug.god(false);
+    return { st, normal, stuckDmg, moved, after: b.state };
+  });
+  ok('Plasmus: braço grudado após o soco (parado, dano dobrado) e depois se solta', sticky.st === 'stuck' && sticky.stuckDmg === sticky.normal * 2 && sticky.moved < 1 && sticky.after !== 'stuck', sticky);
+
+  // 4b5) Vozes: os Titãs falam as falas dos golpes (ex.: Ravena -> "Azarath Metrion Zinthos!")
+  const voices = await ev(() => {
+    const g = TT.game, A = TT.audio, calls = [], orig = A.voice;
+    A.voice = (k, t) => calls.push(k + ':' + t);
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    for (const i of [3, 2]) {
+      g.switchCool = 0; g.switchTo(i, true); TT.debug.step(60);
+      g.energy = 100; g.input.pressed.add('special'); TT.debug.step(30);
+    }
+    g.say(g.enemies[0] || {}, 'GRRR', '#fff'); // inimigos não usam voz de Titã
+    A.voice = orig;
+    return calls;
+  });
+  ok('vozes: Ravena diz "Azarath Metrion Zinthos!" e Ciborgue "BOOYAH!" (só Titãs falam)',
+    voices.includes('raven:Azarath Metrion Zinthos!') && voices.includes('cyborg:BOOYAH!') && voices.every((c) => /^(robin|starfire|cyborg|raven|beastboy):/.test(c)), voices);
+  const songs = await ev(() => TT.STAGES.map((s) => s.song));
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 4 && songs.every((s) => s === 'theme'), songs);
+
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
   const bossTele = await ev(() => {
@@ -315,6 +353,16 @@ async page => {
     C(2, 'teleport', (b) => ({ x: b.x - 400, y: b.y + 20 }),
       (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
     C(2, 'ring', (b) => ({ x: b.x - 250, y: b.y }), (b) => ({ x: b.x - 80, y: b.y + 20 }));
+    // Plasmus (fase 4)
+    C(3, 'punch', (b) => ({ x: b.x - 320, y: b.y + 10 }), (b) => ({ x: b.x - 320, y: b.y + 70 }));
+    C(3, 'spit', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    C(3, 'wave', (b) => ({ x: b.x - 300, y: b.y + 40 }), (b) => ({ x: b.x - 610, y: 695 }));
+    C(3, 'dive', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -328,14 +376,14 @@ async page => {
     ok('aviso do chefe: ' + k + (expectHit ? ' (acerta)' : ' (não acerta)'), warned && r.hit === expectHit && r.inside === expectHit, r);
   }
 
-  // 5) Jogo completo com bot (modo deus): fase 1 -> fase 2 -> final, 3 vezes (detecta travamentos raros)
+  // 5) Jogo completo com bot (modo deus): todas as fases até a vitória, 3 vezes (detecta travamentos raros)
   for (let run = 1; run <= 3; run++) {
     const full = await ev(() => {
       const g = TT.game;
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 70000) {
+      while (g.state !== 'victory' && steps < 100000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -354,11 +402,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (3 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:2') && full.seen.includes('clear:2'), full);
+    ok('jogo completo (4 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:3') && full.seen.includes('clear:3'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2]) {
+  for (const st of [0, 1, 2, 3]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

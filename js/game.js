@@ -219,6 +219,11 @@
         b = new TT.Overload(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'zap';
+      } else if (sec.boss === 'plasmus') {
+        // sobe de uma poça de lodo no meio da arena
+        b = new TT.Plasmus(this, this.camX + 880, 590);
+        b.facing = -1; b.rise = 0;
+        this.introKind = 'rise';
       } else {
         b = new TT.GizmoMech(this, this.camX + W + 200, 590);
         b.facing = -1;
@@ -251,7 +256,13 @@
         if (k === 60) { b.alpha = 1; this.impact(b.x, b.y, 'KRAKA-BOOM!', '#6fe3ff', 1.5); A().play('thunder'); }
         if (k > 60 && k === 90) this.say(b, 'ENERGIA... MAIS ENERGIA!', '#bff6ff');
       }
-      if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; }
+      if (this.introKind === 'rise') {
+        const k = 170 - this.bossIntro;
+        b.rise = TT.clamp((k - 20) / 70, 0, 1);
+        if (k > 10 && k < 90 && k % 8 === 0) { b.splash(this, b.x, b.y, 4); A().play('land'); }
+        if (k === 92) { this.impact(b.x, b.y, 'GROOOAAAR!', '#ff5ab4', 1.4); this.shake = 16; A().play('roar'); }
+      }
+      if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
 
     onBossKilled(b) {
@@ -507,6 +518,7 @@
       this.particles.spawn('text', x, y, { text, size: big ? 38 : 26, color, vy: -0.8, life: 70 });
     }
     say(f, text, color) {
+      if (f && f.key && TT.TITANS[f.key]) A().voice(f.key, text); // os Titãs falam as próprias falas
       this.bubbles = this.bubbles.filter((b) => b.f !== f);
       this.bubbles.push({ f, text, color: color || '#ffffff', t: 0, dur: 85 });
     }
@@ -536,7 +548,7 @@
           break;
         case 'victory':
           this.updateCelebration();
-          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; A().playSong('title'); }
+          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; A().playSong('theme'); }
           break;
         default: break;
       }
@@ -548,7 +560,7 @@
 
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
-      if (!this.titleSong) { A().playSong('title'); this.titleSong = true; }
+      if (!this.titleSong) { A().playSong('theme'); this.titleSong = true; }
       const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
       if (this.showControls) {
         if (inp.wasPressed('heavy') || inp.wasPressed('special') || ok || inp.wasPressed('pause')) this.showControls = false;
@@ -568,6 +580,7 @@
         if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
         A().play('select');
+        if (!A().hasThemeFile()) A().voice('_intro', "Teen Titans, let's go!");
         this.score = 0;
         this.startStage(0);
       }

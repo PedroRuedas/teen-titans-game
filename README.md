@@ -1,7 +1,7 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): três fases
-(**Torre Titã**, **Perfuratriz do Terror** e **Usina de Energia**), os 5 Titãs jogáveis com troca
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): quatro fases
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia** e **Fábrica Química**), os 5 Titãs jogáveis com troca
 em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
 ## Como jogar
@@ -89,12 +89,28 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
    **Overload**: raio em linha, poças elétricas, teleporte com descarga e, abaixo de 50% de vida,
    anel de descarga e raio duplo. **Fraqueza:** depois do teleporte ele superaquece e fica com o
    **chip exposto** — dano dobrado!
+4. **Fábrica Química**: pátio de tanques e barris tóxicos, galpão de tonéis borbulhando e o
+   laboratório de contenção. O chefe é o **Plasmus**, o monstro de lodo: soco esticado em linha,
+   cusparada de lodo (fuja dos círculos), onda de lodo (pule!) e, abaixo de 50% de vida, mergulho
+   no chão para emergir embaixo de você. **Fraqueza:** depois do soco esticado o braço fica
+   **grudado no chão** — ele trava no lugar e leva dano dobrado!
+
+## Música e vozes
+
+- A trilha das fases e do título é a **abertura de Teen Titans**, num arranjo sintetizado feito de
+  memória. Os chefes têm músicas próprias.
+- Os Titãs **falam** as falas dos golpes ("Azarath Metrion Zinthos!", "BOOYAH!", "Raios
+  oculares!"…) com a voz sintetizada do navegador, cada um com seu tom.
+- Para usar a **música original** e **falas reais** dos episódios, coloque seus próprios arquivos
+  (mp3/ogg/wav) na pasta `audio/` e escreva os caminhos em `audio/arquivos.js` (há exemplos
+  comentados lá). O jogo usa esses arquivos no lugar dos sons sintetizados; se algum não for
+  encontrado, volta sozinho para a versão sintetizada.
 
 ## Tecnologia
 
 - **HTML5 Canvas + JavaScript puro**, sem bibliotecas nem arquivos externos. Todos os gráficos são
-  desenhados em vetor, em estilo cartoon com contorno grosso, e todo o áudio (efeitos e 7 músicas
-  originais) é sintetizado na hora com WebAudio.
+  desenhados em vetor, em estilo cartoon com contorno grosso, e o áudio (efeitos e músicas) é
+  sintetizado na hora com WebAudio; as vozes usam a síntese de fala do navegador.
 - **Por que não Unity/Unreal:** o objetivo era entregar algo pronto e **testado de verdade** sem
   ninguém por perto. Com Canvas eu pude rodar e jogar o jogo de forma automatizada, tirar prints
   e conferir cada tela.
@@ -109,7 +125,8 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
 ```
 index.html        página do jogo
 js/util.js        constantes, matemática, teclado e gamepad
-js/audio.js       efeitos e músicas sintetizados
+js/audio.js       efeitos, músicas e vozes sintetizados
+audio/arquivos.js seus próprios arquivos de música e voz (opcional)
 js/render.js      modelos (rig sombreado), rostos e formas animais
 js/faces.js       rostos dos Titãs em arte vetorial (caminhos SVG)
 js/anim.js        animações: quadros-chave, locomoção e golpes de cada Titã
@@ -130,23 +147,24 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 79 verificações e todas passam:
+página e chame a função serve.) A suíte tem 91 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
-- Cada ataque dos 3 chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
-  fora não acerta). Golpes e tokens do Soldado Elétrico; fraqueza do Overload.
+- Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
+  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload e do Plasmus.
+- Vozes dos Titãs nos golpes e a abertura tocando em todas as fases.
 - Titãs, avante! e regressões.
-- 3 partidas completas (3 fases) do início ao fim com um bot.
-- Os três chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (4 fases) do início ao fim com um bot.
+- Os quatro chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Academia H.I.V.E., Mumbo, Slade…).
+- Mais fases (Academia H.I.V.E., Mumbo, Control Freak, Slade…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

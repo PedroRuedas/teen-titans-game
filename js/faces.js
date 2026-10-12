@@ -30,8 +30,6 @@
   const HEAD_SH = 'M -120 -120 L -10 -120 C -40 -60 -44 10 -6 110 L -120 110 Z';
   const JAW_SH = 'M -60 60 C -20 84 20 96 50 92 L 40 130 L -80 130 Z';
   const NOSE = 'M 86 2 L 97 25 L 84 30';
-  const EAR = 'M -44 -10 C -58 -24 -76 -8 -70 14 C -66 30 -52 34 -42 26';
-  const EAR_IN = 'M -50 -2 C -58 -6 -62 6 -58 14';
 
   // Olho no estilo da série. o: { rx, ry, iris, pupil, sclera, irisK, lid (cor da pálpebra), lidK, lash (+1 canto externo à esq.), look, brow: [d], tilt }
   function eye(ctx, x, y, pose, o) {
@@ -113,28 +111,27 @@
   TT.FACES = F;
 
   // ------------------------------------------------------------------ Robin
-  const R_BACK = 'M 88 -50 C 96 -70 98 -92 90 -114 C 80 -102 66 -98 54 -100 C 48 -126 30 -144 4 -154 C 6 -130 -2 -118 -12 -112 ' +
-    'C -34 -134 -66 -144 -102 -140 C -82 -122 -70 -110 -66 -102 C -98 -106 -130 -96 -158 -72 C -124 -70 -104 -64 -94 -56 ' +
-    'C -120 -46 -140 -24 -152 6 C -122 -10 -106 -12 -94 -10 C -106 6 -112 30 -110 54 C -92 34 -80 24 -72 20 L -40 -20 L 40 -70 Z';
-  const R_CAP = 'M 94 -50 C 80 -62 52 -64 30 -58 C 6 -52 -18 -42 -38 -24 C -46 -12 -50 10 -46 34 C -66 36 -84 24 -88 0 ' +
-    'C -94 -60 -50 -104 0 -106 C 50 -108 88 -88 94 -50 Z';
+  // Cabeça mais estreita, maxilar marcado e queixo pontudo (traço do Robin na série).
+  const R_HEAD = 'M -78 -12 C -80 -66 -34 -98 14 -98 C 60 -98 90 -66 94 -22 C 96 2 93 20 89 32 C 83 52 70 72 56 88 C 50 95 42 97 34 95 ' +
+    'C 10 90 -20 76 -42 58 C -64 40 -76 16 -78 -12 Z';
+  // cabelo: mechas curtas e grossas penteadas para cima, só levemente para trás, rente à cabeça
+  const R_HAIR = 'M 92 -38 Q 102 -58 104 -80 Q 92 -74 80 -76 Q 82 -102 72 -122 Q 56 -106 42 -102 Q 36 -126 18 -140 Q 8 -118 -6 -108 ' +
+    'Q -20 -130 -46 -136 Q -40 -116 -46 -104 Q -70 -118 -96 -116 Q -82 -98 -80 -88 Q -100 -84 -116 -66 Q -98 -60 -90 -54 ' +
+    'Q -106 -38 -112 -14 Q -96 -20 -84 -20 Q -90 0 -90 18 L -62 14 C -58 -6 -50 -22 -38 -32 C -12 -50 28 -54 58 -50 C 74 -48 86 -44 92 -38 Z';
   F.robin = function (ctx, pose) {
-    const skin = '#f4c39e', hair = '#16161c';
-    // cabelo de trás: mechas grandes e pontudas jogadas para trás
-    fill(ctx, R_BACK, hair);
-    baseHead(ctx, skin);
-    // touca do cabelo sobre o crânio e a nuca (linha da testa alta, puxada para trás)
-    fill(ctx, R_CAP, hair);
-    shine(ctx, [R_BACK, R_CAP], 'M 72 -86 Q 40 -104 4 -130 M 20 -92 Q -30 -110 -80 -124 M -40 -74 Q -90 -78 -132 -70 M -66 -40 Q -100 -30 -128 -6', '#4c5a86');
-    fill(ctx, EAR, skin, 6); line(ctx, EAR_IN, 4.5, SKIN_SH(skin));
-    line(ctx, NOSE, 5.5);
-    // máscara preta com pontas e lentes brancas
-    fill(ctx, 'M 2 -14 L -18 -42 L 14 -36 C 36 -46 70 -48 100 -36 L 102 -6 C 90 8 72 12 60 4 C 54 12 46 14 38 12 C 22 18 8 10 2 -14 Z', '#141318', 0);
+    const skin = '#f6c7a2', hair = '#141419';
+    baseHead(ctx, skin, R_HEAD);
+    fill(ctx, R_HAIR, hair);
+    shine(ctx, [R_HAIR], 'M 70 -76 Q 60 -94 48 -110 M 16 -80 Q 4 -104 -10 -120 M -36 -70 Q -60 -90 -82 -102 M -64 -40 Q -84 -48 -100 -58', '#3d4a72');
+    fill(ctx, 'M -36 -6 C -48 -18 -66 -8 -62 12 C -58 28 -46 32 -36 24', skin, 6); line(ctx, 'M -42 2 C -50 0 -52 10 -48 16', 4, SKIN_SH(skin));
+    line(ctx, 'M 88 -2 L 96 20 L 86 24', 5);
+    // máscara de dominó: faixa preta com pontas para trás e lentes brancas amendoadas
+    fill(ctx, 'M 4 -10 L -16 -34 L 16 -32 C 38 -42 70 -44 98 -34 L 100 -4 C 90 8 74 10 64 2 C 58 10 48 12 40 10 C 24 16 10 8 4 -10 Z', '#141318', 0);
     if (!FL && pose.eyes !== 'shut' && pose.eyes !== 'x') {
-      fill(ctx, 'M 14 -18 C 22 -32 44 -34 54 -24 C 52 -12 42 -2 30 -4 C 22 -6 16 -10 14 -18 Z', '#ffffff', 0);
-      fill(ctx, 'M 68 -26 C 76 -34 92 -34 98 -28 C 96 -16 88 -8 82 -8 C 74 -10 70 -16 68 -26 Z', '#ffffff', 0);
-    } else if (!FL) line(ctx, 'M 16 -14 L 52 -18 M 70 -18 L 96 -20', 4, '#ffffff');
-    mouth(ctx, 62, 58, pose);
+      fill(ctx, 'M 16 -16 C 24 -28 44 -32 56 -22 C 54 -10 44 -2 32 -2 C 24 -4 18 -8 16 -16 Z', '#ffffff', 0);
+      fill(ctx, 'M 70 -24 C 78 -32 92 -32 97 -26 C 95 -14 88 -6 82 -6 C 76 -8 72 -14 70 -24 Z', '#ffffff', 0);
+    } else if (!FL) line(ctx, 'M 18 -12 L 54 -16 M 72 -16 L 95 -18', 4, '#ffffff');
+    mouth(ctx, 62, 56, pose);
   };
 
   // ------------------------------------------------------------------ Estelar
@@ -156,26 +153,24 @@
   };
 
   // ------------------------------------------------------------------ Mutano
-  const B_BACK = 'M 84 -48 C 98 -66 104 -82 100 -102 C 88 -92 76 -90 66 -92 C 66 -114 56 -130 40 -140 C 34 -120 26 -110 16 -106 ' +
-    'C 4 -128 -16 -138 -42 -140 C -32 -120 -32 -108 -36 -100 C -60 -110 -88 -108 -112 -96 C -90 -84 -80 -76 -76 -68 ' +
-    'C -98 -62 -112 -46 -120 -28 C -98 -32 -86 -32 -78 -30 L -40 -20 L 40 -60 Z';
-  const B_CAP = 'M 94 -40 C 86 -52 72 -52 62 -56 C 64 -46 62 -40 56 -34 C 50 -44 40 -50 30 -52 C 28 -44 24 -38 16 -34 ' +
-    'C 10 -44 -2 -50 -16 -48 C -32 -44 -44 -32 -52 -16 C -64 -22 -76 -16 -84 -4 C -92 -52 -56 -104 2 -106 C 54 -108 90 -84 94 -40 Z';
+  // Rosto redondo de garoto; cabelo bagunçado em pontas curtas com franja espetada sobre a testa.
+  const B_HEAD = 'M -80 -10 C -82 -66 -34 -98 14 -98 C 62 -98 94 -64 95 -18 C 96 10 92 30 84 48 C 74 70 56 88 36 94 ' +
+    'C 6 100 -30 86 -52 64 C -70 46 -80 22 -80 -10 Z';
+  const B_HAIR = 'M 94 -30 Q 104 -50 100 -74 Q 90 -66 80 -70 Q 82 -94 70 -112 Q 58 -96 44 -94 Q 40 -118 22 -130 Q 14 -110 0 -102 ' +
+    'Q -16 -122 -40 -126 Q -34 -106 -40 -96 Q -64 -104 -88 -96 Q -74 -82 -72 -74 Q -92 -66 -104 -48 Q -88 -46 -80 -40 ' +
+    'Q -92 -24 -94 -4 L -70 -6 C -62 -26 -52 -38 -36 -46 L -22 -28 L -14 -50 L 4 -32 L 12 -54 L 30 -36 L 38 -56 L 54 -38 L 62 -54 L 76 -36 L 84 -50 Z';
   F.beastboy = function (ctx, pose) {
-    const skin = '#7cc444', hair = '#2a6a1a';
-    // tufos de trás: espetados para cima e para trás
-    fill(ctx, B_BACK, hair);
-    baseHead(ctx, skin);
-    // touca com franja espetada caindo sobre a testa
-    fill(ctx, B_CAP, hair);
-    shine(ctx, [B_BACK, B_CAP], 'M 60 -80 Q 40 -100 24 -120 M -6 -86 Q -30 -104 -52 -120 M -52 -64 Q -80 -76 -100 -84', '#62b23c');
-    // orelha pontuda bem grande saindo do lado da cabeça
-    fill(ctx, 'M -52 -8 C -90 -40 -132 -66 -172 -86 C -142 -50 -104 -8 -60 36 Z', skin, 6.5);
-    if (!FL) fill(ctx, 'M -64 2 C -94 -26 -122 -48 -148 -64 C -122 -36 -96 -6 -66 22 Z', '#5f9e33', 0);
-    line(ctx, NOSE, 5.5);
-    eye(ctx, 32, -4, pose, { rx: 20, ry: 23, iris: '#2d8a1f', irisK: 0.56, look: 0.3, brow: 'M 8 -36 L 52 -30', browW: 6 });
-    eye(ctx, 82, -6, pose, { rx: 12, ry: 21, iris: '#2d8a1f', irisK: 0.52, look: 0.2, brow: 'M 72 -34 L 96 -38', browW: 5.5 });
-    mouth(ctx, 58, 58, pose, { grin: true, fang: true });
+    const skin = '#86c95a', hair = '#2c5e20';
+    // orelha pontuda (élfica) saindo do lado da cabeça, apontando para trás e para cima
+    fill(ctx, 'M -50 -10 C -74 -28 -104 -46 -138 -58 C -120 -30 -94 2 -58 28 Z', skin, 6);
+    if (!FL) fill(ctx, 'M -58 -2 C -78 -18 -100 -32 -122 -44 C -106 -22 -86 0 -62 18 Z', '#68a843', 0);
+    baseHead(ctx, skin, B_HEAD);
+    fill(ctx, B_HAIR, hair);
+    shine(ctx, [B_HAIR], 'M 66 -76 Q 58 -92 50 -104 M 14 -78 Q 6 -98 -4 -114 M -40 -70 Q -60 -84 -78 -90', '#4f8f3a');
+    line(ctx, 'M 88 2 L 96 22 L 86 26', 5);
+    eye(ctx, 32, -6, pose, { rx: 20, ry: 23, iris: '#2f8f22', irisK: 0.56, look: 0.3, brow: 'M 10 -36 Q 30 -42 52 -34', browCol: '#1d4214', browW: 6 });
+    eye(ctx, 82, -8, pose, { rx: 12, ry: 21, iris: '#2f8f22', irisK: 0.52, look: 0.2, brow: 'M 72 -36 Q 84 -40 96 -36', browCol: '#1d4214', browW: 5 });
+    mouth(ctx, 58, 54, pose, { grin: true, fang: true });
   };
 
   // ------------------------------------------------------------------ Ciborgue
