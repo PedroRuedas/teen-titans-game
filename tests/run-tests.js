@@ -184,6 +184,69 @@ async page => {
   });
   ok('super e troca apertados durante hit-stop funcionam', reg2.superOk && reg2.switched, reg2);
 
+  // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
+  // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
+  const bossTele = await ev(() => {
+    const g = TT.game;
+    const BOSS = { 0: 4, 1: 4, 2: 4 };
+    const runAtk = (stage, name, place) => {
+      TT.debug.start(stage); TT.debug.toSection(BOSS[stage]); TT.debug.god(false);
+      let n = 0;
+      while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+      const b = g.boss;
+      g.enemies.length = 0; g.enemies.push(b); g.projectiles.length = 0; g.effects.length = 0;
+      b.x = g.camX + 700; b.y = 580; b.vx = b.vy = 0; b.z = 0; b.facing = -1; b.cool = 1e9; b.setState('idle');
+      const p = g.player;
+      p.hp = p.maxHp = 99999; p.invul = 0; p.z = 0; p.vz = 0; p.setState('idle'); p.atk = null;
+      p.x = b.x - 300; p.y = 580;
+      b.startAttack(b.ATK[name]);
+      const a = b.atk;
+      let zone = a.zones ? a.zones.slice() : null;
+      const pos = place(b, zone);
+      p.x = pos.x; p.y = pos.y;
+      let tells = 0, zoneFrames = 0, hitT = -1, inside = null, t = 0;
+      const h0 = p.hp;
+      for (t = 1; t < 260; t++) {
+        // na pedra, o alvo segue o Titã até travar; reposiciona depois de travar
+        if (pos.after && t === pos.afterT) { const q = pos.after(b, b.atk && b.atk.zones && b.atk.zones[0]); p.x = q.x; p.y = q.y; }
+        if (b.atk === a && b.tellK() >= 0) tells++;
+        const zs = g.dangerZones();
+        if (zs.length) { zoneFrames++; zone = zs.slice(); }
+        if (hitT < 0) inside = zone ? zone.some((z) => TT.zoneHas(z, p.x, p.y)) : false;
+        p.vx = p.vy = 0;
+        if (p.state === 'idle') { p.x = pos.lockX != null ? pos.lockX : p.x; }
+        g.step();
+        if (hitT < 0 && p.hp < h0) hitT = t;
+        if (b.state !== 'attack' && !g.projectiles.length && !g.effects.length && t > 40) break;
+      }
+      b.cool = 1e9;
+      return { hit: hitT > 0, hitT, inside, tells, zoneFrames, s: a.def.s };
+    };
+    const R = {};
+    const C = (stage, name, inPos, outPos) => {
+      R[name + ':dentro'] = runAtk(stage, name, inPos);
+      R[name + ':fora'] = runAtk(stage, name, outPos);
+    };
+    C(0, 'swipe', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 245, y: b.y }));
+    C(0, 'pound', (b) => ({ x: b.x - 300, y: b.y + 40 }), (b) => ({ x: b.x - 560, y: 695 }));
+    C(0, 'charge', (b) => ({ x: b.x - 420, y: b.y + 20 }), (b) => ({ x: b.x - 420, y: b.y + 84 }));
+    C(0, 'throw', (b) => ({ x: b.x - 400, y: b.y + 30 }),
+      (b) => ({ x: b.x - 400, y: b.y + 30, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x - z.rx - 40, y: z.y }) }));
+    C(1, 'drill', (b) => ({ x: b.x - 260, y: b.y }), (b) => ({ x: b.x - 260, y: b.y + 80 }));
+    C(1, 'laser', (b) => ({ x: b.x - 600, y: b.y - 10 }), (b) => ({ x: b.x - 600, y: b.y + 60 }));
+    // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
+    for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
+    TT.debug.god(false);
+    return R;
+  });
+  for (const k in bossTele) {
+    const r = bossTele[k];
+    const isMissile = k.startsWith('missiles');
+    const expectHit = isMissile ? r.inside : k.endsWith(':dentro');
+    const warned = (r.tells > 0 || isMissile) && r.zoneFrames >= Math.min(20, r.s * 0.7) && (!r.hit || r.hitT > r.s * 0.7);
+    ok('aviso do chefe: ' + k + (expectHit ? ' (acerta)' : ' (não acerta)'), warned && r.hit === expectHit && r.inside === expectHit, r);
+  }
+
   // 5) Jogo completo com bot (modo deus): fase 1 -> fase 2 -> final, 3 vezes (detecta travamentos raros)
   for (let run = 1; run <= 3; run++) {
     const full = await ev(() => {
@@ -213,17 +276,18 @@ async page => {
     ok('jogo completo até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall, full);
   }
 
-  // 6) Balanceamento: bot sem modo deus contra cada chefe (informativo)
+  // 6) Bot sem modo deus vence cada chefe no NORMAL
   for (const st of [0, 1]) {
     const r = await ev((stage) => {
       const g = TT.game;
+      TT.game.setDifficulty('normal'); TT.debug.god(false);
       TT.debug.start(stage); TT.debug.toSection(4); TT.debug.bot(true);
       let steps = 0;
       while (g.state === 'play' && steps < 20000) { g.step(); steps++; }
       TT.debug.bot(false);
       return { stage, result: g.state, steps, koTitans: g.team.filter((t) => t.ko).length, bossHp: g.boss ? Math.round(g.boss.hp) : 0 };
     }, st);
-    ok('chefe da fase ' + (st + 1) + ' (bot sem trapaça)', true, r);
+    ok('bot vence o chefe da fase ' + (st + 1) + ' sem trapaça (NORMAL)', r.result === 'clear', r);
   }
 
   // 7) Desempenho em tempo real (com renderização de verdade)
@@ -237,7 +301,7 @@ async page => {
     TT.paused = true; TT.debug.bot(false); TT.debug.god(false);
     return { fps: Math.round(frames / 4), avgRenderMs: +(g.stats.renderMs / g.stats.frames).toFixed(2), maxRenderMs: +g.stats.maxRenderMs.toFixed(2), particles: g.particles.list.length };
   });
-  ok('desempenho (>= 50 fps, render < 8ms)', perf.fps >= 50 && perf.avgRenderMs < 8, perf);
+  ok('desempenho (>= 50 fps, render médio < 2ms)', perf.fps >= 50 && perf.avgRenderMs < 2, perf);
 
   ok('nenhum erro de JavaScript', errors.length === 0 && (await ev(() => (TT.errors || []).length)) === 0, errors.slice(0, 5));
   await ev(() => { TT.paused = false; TT.debug.start(0); TT.game.state = 'title'; });

@@ -7,6 +7,26 @@
   class Bot {
     constructor(game) { this.game = game; this.down = new Set(); this.pressed = new Set(); this.t = 0; }
     press(a) { this.pressed.add(a); }
+    // Ponto seguro mais rápido de alcançar fora de uma zona de perigo.
+    escape(z, p) {
+      const g = this.game, T = TT.FLOOR_TOP + 10, B = TT.FLOOR_BOTTOM - 4, L = g.camX + 40, R = g.camX + TT.W - 40;
+      const c = [];
+      if (z.k === 'rect') {
+        c.push({ x: p.x, y: z.y - z.d - 26 }, { x: p.x, y: z.y + z.d + 26 });
+      } else {
+        const ky = Math.sqrt(Math.max(0, 1 - Math.pow((p.x - z.x) / z.rx, 2))) * z.ry;
+        const kx = Math.sqrt(Math.max(0, 1 - Math.pow((p.y - z.y) / z.ry, 2))) * z.rx;
+        c.push({ x: p.x, y: z.y - ky - 22 }, { x: p.x, y: z.y + ky + 22 }, { x: z.x - kx - 34, y: p.y }, { x: z.x + kx + 34, y: p.y });
+        if (z.k === 'half') c.push({ x: z.x - z.f * 30, y: p.y });
+      }
+      let best = null, bt = 1e9;
+      for (const q of c) {
+        if (q.y < T || q.y > B || q.x < L || q.x > R) continue;
+        const t = Math.abs(q.x - p.x) / 4.5 + Math.abs(q.y - p.y) / 2.8;
+        if (t < bt) { bt = t; best = q; }
+      }
+      return best;
+    }
     update() {
       const g = this.game; this.t++;
       this.down.clear();
@@ -24,6 +44,18 @@
       for (const e of g.effects) if (e instanceof TT.Shockwave) {
         const dx = p.x - e.x, dy = (p.y - e.y) / 0.38, d = Math.hypot(dx, dy);
         if (d - e.r > 0 && d - e.r < 60 && p.z === 0) this.press('jump');
+      }
+      // foge das marcações de perigo no chão (avisos dos chefes); a onda de choque é pulada
+      if (p.state === 'idle' || p.state === 'air') {
+        for (const z of g.dangerZones()) {
+          if (z.jump || !TT.zoneHas(z, p.x, p.y)) continue;
+          const esc = this.escape(z, p);
+          if (!esc) continue;
+          this.down.clear();
+          if (Math.abs(esc.x - p.x) > 6) this.down.add(esc.x > p.x ? 'right' : 'left');
+          if (Math.abs(esc.y - p.y) > 4) this.down.add(esc.y > p.y ? 'down' : 'up');
+          return;
+        }
       }
       // alvo mais próximo
       let target = null, best = 1e9;

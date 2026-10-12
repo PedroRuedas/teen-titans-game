@@ -91,6 +91,11 @@
     beam: { w: { armF: [0.8, 1.2], lean: -0.05 }, h: { armF: [1.57, 1.57], armB: [1.1, 1.6], lean: -0.12, legF: [0.55, 0.35], legB: [-0.55, -0.7] } },
     claw: { w: { armF: [-1.6, -1.2], armB: [-1.4, -1.0], lean: -0.2 }, h: { armF: [1.9, 2.1], armB: [1.7, 1.9], lean: 0.3, legF: [0.5, 0.3], legB: [-0.5, -0.6] } },
     spin: { w: { armF: [1.5, 1.5], armB: [-1.5, -1.5] }, h: { armF: [1.5, 1.5], armB: [-1.5, -1.5], lean: 0.1 } },
+    // Poses exageradas dos chefes (preparação bem visível)
+    bigSwing: { w: { armF: [-2.9, -3.2], armB: [-2.6, -3.0], lean: -0.5, bob: 6, tilt: -0.25, legF: [0.5, 0.2], legB: [-0.5, -0.7] }, h: { armF: [1.25, 1.5], armB: [1.0, 1.4], lean: 0.5, bob: 6, legF: [0.7, 0.3], legB: [-0.6, -0.9] } },
+    bigSlam: { w: { armF: [3.0, 3.1], armB: [2.9, 3.0], bob: 10, lean: -0.3, legF: [0.6, -0.4], legB: [-0.5, -1.0] }, h: { armF: [0.9, 0.5], armB: [0.8, 0.4], bob: 12, lean: 0.55, legF: [0.8, 0.2], legB: [-0.7, -1.0] } },
+    bigCharge: { w: { lean: -0.35, bob: 8, armF: [-0.9, -0.2], armB: [-1.1, -0.4], legF: [0.7, -0.2], legB: [-0.6, -1.1] }, h: { lean: 0.7, bob: 4, armF: [1.2, 1.4], armB: [-1.2, -0.8], legF: [0.9, 0.3], legB: [-0.8, -1.2] } },
+    bigThrow: { w: { armF: [-2.7, -3.0], armB: [-2.5, -2.9], lean: -0.4, bob: 4, tilt: -0.2 }, h: { armF: [1.5, 1.6], armB: [1.2, 1.4], lean: 0.4, legF: [0.6, 0.3], legB: [-0.5, -0.7] } },
   };
   TT.ATK_POSES = ATK;
 

@@ -236,7 +236,12 @@
       if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return; // pisca antes de sumir
       if (this.invul > 0 && this.state !== 'getup' && (this.invul >> 2) % 2 === 0 && this.team === 'hero') ctx.globalAlpha = 0.55;
       TT.computePose(this, this.pose);
-      TT.drawRig(ctx, this.style, this.pose, this.x - camX, this.y - this.z, this.facing, { flash: this.flash > 3, t: this.animT });
+      // inimigos: brilho e piscada curtos antes de atacar
+      const a = this.atk, sx = this.x - camX, sy = this.y - this.z;
+      const tell = this.team === 'enemy' && a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      const blink = tell > 0.55 && (a.t >> 1) % 2 === 0;
+      TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3 || blink, t: this.animT });
+      if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', sx + this.facing * 26, sy - 78, 16 + 22 * tell, 0.35 + 0.5 * tell);
       ctx.globalAlpha = 1;
     }
   }
@@ -633,7 +638,7 @@
     }
     think() {
       if (this.commonStates()) return;
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
       if (this.state !== 'idle') { this.setState('idle'); }
       if (!p || p.ko) { this.vx *= 0.8; this.vy *= 0.8; this.setAnim('idle'); return; }
@@ -702,7 +707,7 @@
         return;
       }
       if (this.commonStates()) return;
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       this.z += (this.hover + Math.sin(this.animT * 0.08) * 6 - this.z) * 0.1;
       if (!p || p.ko) { this.vx *= 0.9; this.vy *= 0.9; return; }
       const dx = p.x - this.x;
@@ -756,6 +761,63 @@
   }
   TT.Drone = Drone;
 
+  // ================================================================ Avisos de ataque (zonas no chão)
+  // Zonas no plano do chão: 'rect' (faixa), 'ell' (elipse/círculo) e 'half' (arco à frente).
+  // A MESMA zona é usada para desenhar o aviso e para decidir o acerto (pé do alvo dentro da zona).
+  TT.zoneHas = function (z, x, y) {
+    if (z.k === 'rect') return x >= Math.min(z.x0, z.x1) && x <= Math.max(z.x0, z.x1) && Math.abs(y - z.y) <= z.d;
+    if (z.k === 'half' && (x - z.x) * z.f < 0) return false;
+    const dx = (x - z.x) / z.rx, dy = (y - z.y) / z.ry;
+    return dx * dx + dy * dy <= 1;
+  };
+  function zonePath(ctx, z, camX, k) {
+    ctx.beginPath();
+    if (z.k === 'rect') {
+      const x0 = z.x0 - camX, x1 = z.x0 + (z.x1 - z.x0) * k - camX;
+      ctx.rect(Math.min(x0, x1), z.y - z.d, Math.abs(x1 - x0), z.d * 2);
+    } else if (z.k === 'half') {
+      const a0 = z.f > 0 ? -Math.PI / 2 : Math.PI / 2;
+      ctx.moveTo(z.x - camX, z.y);
+      ctx.ellipse(z.x - camX, z.y, z.rx * k, z.ry * k, 0, a0, a0 + Math.PI);
+      ctx.closePath();
+    } else {
+      ctx.ellipse(z.x - camX, z.y, z.rx * k, z.ry * k, 0, 0, Math.PI * 2);
+    }
+  }
+  // k = progresso do aviso (0..1): a zona vai se preenchendo até o impacto.
+  TT.drawZone = function (ctx, z, camX, k, t, rgb) {
+    rgb = rgb || '255,40,40';
+    k = TT.clamp(k, 0, 1);
+    const late = k > 0.7, blink = late ? (t >> 1) % 2 === 0 : (t >> 3) % 2 === 0;
+    ctx.save();
+    zonePath(ctx, z, camX, 1);
+    ctx.fillStyle = 'rgba(' + rgb + ',0.13)'; ctx.fill();
+    zonePath(ctx, z, camX, Math.max(0.03, k));
+    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.18 + 0.27 * k) + ')'; ctx.fill();
+    if (z.rings) {
+      ctx.strokeStyle = 'rgba(' + rgb + ',0.55)'; ctx.lineWidth = 2;
+      for (let i = 1; i < z.rings; i++) {
+        const f = i / z.rings;
+        ctx.beginPath(); ctx.ellipse(z.x - camX, z.y, z.rx * f, z.ry * f, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    if (z.k === 'rect' && z.arrows) {
+      const dir = Math.sign(z.x1 - z.x0) || 1, len = Math.abs(z.x1 - z.x0), h = z.d * 0.55;
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.25 + 0.35 * k) + ')'; ctx.lineWidth = 5;
+      for (let s = (t * 4) % 90; s < len - 20; s += 90) {
+        const x = z.x0 + dir * s - camX;
+        ctx.beginPath(); ctx.moveTo(x, z.y - h); ctx.lineTo(x + dir * h, z.y); ctx.lineTo(x, z.y + h); ctx.stroke();
+      }
+    }
+    zonePath(ctx, z, camX, 1);
+    ctx.lineWidth = late ? 4 : 3;
+    ctx.strokeStyle = blink ? 'rgba(255,255,255,0.95)' : 'rgba(' + rgb + ',0.95)';
+    if (!late) ctx.setLineDash([16, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
+
   // ================================================================ Chefes
   class Boss extends Fighter {
     constructor(game, x, y) {
@@ -779,6 +841,42 @@
       }
     }
     nextCool(a, b) { return Math.round(TT.randi(a, b) * this.game.diff.bossCool); }
+    startAttack(def) {
+      super.startAttack(def);
+      const a = this.atk;
+      a.zones = def.zone ? def.zone.call(def, this, this.game, a) : null;
+    }
+    // Progresso do aviso (0..1) durante a preparação do golpe; -1 fora dela.
+    tellK() {
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.t >= a.def.s) return -1;
+      return a.t / a.def.s;
+    }
+    // Pisca em branco no fim da preparação.
+    tellFlash() { const k = this.tellK(); return k > 0.62 && (this.atk.t >> 1) % 3 === 0; }
+    // Tremor de "carregando" durante a preparação.
+    tellShake() { const k = this.tellK(); return k > 0 ? Math.sin(this.atk.t * 1.7) * k * 3 : 0; }
+    // Marcação no chão: área exata que o golpe vai atingir.
+    drawGround(ctx, camX) {
+      const a = this.atk;
+      if (!a || !a.zones || this.state !== 'attack') return;
+      const d = a.def;
+      if (a.t >= d.s + d.a) return;
+      const k = a.t < d.s ? a.t / d.s : 1;
+      for (const z of a.zones) TT.drawZone(ctx, z, camX, k, a.t);
+    }
+    // Brilho na cor do ataque + "!" estilo HQ sobre a cabeça.
+    drawTell(ctx, sx, sy, headY) {
+      const k = this.tellK();
+      if (k < 0) return;
+      const a = this.atk, col = a.def.color || '#ff3b30', t = a.t;
+      TT.drawGlow(ctx, col, sx, sy - this.height * 0.5, this.height * (0.6 + 0.3 * k) * (0.92 + 0.08 * Math.sin(t * 0.7)), 0.3 + 0.45 * k);
+      const pop = Math.min(1, t / 5) * (1 + 0.18 * k), bob = Math.sin(t * 0.35) * 3;
+      ctx.save(); ctx.translate(sx, (headY != null ? headY : sy - this.height) - 46 + bob); ctx.scale(pop, pop);
+      TT.drawBurst(ctx, 0, 0, 36, 9, k > 0.62 && (t >> 1) % 2 ? '#ffffff' : '#ffe14a', OUT, 0.15);
+      TT.drawText(ctx, '!', 0, 3, 46, '#ff2a2a', OUT, 'center', 6);
+      ctx.restore();
+    }
     onArmorHit(dmg, d) {
       this.poise += dmg * (d.big ? 1.6 : 1);
       if (this.poise > this.poiseMax && this.state !== 'attack') {
@@ -829,6 +927,15 @@
       return false;
     }
   }
+  TT.Boss = Boss;
+
+  // Alvo no chão perto de um Titã, dentro da tela.
+  function groundTarget(g, p, spreadX, spreadY) {
+    return {
+      x: TT.clamp(p.x + TT.rand(-spreadX, spreadX), g.camX + 60, g.camX + TT.W - 60),
+      y: TT.clamp(p.y + TT.rand(-spreadY, spreadY), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4),
+    };
+  }
 
   // ---- Cinderblock
   class Cinderblock extends Boss {
@@ -842,36 +949,62 @@
       this.grav = 1.1;
       this.def = { score: 5000 };
       this.ATK = {
-        swipe: { pose: 'swing', s: 28, a: 6, r: 26, dmg: 16, reach: [0, 175], depth: 55, kb: 11, knockdown: true, launch: 7, sound0: 'roar',
-          onFrame(f, t, g) { if (t === this.s) { g.shake = 8; A().play('hitHeavy'); } } },
-        pound: { pose: 'slam', s: 32, a: 2, r: 34,
+        // soco giratório: arco à frente (a hitbox é a própria zona)
+        swipe: { pose: 'bigSwing', s: 28, a: 6, r: 26, dmg: 16, reach: [0, 175], depth: 55, kb: 11, knockdown: true, launch: 7, sound0: 'roar', color: '#ff8a3a',
+          zoneHit: true,
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 205, ry: 58, f: f.facing }]; },
+          onFrame(f, t, g) { if (t === this.s) { A().play('hitHeavy'); g.impact(f.x + f.facing * 130, f.y, 'WHAM!', '#ff8a3a', 0.9); } } },
+        // salto + onda de choque: anéis no chão (pule!)
+        pound: { pose: 'bigSlam', s: 32, a: 2, r: 34, color: '#ffd23a',
+          zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 620, ry: 620 * 0.38, rings: 5, jump: true }]; },
           onFrame(f, t, g) {
-            if (t === Math.max(2, this.s - 24)) { f.vz = 11; f.z = 1; }
-            if (t === this.s) { g.shake = 18; A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy')); g.dust(f.x, f.y, 14, '#b9aa9a'); }
+            if (t === Math.max(2, this.s - 20)) { f.vz = 11; f.z = 1; }
+            if (t === this.s) {
+              A().play('shockwave'); g.addEffect(new Shockwave(g, f.x, f.y, 620, 14, 'enemy'));
+              g.dust(f.x, f.y, 14, '#b9aa9a'); g.debrisBurst(f.x, f.y - 20, 10, '#8e8880');
+              g.impact(f.x, f.y, 'KRA-BUM!', '#ffd23a', 1.4);
+            }
           } },
-        charge: { pose: 'cross', s: 30, a: 54, r: 30, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 10.5, sound0: 'roar',
+        // investida: faixa na linha da investida até a parede
+        charge: { pose: 'bigCharge', s: 30, a: 54, r: 30, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 10.5, sound0: 'roar', color: '#ff4a3a',
+          zone(f, g) {
+            const R = g.camX + TT.W - 70, L = g.camX + 70;
+            return [{ k: 'rect', x0: f.x - f.facing * 24, x1: f.facing > 0 ? R + 130 : L - 130, y: f.y, d: 50, arrows: true }];
+          },
           onFrame(f, t, g) {
             const run = t > this.s && t < this.s + this.a;
+            if (t === this.s) g.impact(f.x, f.y, 'VRUUUM!', '#ff4a3a', 0.5);
             if (run && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#b9aa9a'); g.shake = Math.max(g.shake, 3); }
             const L = g.camX + 70, R = g.camX + TT.W - 70;
             if (run && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
               // bate na parede e fica atordoado
-              f.x = TT.clamp(f.x, L, R); f.atk = null; g.shake = 20; A().play('boom');
+              f.x = TT.clamp(f.x, L, R); f.atk = null; A().play('boom');
               g.debrisBurst(f.x + f.facing * 60, f.y - 120, 12, '#8e8880');
+              g.impact(f.x + f.facing * 60, f.y, 'CRASH!', '#ffae3a', 1.3);
               f.setState('stagger'); f.setAnim('hurt'); f.st = -40; f.vx = -f.facing * 4;
             }
           } },
-        throw: { pose: 'throw', s: 26, a: 1, r: 26,
-          onFrame(f, t, g) {
+        // arremesso de pedra: alvo no chão onde ela vai cair (segue o Titã até a metade do aviso)
+        throw: { pose: 'bigThrow', s: 26, a: 1, r: 26, color: '#c9a27a',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = TT.clamp(p.x, g.camX + 60, g.camX + TT.W - 60); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x + f.facing * 300; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 90, ry: 90 * 0.42 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
             if (t === 4) g.debrisBurst(f.x, f.y - 10, 6, '#8e8880');
+            if (t < this.s * 0.55) a.zones = [this.aim(f, g, a)];
             if (t === this.s) {
-              const p = g.player; if (!p) return;
-              const T = 48, z0 = 190, gr = 0.6;
+              const z = a.zones[0], T = 48, z0 = 190, gr = 0.6, x0 = f.x + f.facing * 40;
               g.addProjectile(new Projectile(g, {
-                kind: 'boulder', team: 'enemy', owner: f, x: f.x + f.facing * 40, y: f.y, z: z0,
-                vx: (p.x - f.x) / T, vy: (p.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
+                kind: 'boulder', team: 'enemy', owner: f, x: x0, y: f.y, z: z0,
+                vx: (z.x - x0) / T, vy: (z.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
                 r: 30, dmg: 14, kb: 6, knockdown: true, launch: 6, life: 120, explodeOnGround: 90,
+                zone: z, flight: T, impactWord: 'BOOM!',
               }));
+              a.zones = null; // daqui em diante a pedra desenha o alvo
               A().play('whoosh');
             }
           } },
@@ -881,9 +1014,9 @@
     think() {
       if (this.commonBoss()) return;
       if (this.state === 'down' || this.state === 'hurt') { this.setState('idle'); }
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
-      if (!this.active || !p || p.ko) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
       const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
       this.facing = dx > 0 ? 1 : -1;
       const p2 = this.phase2();
@@ -904,9 +1037,23 @@
       if (this.state === 'dying' && (this.st >> 2) % 2 === 0) ctx.globalAlpha = 0.7;
       TT.computePose(this, this.pose);
       if (this.state === 'stagger') { this.pose.lean = -0.3; this.pose.tilt = -0.3; }
-      TT.drawRig(ctx, this.style, this.pose, this.x - camX, this.y - this.z, this.facing, { flash: this.flash > 3, t: this.animT });
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      // squash-and-stretch: agacha na preparação, estica no golpe
+      const k = this.tellK(), a = this.atk;
+      let sq = 0;
+      if (k >= 0) sq = -0.07 * TT.easeOut(k);
+      else if (a && a.t < a.def.s + a.def.a + 6) sq = 0.06;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t: this.animT });
+      ctx.restore();
       ctx.globalAlpha = 1;
-      if (this.state === 'stagger') this.drawDizzy(ctx, this.x - camX, this.y - this.z - this.height - 10);
+      // pedra erguida acima da cabeça durante a preparação do arremesso
+      if (k >= 0 && a.def === this.ATK.throw) {
+        const ry = y - this.height + 10 - 14 * TT.easeOut(k);
+        drawBoulder(ctx, x - this.facing * 26, ry, 1.3, a.t * 0.05);
+      }
+      this.drawTell(ctx, x, y, y - this.height - 50);
+      if (this.state === 'stagger') this.drawDizzy(ctx, x, y - this.height - 10);
     }
     drawDizzy(ctx, x, y) {
       for (let i = 0; i < 3; i++) {
@@ -916,6 +1063,15 @@
     }
   }
   TT.Cinderblock = Cinderblock;
+
+  function drawBoulder(ctx, x, y, s, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.fillStyle = '#8e8880'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-12, -26); ctx.lineTo(16, -24); ctx.lineTo(30, -2); ctx.lineTo(18, 22); ctx.lineTo(-14, 24); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#a7a199'; ctx.beginPath(); ctx.moveTo(-20, -8); ctx.lineTo(-10, -20); ctx.lineTo(10, -19); ctx.lineTo(0, -6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#6f6a63'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(6, 4); ctx.lineTo(2, 14); ctx.stroke();
+    ctx.restore();
+  }
 
   // ---- Gizmo no robô-aranha perfurador
   class GizmoMech extends Boss {
@@ -929,26 +1085,34 @@
       this.def = { score: 6000 };
       this.taunts = ['Seus pateta-titãs!', 'Tecnologia de ponta, otários!', 'Vou perfurar vocês!', 'Ninguém vence o Gizmo!'];
       this.ATK = {
-        drill: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 8, dmg: 6, rehit: 8, reach: [40, 210], depth: 48, kb: 4, stun: 14, sound0: 'drill',
+        // broca: faixa à frente cobrindo todo o avanço
+        drill: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 8, dmg: 6, rehit: 8, reach: [40, 210], depth: 48, kb: 4, stun: 14, sound0: 'drill', color: '#ffcf5a',
+          zone(f, g) {
+            const minX = g.camX + f.radius, maxX = g.camX + TT.W - f.radius;
+            const xe = TT.clamp(f.x + f.facing * (26 * 8 + 8 * 6 + 16), minX, maxX);
+            return [{ k: 'rect', x0: f.x + f.facing * 16, x1: xe + f.facing * 234, y: f.y, d: 48, arrows: true }];
+          },
           onFrame(f, t, g) {
             f.drillSpin += t < this.s ? 0.2 + t * 0.02 : 1.1;
+            if (t === this.s) g.impact(f.x + f.facing * 200, f.y, 'VRRRR!', '#ffcf5a', 0.5);
             if (t >= this.s && t < this.s + this.a && t % 4 === 0) { A().play('drill'); g.particles.spawn('spark', f.x + f.facing * 200, f.y - 90, { vx: f.facing * TT.rand(3, 9), vy: TT.rand(-6, 1), color: '#ffcf5a', size: 3, life: 14, grav: 0.4 }); }
-            if (t === this.s + 26) f.atk.def = f.ATK.drillEnd;
+            if (t === this.s + 26) { const z = f.atk.zones; f.atk.def = f.ATK.drillEnd; f.atk.zones = z; }
           } },
-        drillEnd: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 6, dmg: 9, reach: [40, 210], depth: 48, kb: 9, knockdown: true, launch: 6 },
-        missiles: { pose: 'castUp', s: 24, a: 1, r: 40,
+        drillEnd: { pose: 'jab', s: 34, a: 34, r: 30, lunge: 6, dmg: 9, reach: [40, 210], depth: 48, kb: 9, knockdown: true, launch: 6, color: '#ffcf5a' },
+        // chuva de mísseis: cada míssil marca um círculo no chão
+        missiles: { pose: 'castUp', s: 24, a: 1, r: 40, color: '#ff4a3a',
           onFrame(f, t, g) {
             if (t === 1) A().play('alarm');
             const n = f.phase2() ? 7 : 4;
             if (t >= this.s && t < this.s + n * 6 && (t - this.s) % 6 === 0) {
-              const p = g.player; if (!p) return;
-              const tx = TT.clamp(p.x + TT.rand(-160, 160), g.camX + 60, g.camX + TT.W - 60);
-              const ty = TT.clamp(p.y + TT.rand(-60, 60), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4);
-              g.addProjectile(new Projectile(g, { kind: 'missile', team: 'enemy', owner: f, x: tx, y: ty, z: 700, vz: -12, grav: 0, r: 0, dmg: 0, life: 200, explodeOnGround: 85, blastDmg: 12 }));
+              const p = g.targetFor(f, true); if (!p) return;
+              const tp = groundTarget(g, p, 160, 60);
+              g.addProjectile(new Projectile(g, { kind: 'missile', team: 'enemy', owner: f, x: tp.x, y: tp.y, z: 700, vz: -12, grav: 0, r: 0, dmg: 0, life: 200,
+                explodeOnGround: 85, blastDmg: 12, zone: { k: 'ell', x: tp.x, y: tp.y, rx: 85, ry: 85 * 0.42 }, flight: 58, impactWord: 'BOOM!' }));
               A().play('laser');
             }
           } },
-        drones: { pose: 'castUp', s: 20, a: 1, r: 30,
+        drones: { pose: 'castUp', s: 20, a: 1, r: 30, color: '#9effa8',
           onFrame(f, t, g) {
             if (t === this.s) {
               for (let i = 0; i < 2; i++) {
@@ -959,7 +1123,10 @@
               g.say(f, TT.choice(f.taunts), '#9effa8');
             }
           } },
-        laser: { pose: 'beam', s: 40, a: 34, r: 24, dmg: 5, rehit: 6, reach: [60, 1300], depth: 24, kb: 3, zr: 50, sound: 'sonic' },
+        // laser (fase 2): faixa piscando em toda a tela
+        laser: { pose: 'beam', s: 40, a: 34, r: 24, dmg: 5, rehit: 6, reach: [60, 1300], depth: 24, kb: 3, zr: 50, sound: 'sonic', color: '#ff3a3a',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 36, x1: f.x + f.facing * 1324, y: f.y, d: 24 }]; },
+          onFrame(f, t, g) { if (t === this.s) g.impact(f.x + f.facing * 90, f.y, 'ZZZAP!', '#ff3a3a', 0.6); } },
       };
       this.applyDifficulty();
     }
@@ -967,9 +1134,9 @@
       this.drillSpin += 0.05;
       if (this.commonBoss()) return;
       if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
-      const g = this.game, p = g.player;
+      const g = this.game, p = g.targetFor(this);
       if (this.state === 'attack') { this.updateAttack(); return; }
-      if (!this.active || !p || p.ko) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
       const dx = p.x - this.x, adx = Math.abs(dx);
       this.facing = dx > 0 ? 1 : -1;
       const p2 = this.phase2();
@@ -992,20 +1159,22 @@
       }
     }
     draw(ctx, camX) {
-      const x = this.x - camX, y = this.y - this.z, t = this.animT, fl = this.flash > 3;
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z, t = this.animT, fl = this.flash > 3 || this.tellFlash();
       const col = (c) => (fl ? '#ffffff' : c);
       if (this.state === 'dying' && (this.st >> 2) % 2 === 0) ctx.globalAlpha = 0.75;
-      const a = this.atk;
+      const a = this.atk, tk = this.tellK();
       const walking = this.anim === 'walk';
       ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      const bodyY = -120 + Math.sin(t * 0.1) * 3;
+      // agacha durante a preparação (pose exagerada)
+      const crouch = tk >= 0 ? TT.easeOut(tk) * 22 : 0;
+      const bodyY = -120 + Math.sin(t * 0.1) * 3 + crouch;
       // pernas
       for (let i = 0; i < 4; i++) {
         const back = i < 2;
         const base = [-60, 40, -30, 70][i];
         const ph = walking ? Math.sin(t * 0.2 + i * 1.6) * 16 : 0;
-        const fx = base + ph, kx = base * 0.75 + (base > 0 ? 25 : -25), ky = bodyY - 20;
+        const fx = base + ph + (base > 0 ? 1 : -1) * crouch * 0.8, kx = base * 0.75 + (base > 0 ? 25 : -25) + (base > 0 ? 1 : -1) * crouch, ky = bodyY - 20;
         ctx.strokeStyle = OUT; ctx.lineWidth = 14;
         ctx.beginPath(); ctx.moveTo(base * 0.4, bodyY + 10); ctx.lineTo(kx, ky - 30); ctx.lineTo(fx, back ? -6 : 0); ctx.stroke();
         ctx.strokeStyle = col(back ? '#4f5866' : '#7c8798'); ctx.lineWidth = 8; ctx.stroke();
@@ -1016,9 +1185,11 @@
       ctx.fillStyle = col('#6c7686'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
       ctx.beginPath(); ctx.ellipse(0, bodyY + 12, 80, 30, 0, 0, Math.PI); ctx.fillStyle = col('#535c6b'); ctx.fill();
       ctx.fillStyle = col('#f0c62e'); ctx.fillRect(-70, bodyY - 4, 140, 8);
-      // míssil na traseira
-      ctx.fillStyle = col('#3e4652'); ctx.fillRect(-90, bodyY - 60, 50, 34); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-90, bodyY - 60, 50, 34);
-      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-80 + k * 15, bodyY - 43, 5, 0, Math.PI * 2); ctx.fillStyle = col('#ff4a3a'); ctx.fill(); }
+      // casulo de mísseis na traseira (abre ao preparar a chuva de mísseis)
+      const pod = a && a.def === this.ATK.missiles && a.t < a.def.s + 30;
+      ctx.fillStyle = col('#3e4652'); ctx.fillRect(-90, bodyY - 60 - (pod ? 14 : 0), 50, 34); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-90, bodyY - 60 - (pod ? 14 : 0), 50, 34);
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(-80 + k * 15, bodyY - 43 - (pod ? 14 : 0), 5, 0, Math.PI * 2); ctx.fillStyle = col('#ff4a3a'); ctx.fill(); }
+      if (pod && !fl) TT.drawGlow(ctx, '#ff4a3a', -65, bodyY - 60, 40 + Math.sin(a.t * 0.8) * 8, 0.9);
       // cabine com o Gizmo
       ctx.beginPath(); ctx.arc(10, bodyY - 48, 40, Math.PI, Math.PI * 2); ctx.closePath();
       ctx.fillStyle = 'rgba(140,220,255,0.35)'; ctx.fill();
@@ -1026,8 +1197,9 @@
       ctx.beginPath(); ctx.arc(10, bodyY - 48, 40, Math.PI, Math.PI * 2); ctx.closePath();
       ctx.fillStyle = 'rgba(200,240,255,0.18)'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(-6, bodyY - 70, 10, 5, -0.5, 0, Math.PI * 2); ctx.fill();
-      // braço-broca
-      const extend = a && a.def.lunge ? Math.min(1, a.t / 20) * 30 : 0;
+      // braço-broca (recua na preparação e avança no golpe)
+      const drilling = a && (a.def === this.ATK.drill || a.def === this.ATK.drillEnd);
+      const extend = drilling ? (a.t < a.def.s ? -TT.easeOut(a.t / a.def.s) * 26 : 30) : 0;
       ctx.save(); ctx.translate(70 + extend, bodyY + 4);
       ctx.fillStyle = col('#7c8798'); ctx.fillRect(-20, -16, 40, 32); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-20, -16, 40, 32);
       ctx.beginPath(); ctx.moveTo(18, -26); ctx.lineTo(120, 0); ctx.lineTo(18, 26); ctx.closePath();
@@ -1037,23 +1209,21 @@
       const sp = (this.drillSpin * 20) % 24;
       for (let k = -24; k < 120; k += 24) { ctx.beginPath(); ctx.moveTo(k + sp, -30); ctx.lineTo(k + sp + 16, 30); ctx.stroke(); }
       ctx.restore();
+      if (drilling && !fl) TT.drawGlow(ctx, '#ffcf5a', 110, 0, 30 + (a.t < a.def.s ? a.t : 20), 0.8);
       ctx.restore();
       // olho-laser
       const charging = a && a.def === this.ATK.laser;
       ctx.beginPath(); ctx.arc(76, bodyY - 26, 12, 0, Math.PI * 2); ctx.fillStyle = '#200'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
       ctx.beginPath(); ctx.arc(78, bodyY - 26, 7, 0, Math.PI * 2); ctx.fillStyle = '#ff3030'; ctx.fill();
-      TT.drawGlow(ctx, '#ff3030', 78, bodyY - 26, charging ? 30 + a.t : 16, 1);
+      TT.drawGlow(ctx, '#ff3030', 78, bodyY - 26, charging ? 30 + Math.min(a.t, 60) : 16, 1);
       ctx.restore();
       ctx.globalAlpha = 1;
       // feixe laser (fase 2)
       if (charging) {
         const d = a.def, oy = y + bodyY - 26;
         if (a.t < d.s) {
-          ctx.strokeStyle = 'rgba(255,60,60,' + (0.3 + (a.t % 6 < 3 ? 0.4 : 0)) + ')'; ctx.lineWidth = 2; ctx.setLineDash([12, 10]);
+          ctx.strokeStyle = 'rgba(255,60,60,' + (0.4 + (a.t % 6 < 3 ? 0.5 : 0)) + ')'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]);
           ctx.beginPath(); ctx.moveTo(x + this.facing * 90, oy); ctx.lineTo(x + this.facing * 1400, oy); ctx.stroke(); ctx.setLineDash([]);
-          // marca no chão da faixa de profundidade atingida
-          ctx.fillStyle = 'rgba(255,40,40,0.18)';
-          ctx.fillRect(this.facing > 0 ? x + 60 : x - 1360, this.y - 24, 1300, 48);
         } else if (a.t < d.s + d.a) {
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           const w = 20 + Math.sin(a.t) * 4;
@@ -1064,6 +1234,7 @@
           ctx.restore();
         }
       }
+      this.drawTell(ctx, x, y, y + bodyY - 100);
       if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height + 20);
     }
     drawGizmo(ctx, x, y, fl) {
@@ -1153,7 +1324,7 @@
   class Projectile {
     constructor(game, o) {
       this.game = game;
-      Object.assign(this, { vy: 0, vz: 0, grav: 0, pierce: false, life: 60, r: 12, t: 0, kb: 3, launch: 5, knockdown: false });
+      Object.assign(this, { vx: 0, vy: 0, vz: 0, grav: 0, pierce: false, life: 60, r: 12, t: 0, kb: 3, launch: 5, knockdown: false });
       Object.assign(this, o);
       this.hits = new Set();
       this.remove = false;
@@ -1171,6 +1342,7 @@
       if (this.explodeOnGround && this.z <= 0) {
         this.z = 0; this.remove = true;
         g.blast(this.x, this.y, this.explodeOnGround, this.blastDmg || this.dmg, this.team, this.owner);
+        if (this.impactWord) g.impact(this.x, this.y, this.impactWord, '#ff7a2a', 0.5);
         return;
       }
       if (this.kind === 'starbolt' || this.kind === 'bigbolt') {
@@ -1183,7 +1355,7 @@
       if (!this.dmg) return;
       const sx = this.x - g.camX;
       if (sx < -200 || sx > TT.W + 200) { this.remove = true; return; }
-      const targets = this.team === 'hero' ? g.enemies.concat(g.props) : [g.player];
+      const targets = this.team === 'hero' ? g.enemies.concat(g.props) : g.heroes();
       for (const t of targets) {
         if (!t || t.dead || this.hits.has(t) || (t.ko)) continue;
         if (Math.abs(t.x - this.x) > this.r + t.radius) continue;
@@ -1231,11 +1403,7 @@
           ctx.restore();
           break;
         case 'boulder':
-          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.3);
-          ctx.fillStyle = '#8e8880'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.moveTo(-28, -8); ctx.lineTo(-12, -26); ctx.lineTo(16, -24); ctx.lineTo(30, -2); ctx.lineTo(18, 22); ctx.lineTo(-14, 24); ctx.closePath(); ctx.fill(); ctx.stroke();
-          ctx.strokeStyle = '#6f6a63'; ctx.beginPath(); ctx.moveTo(-8, -10); ctx.lineTo(6, 4); ctx.stroke();
-          ctx.restore();
+          drawBoulder(ctx, x, y, 1, this.spin * 0.3);
           break;
         case 'missile': {
           ctx.save(); ctx.translate(x, y);
@@ -1250,17 +1418,17 @@
       }
     }
     drawGround(ctx, camX) {
-      // alvos marcados no chão (míssil/pedra)
-      if (!this.explodeOnGround) return;
-      const x = this.x - camX, k = Math.min(1, this.t / 30);
-      if (this.kind === 'missile') {
-        ctx.strokeStyle = 'rgba(255,50,50,' + (0.4 + 0.4 * ((this.t >> 2) % 2)) + ')'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.ellipse(x, this.y, this.explodeOnGround * k, this.explodeOnGround * 0.38 * k, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,50,50,0.15)'; ctx.fill();
-      } else {
-        ctx.fillStyle = 'rgba(15,5,25,0.3)';
-        ctx.beginPath(); ctx.ellipse(x, this.y, 30, 10, 0, 0, Math.PI * 2); ctx.fill();
-      }
+      // alvo marcado no chão (míssil/pedra): a zona é exatamente a área da explosão
+      if (!this.zone) return;
+      const z = this.zone, k = Math.min(1, this.t / (this.flight || 40));
+      TT.drawZone(ctx, z, camX, k, this.t);
+      // mira no centro
+      const x = z.x - camX, r = 14 + 8 * (1 - k);
+      ctx.strokeStyle = (this.t >> 2) % 2 ? '#ffffff' : '#ff2a2a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x - r, z.y); ctx.lineTo(x + r, z.y); ctx.moveTo(x, z.y - r * 0.42); ctx.lineTo(x, z.y + r * 0.42); ctx.stroke();
+      // sombra do objeto caindo
+      ctx.fillStyle = 'rgba(15,5,25,0.35)';
+      ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 26 * (0.5 + 0.5 * k), 9 * (0.5 + 0.5 * k), 0, 0, Math.PI * 2); ctx.fill();
     }
   }
   TT.Projectile = Projectile;
@@ -1272,14 +1440,15 @@
     }
     update() {
       this.t++; this.r += 11;
-      if (this.r > this.maxR) this.remove = true;
+      if (this.r > this.maxR + 13) this.remove = true;
       const g = this.game;
-      const targets = this.team === 'hero' ? g.enemies : [g.player];
+      const targets = this.team === 'hero' ? g.enemies : g.heroes();
       for (const t of targets) {
         if (!t || t.dead || t.ko || this.hits.has(t) || t.z > 8) continue;
         const dx = t.x - this.x, dy = (t.y - this.y) / 0.38;
         const d = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(d - this.r) < 26) {
+        // a frente da onda acabou de passar pelo alvo (e ele está dentro da área marcada)
+        if (d <= this.maxR && d <= this.r + 13 && d > this.r - 37) {
           this.hits.add(t);
           if (t.takeHit({ x: this.x, dmgMul: 1 }, { dmg: this.dmg, kb: 7, knockdown: true, launch: 7 })) g.onHit(null, t, { dmg: this.dmg, big: true });
         }
@@ -1290,11 +1459,14 @@
       }
     }
     drawGround(ctx, camX) {
-      const k = 1 - this.r / this.maxR, x = this.x - camX;
-      ctx.strokeStyle = 'rgba(255,230,180,' + (0.8 * k) + ')'; ctx.lineWidth = 10 * k + 3;
-      ctx.beginPath(); ctx.ellipse(x, this.y, this.r, this.r * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,80,40,' + (0.6 * k) + ')'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.ellipse(x, this.y, this.r - 10, (this.r - 10) * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      const r = Math.min(this.r, this.maxR), k = 1 - r / this.maxR, x = this.x - camX;
+      // borda vermelha da área total enquanto a onda viaja
+      ctx.strokeStyle = 'rgba(255,60,60,' + (0.35 + 0.3 * ((this.t >> 2) % 2)) + ')'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, this.y, this.maxR, this.maxR * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,230,180,' + (0.3 + 0.6 * k) + ')'; ctx.lineWidth = 12 * k + 5;
+      ctx.beginPath(); ctx.ellipse(x, this.y, r, r * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(120,80,40,' + (0.3 + 0.4 * k) + ')'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, this.y, Math.max(1, r - 12), Math.max(1, r - 12) * 0.38, 0, 0, Math.PI * 2); ctx.stroke();
     }
   }
   TT.Shockwave = Shockwave;
@@ -1393,8 +1565,8 @@
       this.t++;
       if (this.z > 0 || this.vz > 0) { this.vz -= 0.6; this.z += this.vz; if (this.z < 0) { this.z = 0; this.vz = 0; } }
       if (--this.life <= 0) this.remove = true;
-      const p = g.player;
-      if (p && !p.ko && this.t > 15 && Math.abs(p.x - this.x) < 44 && Math.abs(p.y - this.y) < 26 && p.z < 30) {
+      for (const p of g.heroes()) {
+        if (this.remove || !(this.t > 15 && Math.abs(p.x - this.x) < 44 && Math.abs(p.y - this.y) < 26 && p.z < 30)) continue;
         this.remove = true;
         A().play('pickup');
         if (this.kind === 'pizza') { p.hp = Math.min(p.maxHp, p.hp + 40); g.popText(p.x, p.y - 150, '+VIDA', '#ffe14a'); }

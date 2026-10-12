@@ -230,17 +230,44 @@
     addProjectile(p) { this.projectiles.push(p); }
     addEffect(e) { this.effects.push(e); }
     addPickup(p) { this.pickups.push(p); }
-    allFighters() { return this.enemies.concat([this.player]); }
+    allFighters() { return this.enemies.concat(this.heroes()); }
+    // Titãs em campo (não nocauteados) — alvos dos inimigos.
+    heroes() { const p = this.player; return p && !p.ko ? [p] : []; }
+    // Titã mais próximo de um inimigo (ou um aleatório, se random).
+    targetFor(f, random) {
+      const hs = this.heroes();
+      if (hs.length < 2) return hs[0] || null;
+      if (random) return TT.choice(hs);
+      let best = null, bd = 1e9;
+      for (const h of hs) { const d = Math.abs(h.x - f.x) + Math.abs(h.y - f.y) * 2; if (d < bd) { bd = d; best = h; } }
+      return best;
+    }
+    // Zonas de perigo ativas (avisos dos chefes, mísseis, pedras) — usadas pelo bot.
+    dangerZones() {
+      const out = [];
+      for (const e of this.enemies) {
+        const a = e.atk;
+        if (a && a.zones && e.state === 'attack' && a.t < a.def.s + a.def.a) for (const z of a.zones) out.push(z);
+      }
+      for (const p of this.projectiles) if (p.zone && p.team === 'enemy') out.push(p.zone);
+      for (const ef of this.effects) if (ef.zones) for (const z of ef.zones) out.push(z);
+      return out;
+    }
 
     meleeCheck(att, d, hits, a) {
       const hero = att.team === 'hero';
-      const targets = hero ? this.enemies.concat(this.props) : [this.player];
+      const targets = hero ? this.enemies.concat(this.props) : this.heroes();
       const depth = d.depth || 30, zr = d.zr || 80;
       for (const t of targets) {
         if (!t || t.dead || t.ko || hits.has(t)) continue;
-        const dx = (t.x - att.x) * att.facing;
-        if (dx < d.reach[0] - t.radius || dx > d.reach[1] + t.radius) continue;
-        if (Math.abs(t.y - att.y) > depth) continue;
+        if (d.zoneHit && a && a.zones) {
+          // a hitbox é a própria marcação no chão
+          if (!a.zones.some((z) => TT.zoneHas(z, t.x, t.y))) continue;
+        } else {
+          const dx = (t.x - att.x) * att.facing;
+          if (dx < d.reach[0] - t.radius || dx > d.reach[1] + t.radius) continue;
+          if (Math.abs(t.y - att.y) > depth) continue;
+        }
         if (Math.abs(t.z - att.z) > zr) continue;
         hits.add(t);
         if (t.takeHit(att, d, att.facing)) {
@@ -373,7 +400,7 @@
     }
     blast(x, y, radius, dmg, team, owner) {
       this.explosion(x, y, 10, radius / 90);
-      const targets = team === 'hero' ? this.enemies : [this.player];
+      const targets = team === 'hero' ? this.enemies : this.heroes();
       for (const t of targets) {
         if (!t || t.dead || t.ko) continue;
         const dx = (t.x - x) / radius, dy = (t.y - y) / (radius * 0.42);
@@ -381,6 +408,22 @@
         const d = { dmg, kb: 7, knockdown: true, launch: 7, big: true };
         if (t.takeHit(owner || { x, dmgMul: 1 }, d, TT.sign(t.x - x))) this.onHit(owner, t, d);
       }
+    }
+    // Impacto forte de golpe de chefe: clarão, tremor, partículas e onomatopeia.
+    impact(x, y, word, color, power) {
+      power = power || 1;
+      color = color || '#ff7a2a';
+      this.whiteFlash = Math.max(this.whiteFlash, Math.round(2 + 3 * power));
+      this.shake = Math.max(this.shake, 8 + 10 * power);
+      this.particles.spawn('ring', x, y, { size: 150 * power, color: '#fff3c0', life: 16, flat: 0.38 });
+      this.particles.spawn('glow', x, y - 50, { size: 170 * power, color, life: 12 });
+      const n = Math.round(12 * power);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, sp = TT.rand(5, 13) * power;
+        this.particles.spawn('spark', x, y - 40, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.7 - 3, color: TT.choice(['#fff6b0', color, '#ffffff']), size: 5, life: TT.randi(10, 18), grav: 0.25 });
+      }
+      this.dust(x, y, Math.round(8 * power), '#c9b9a8');
+      if (word) this.particles.spawn('text', x + TT.rand(-20, 20), y - 130, { text: word, size: Math.round(40 + 14 * Math.min(power, 1.4)), color: '#ffe14a', color2: color, vy: -0.5, life: 48, rot: TT.rand(-0.2, 0.2) });
     }
     popText(x, y, text, color, big) {
       this.particles.spawn('text', x, y, { text, size: big ? 38 : 26, color, vy: -0.8, life: 70 });
@@ -645,8 +688,9 @@
       for (const l of this.bg.layers) l.draw(ctx, camX);
       this.drawAmbient(ctx, camX);
 
-      // sombras e marcações no chão
+      // sombras e marcações no chão (avisos de ataque dos chefes)
       for (const e of this.effects) if (e.drawGround) e.drawGround(ctx, camX);
+      for (const e of this.enemies) if (e.drawGround) e.drawGround(ctx, camX);
       for (const p of this.projectiles) if (p.drawGround) p.drawGround(ctx, camX);
       const D = this.drawables; D.length = 0;
       if (this.state !== 'clear') D.push(this.player); // na tela de vitória a equipe é desenhada à parte
@@ -701,7 +745,7 @@
         const w = Math.max(80, ctx.measureText(b.text).width + 26);
         // mantém o balão inteiro dentro da tela (a ponta continua apontando para quem fala)
         const fx = f.x - camX, x = TT.clamp(fx, w / 2 + 10, W - w / 2 - 10);
-        const y = Math.max(150, f.y - f.z - (f.height || 120) - 34);
+        const y = Math.max(200, f.y - f.z - (f.height || 120) - 34);
         const pop = Math.min(1, b.t / 6);
         ctx.save(); ctx.translate(x, y); ctx.scale(pop, pop);
         const tail = TT.clamp(fx - x, -w / 2 + 14, w / 2 - 14);
@@ -801,9 +845,10 @@
       // barra do chefe
       const b = this.boss;
       if (b && !b.dead) {
+        // no alto da tela, para não esconder as marcações de perigo no chão
         const w = 640 * this.bossShown, x = W / 2 - 320;
-        TT.drawText(ctx, b.name, x, H - 58, 26, '#ff6a6a', OUT, 'left', 5);
-        this.drawBar(ctx, x, H - 42, w, 22, b.hp / b.maxHp, b.hp < b.maxHp * 0.5 ? '#ff3b30' : '#ff8a3a');
+        TT.drawText(ctx, b.name, x, 136, 24, '#ff6a6a', OUT, 'left', 5);
+        this.drawBar(ctx, x, 150, w, 18, b.hp / b.maxHp, b.hp < b.maxHp * 0.5 ? '#ff3b30' : '#ff8a3a');
       }
 
       // seta "SIGA"
