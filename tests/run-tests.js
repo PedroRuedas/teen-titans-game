@@ -52,7 +52,7 @@ async page => {
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
 
-  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 6) e ENTER começa nela
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 7) e ENTER começa nela
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
@@ -65,7 +65,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 6 no título e começar nela', pick.sel === 5 && /MUMBO/.test(pick.label) && pick.st === 'play' && pick.stage === 5, pick);
+  ok('menu: escolher a fase 7 no título e começar nela', pick.sel === 6 && /SLADE/.test(pick.label) && pick.st === 'play' && pick.stage === 6, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -163,6 +163,60 @@ async page => {
     return out;
   });
   for (const k in moves) ok('todos os golpes acertam: ' + k, Object.values(moves[k]).every((d) => d > 0), moves[k]);
+
+  // 3a) Golpes novos da fase 7: todos acertam e cada um dá mais dano que o golpe original
+  const plus = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {}, flags = {};
+    for (const st of [5, 6]) { TT.debug.start(st); flags[st] = g.team.every((t) => !!t.def.plus === (st === 6)); }
+    for (const st of [0, 6]) {
+      TT.debug.start(st); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true);
+        const p = g.player, res = {};
+        const tryMove = (name, seq) => {
+          g.enemies.length = 0; g.projectiles.length = 0; g.effects.length = 0;
+          p.atk = null; p.setState('idle'); p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0; p.invul = 0; p.facing = 1; p.y = 590;
+          const e = new TT.Enemy(g, 'slade', p.x + 70, p.y);
+          e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+          g.addEnemy(e); g.energy = 100;
+          for (const [a, n] of seq) { g.input.pressed.add(a); TT.debug.step(n); }
+          res[name] = Math.round(9999 - e.hp);
+        };
+        tryMove('leve', [['light', 30]]);
+        tryMove('combo', [['light', 10], ['light', 10], ['light', 40]]);
+        tryMove('forte', [['heavy', 70]]);
+        tryMove('especial', [['special', 110]]);
+        tryMove('aereo', [['jump', 8], ['light', 50]]);
+        tryMove('corrida', [['dash', 3], ['light', 45]]);
+        (out[p.key] = out[p.key] || {})[st] = res;
+      }
+    }
+    g.enemies.length = 0;
+    return { out, flags };
+  });
+  ok('golpes novos só a partir da fase 7', plus.flags[5] && plus.flags[6], plus.flags);
+  for (const k in plus.out) {
+    const a = plus.out[k][0], b = plus.out[k][6];
+    ok('golpes novos (fase 7) dão mais dano: ' + k, Object.keys(a).every((m) => b[m] > a[m]), { original: a, novo: b });
+  }
+
+  // 3a2) Disco congelante do Robin: o inimigo fica preso no gelo (parado) por bem mais tempo que um golpe comum
+  const ice = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(6); TT.debug.toSection(0); TT.debug.step(5);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    const p = g.player; p.facing = 1; p.y = 590; p.invul = 0;
+    g.enemies.length = 0;
+    const e = new TT.Enemy(g, 'hive', p.x + 200, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; g.addEnemy(e);
+    g.input.pressed.add('heavy');
+    let frozen = 0, maxFrozen = 0;
+    for (let t = 0; t < 140; t++) { g.step(); if (e.frozen > 0) { frozen++; maxFrozen = Math.max(maxFrozen, e.frozen); } }
+    g.enemies.length = 0;
+    return { frozen, maxFrozen, after: e.frozen };
+  });
+  ok('Robin (fase 7): disco congelante prende o inimigo no gelo', ice.frozen >= 60 && ice.after === 0, ice);
 
   // 3b) Nova forma do Mutano: rinoceronte no ataque em corrida (esquiva + ataque)
   const rhino = await ev(() => {
@@ -410,6 +464,54 @@ async page => {
     return out;
   });
   for (const k in s6) ok('fase 6: golpe ' + k + ' acerta após o aviso', s6[k].zone && s6[k].inside && s6[k].hitT >= s6[k].s, s6[k]);
+
+  // 4b4f) Inimigos da fase 7: estocada e giro do Comando do Slade e bola de fogo do Demônio acertam só depois do aviso
+  const s7 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['commando', 0, 160], ['commando', 1, 80], ['demon', 0, 150]]) {
+      TT.debug.start(6); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s7) ok('fase 7: golpe ' + k + ' acerta após o aviso', s7[k].zone && s7[k].inside && s7[k].hitT >= s7[k].s, s7[k]);
+
+  // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
+  //       na fase 2 chama comandos
+  const slade = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(6); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.leap);
+    let maxZ = 0;
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) { g.step(); maxZ = Math.max(maxZ, b.z); }
+    out.st = b.state; out.maxZ = Math.round(maxZ); out.z = b.z; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.commandos = g.enemies.filter((e) => e.kind === 'commando' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0;
+    return out;
+  });
+  ok('Slade: salto com o bastão e guarda aberta depois (parado, dano dobrado), depois se recupera', slade.st === 'open' && slade.maxZ > 200 && slade.z === 0 && slade.openDmg === slade.normal * 2 && slade.moved < 1 && slade.after !== 'open', slade);
+  ok('Slade: chama comandos na fase 2', slade.commandos === 2, slade);
   for (const k in s5) if (k !== 'armor') ok('fase 5: golpe ' + k + ' acerta após o aviso', s5[k].zone && s5[k].inside && s5[k].hitT >= s5[k].s, s5[k]);
   ok('fase 5: Mammoth não cai com golpe comum (super armadura)', s5.armor !== 'down' && s5.armor !== 'hurt', s5.armor);
 
@@ -427,7 +529,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 6 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 7 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -520,6 +622,16 @@ async page => {
       for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
       return { x: bb.x, y: bb.y };
     } }));
+    // Slade (fase 7)
+    C(6, 'combo', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 270, y: b.y }));
+    C(6, 'leap', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(6, 'fire', (b) => ({ x: b.x - 200, y: b.y }), (b) => ({ x: b.x - 420, y: b.y }));
+    C(6, 'bombs', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -540,7 +652,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 170000) {
+      while (g.state !== 'victory' && steps < 200000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -559,11 +671,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (6 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:5') && full.seen.includes('clear:5'), full);
+    ok('jogo completo (7 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:6') && full.seen.includes('clear:6'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4, 5]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);
@@ -759,16 +871,19 @@ async page => {
   ok('capa do Robin com física (pendurada parada, esvoaça correndo)', capeT.idleDrop > 40 && capeT.runTip < capeT.idleTip - 15, capeT);
   ok('rostos vetoriais dos 5 Titãs', capeT.faces === 5, capeT);
 
-  // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca)
+  // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca),
+  // com os golpes originais (fase 1) e os golpes novos (fase 7)
   const allFrames = await ev(() => {
     TT.paused = true; const g = TT.game; const before = (TT.errors || []).length;
-    TT.debug.start(0); TT.debug.god(true); TT.debug.toSection(1); TT.debug.step(60);
-    for (let i = 0; i < 5; i++) {
-      g.switchCool = 0; g.switchTo(i, true); TT.debug.step(20);
-      for (const seq of [['light', 'light', 'light'], ['heavy'], ['special'], ['jump', 'light'], ['dash', 'light']]) {
-        g.energy = 100;
-        for (const b of seq) { g.input.pressed.add(b); for (let f = 0; f < 14; f++) { g.step(); g.render(); } }
-        for (let f = 0; f < 90; f++) { g.step(); g.render(); }
+    for (const st of [0, 6]) {
+      TT.debug.start(st); TT.debug.god(true); TT.debug.toSection(1); TT.debug.step(60);
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true); TT.debug.step(20);
+        for (const seq of [['light', 'light', 'light'], ['heavy'], ['special'], ['jump', 'light'], ['dash', 'light']]) {
+          g.energy = 100;
+          for (const b of seq) { g.input.pressed.add(b); for (let f = 0; f < 14; f++) { g.step(); g.render(); } }
+          for (let f = 0; f < 90; f++) { g.step(); g.render(); }
+        }
       }
     }
     TT.debug.god(false);

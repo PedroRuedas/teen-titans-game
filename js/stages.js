@@ -97,5 +97,23 @@
         { type: 'boss', camX: 6000, boss: 'mumbo', intro: 'O mágico do mal' },
       ],
     },
+    {
+      // Daqui em diante os Titãs usam os golpes novos (powerUp).
+      id: 7,
+      name: 'FASE 7 — O COVIL DO SLADE',
+      subtitle: 'Slade voltou com o fogo de Trigon. Hora dos golpes mais fortes!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'slade',
+      powerUp: true,
+      crates: [[1150, 620, 'pizza'], [2350, 560, 'energy'], [3650, 640, 'pizza'], [4950, 560, 'energy'], [5500, 620, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['slade', 'slade', 'demon'], ['commando', 'slade', 'slade']] },
+        { type: 'arena', camX: 1500, waves: [['demon', 'commando', 'slade'], ['demon', 'demon', 'slade', 'slade']] },
+        { type: 'arena', camX: 2950, waves: [['commando', 'commando', 'slade', 'slade'], ['demon', 'commando', 'demon', 'slade']] },
+        { type: 'arena', camX: 4300, waves: [['commando', 'demon', 'slade', 'slade'], ['commando', 'commando', 'demon', 'demon', 'slade']] },
+        { type: 'boss', camX: 6000, boss: 'slade', intro: 'O mestre do crime de Jump City' },
+      ],
+    },
   ];
 })();

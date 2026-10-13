@@ -221,6 +221,7 @@
       this.st++; this.animT++;
       if (this.flash > 0) this.flash--;
       if (this.invul > 0) this.invul--;
+      if (this.frozen > 0 && (--this.frozen === 0 || this.state !== 'hurt')) this.frozen = 0;
       this.x += this.vx;
       this.y += this.vy;
       if (this.z > 0 || this.vz !== 0) {
@@ -251,9 +252,23 @@
       TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3 || blink, t: this.animT });
       if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', sx + this.facing * 26, sy - 78, 16 + 22 * tell, 0.35 + 0.5 * tell);
       ctx.globalAlpha = 1;
+      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen);
     }
   }
   TT.Fighter = Fighter;
+
+  // Bloco de gelo do disco congelante do Robin (k = quadros restantes; racha e some no fim).
+  function drawIce(ctx, x, y, h, k) {
+    const a = Math.min(1, k / 12), w = 34, top = y - Math.min(h, 140) - 10;
+    ctx.save(); ctx.globalAlpha = 0.6 * a;
+    ctx.beginPath(); ctx.moveTo(x - w, y + 4); ctx.lineTo(x - w - 6, top + 26); ctx.lineTo(x - w * 0.4, top); ctx.lineTo(x + w * 0.5, top + 8); ctx.lineTo(x + w + 6, top + 34); ctx.lineTo(x + w, y + 4); ctx.closePath();
+    ctx.fillStyle = '#bfefff'; ctx.fill();
+    ctx.globalAlpha = 0.95 * a; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - w * 0.5, top + 20); ctx.lineTo(x - w * 0.2, top + 60); ctx.moveTo(x + w * 0.3, top + 30); ctx.lineTo(x + w * 0.6, top + 52); ctx.stroke();
+    if (k < 20) { ctx.beginPath(); ctx.moveTo(x - 10, top + 10); ctx.lineTo(x + 4, top + 50); ctx.lineTo(x - 6, top + 80); ctx.stroke(); } // rachando
+    ctx.restore();
+  }
 
   // ================================================================ Titãs
   const GREEN = '#5dff8a', DARK = '#a77bff', SONIC = '#5fc2ff';
@@ -280,15 +295,16 @@
     return R && R.fy != null ? TT.clamp(f.y - f.z - R.fy, 25, 140) : fb;
   }
 
-  function spawnBolt(f, g, big) {
+  // vy = desvio lateral (dois tiros em leque); extra = campos que substituem os padrões (golpes novos).
+  function spawnBolt(f, g, big, vy, extra) {
     // no chão sai da mão; no ar sai um pouco acima e desce na diagonal até a altura do peito dos inimigos
     const z0 = f.z > 0 ? f.z + Math.min(handZ(f, 62), 45) : handZ(f, 62);
-    g.addProjectile(new Projectile(g, {
+    g.addProjectile(new Projectile(g, Object.assign({
       kind: big ? 'bigbolt' : 'starbolt', team: 'hero', owner: f,
-      x: f.x + f.facing * 48, y: f.y, z: z0, vx: f.facing * (big ? 11 : 13),
+      x: f.x + f.facing * 48, y: f.y, z: z0, vx: f.facing * (big ? 11 : 13), vy: vy || 0,
       r: big ? 24 : 14, dmg: big ? 17 : 8, kb: big ? 8 : 3, knockdown: big, launch: 6, life: 70, color: GREEN,
       vz: f.z > 0 ? -(z0 - 60) / 6 : 0, minZ: 55, trailN: big ? 9 : 6, // no ar: tiro diagonal para baixo
-    }));
+    }, extra)));
     A().play('starbolt');
   }
 
@@ -484,9 +500,175 @@
   TT.TITANS = TITANS;
   TT.TITAN_ORDER = ['robin', 'beastboy', 'cyborg', 'raven', 'starfire'];
 
+  // ---------------------------------------------------------------- Golpes novos (a partir da fase 7)
+  // Os Titãs liberam os golpes mais fortes da série: mais dano e ataques novos.
+  const ICE = '#9fe8ff', FIRE = '#ff7a1a';
+  const boost = (d, k, o) => Object.assign({}, d, { dmg: d.dmg ? Math.round(d.dmg * k) : d.dmg }, o);
+  // Projétil de herói que explode ao acertar (ou no fim do alcance): blastR/blastDmg.
+  const heroShot = (f, g, o) => g.addProjectile(new Projectile(g, Object.assign({ team: 'hero', owner: f, x: f.x + f.facing * 44, y: f.y, life: 70 }, o)));
+  // Starbolt que cai do céu num ponto do chão e explode.
+  function fallingBolt(f, g, x, y, delay) {
+    const T = 16;
+    g.addProjectile(new Projectile(g, {
+      kind: 'starbolt', team: 'hero', owner: f, x: x - f.facing * 90, y, z: 420 + delay * 6, vx: f.facing * 90 / T, vz: -(420 + delay * 6) / T,
+      r: 16, dmg: 0, blastDmg: 16, explodeOnGround: 78, blastColor: GREEN, life: 60, trailN: 8,
+    }));
+  }
+  const PLUS = {
+    robin: {
+      dashAtk: boost(TITANS.robin.dashAtk, 1.45),
+      light: [
+        boost(TITANS.robin.light[0], 1.5),
+        boost(TITANS.robin.light[1], 1.45),
+        { // bastão elétrico: a pancada solta uma descarga no chão
+          anim: 'robinSlam', smear: 'slam', weapon: 'staff', s: 9, a: 4, r: 14, dmg: 21, reach: [0, 130], depth: 40, kb: 8, knockdown: true, launch: 8, big: true, sound0: 'whoosh', sound: 'zap',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            const x = f.x + f.facing * 86;
+            g.groundRing(x, f.y, ICE); g.shake = Math.max(g.shake, 9);
+            for (let i = 0; i < 4; i++) g.particles.spawn('spark', x + TT.rand(-30, 30), f.y - TT.rand(10, 70), { vx: TT.rand(-6, 6), vy: TT.rand(-7, -1), color: TT.choice([ICE, '#ffffff']), size: 4, life: 14 });
+            g.particles.spawn('text', x, f.y - 150, { text: 'ZZAP!', size: 38, color: '#e0f8ff', color2: '#2a7bff', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+          },
+        },
+      ],
+      // disco congelante: atravessa a fila e congela os inimigos no lugar
+      heavy: {
+        anim: 'robinThrow', s: 14, a: 1, r: 16, shout: 'Disco congelante!', shoutColor: ICE,
+        onFrame(f, t, g) {
+          if (t !== this.s) return;
+          heroShot(f, g, { kind: 'icedisk', x: f.x + f.facing * 40, z: f.z + handZ(f, 70), vx: f.facing * 13, r: 18, dmg: 17, kb: 1, stun: 85, freeze: true, pierce: true, life: 80, trailN: 8 });
+          A().play('birdarang');
+        },
+      },
+      air: boost(TITANS.robin.air, 1.45),
+      // discos explosivos: três discos que explodem no primeiro inimigo que tocam
+      special: {
+        cost: 25, anim: 'robinThrow', s: 14, a: 1, r: 14, shout: 'Discos explosivos!',
+        onFrame(f, t, g) {
+          if (t !== this.s) return;
+          const hz = handZ(f, 70);
+          for (const dy of [-40, 0, 40]) heroShot(f, g, { kind: 'bombdisk', x: f.x + f.facing * 40, z: f.z + hz, vx: f.facing * 13, vy: dy / 22, r: 15, dmg: 12, kb: 5, knockdown: true, launch: 6, blastR: 90, blastDmg: 12, blastEnd: true, life: 60, trailN: 7 });
+          A().play('birdarang');
+        },
+      },
+    },
+    starfire: {
+      dashAtk: boost(TITANS.starfire.dashAtk, 1.45),
+      light: [
+        boost(TITANS.starfire.light[0], 1.5),
+        boost(TITANS.starfire.light[1], 1.45),
+        // dois starbolts de uma vez (um de cada mão)
+        { anim: 'sfBolt', hands: 'open', s: 8, a: 1, r: 13, onFrame(f, t, g) { if (t === this.s) { spawnBolt(f, g, false, -1.2, { dmg: 10 }); spawnBolt(f, g, false, 1.2, { dmg: 10 }); } } },
+      ],
+      // starbolt gigante: explode no impacto
+      heavy: {
+        anim: 'sfCharge', hands: 'open', s: 15, a: 1, r: 16, shout: 'Starbolt gigante!', shoutColor: GREEN,
+        onFrame(f, t, g) {
+          if (t === this.s) spawnBolt(f, g, true, 0, { r: 32, dmg: 24, blastR: 110, blastDmg: 14, blastColor: GREEN });
+          if (t < this.s && t % 2 === 0) g.particles.spawn('glow', f.x + f.facing * 46 + TT.rand(-26, 26), f.y - f.z - 92 + TT.rand(-26, 26), { color: GREEN, size: 18, life: 10, vx: -f.facing * 1.5 });
+        },
+      },
+      air: { anim: 'sfAir', hands: 'open', s: 5, a: 1, r: 12, onFrame(f, t, g) { if (t === this.s) { spawnBolt(f, g, false, -1, { dmg: 10 }); spawnBolt(f, g, false, 1, { dmg: 10 }); } } },
+      // chuva de starbolts: sobe e faz chover estrelas em cima de cada inimigo da tela
+      special: {
+        anim: 'sfRain', hands: 'open', cost: 30, s: 16, a: 30, r: 16, shout: 'Chuva de starbolts!', shoutColor: GREEN, sound0: 'super',
+        onFrame(f, t, g) {
+          if (t < this.s || t >= this.s + this.a || (t - this.s) % 3 !== 0) return;
+          const k = (t - this.s) / 3, foes = g.enemies.filter((e) => !e.dead && Math.abs(e.x - g.camX - TT.W / 2) < TT.W / 2 + 20);
+          let x, y;
+          if (foes.length && k % 2 === 0) { const e = foes[(k / 2) % foes.length]; x = e.x + TT.rand(-20, 20); y = e.y + TT.rand(-8, 8); }
+          else { x = f.x + f.facing * TT.rand(80, 620); y = TT.clamp(f.y + TT.rand(-90, 90), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4); }
+          fallingBolt(f, g, x, y, k % 3);
+          A().play('starbolt');
+        },
+      },
+    },
+    cyborg: {
+      dashAtk: boost(TITANS.cyborg.dashAtk, 1.4),
+      light: [
+        boost(TITANS.cyborg.light[0], 1.4),
+        boost(TITANS.cyborg.light[1], 1.35),
+        boost(TITANS.cyborg.light[2], 1.45, { reach: [10, 200], depth: 56 }),
+      ],
+      // mísseis do ombro: três mísseis que explodem no impacto
+      heavy: {
+        anim: 'cyMissiles', s: 12, a: 12, r: 14, shout: 'Mísseis!', shoutColor: SONIC,
+        onFrame(f, t, g) {
+          if (t < this.s || (t - this.s) % 5 !== 0 || t > this.s + 10) return;
+          const i = (t - this.s) / 5;
+          heroShot(f, g, { kind: 'heroMissile', x: f.x - f.facing * 6, z: f.z + 150, vx: f.facing * 6, vz: 5 - i * 2.5, grav: 0.32, vy: (i - 1) * 0.9,
+            r: 16, dmg: 7, kb: 4, blastR: 85, blastDmg: 8, blastEnd: true, homing: true, minZ: 40, life: 70, trailN: 8 });
+          A().play('whoosh');
+        },
+      },
+      air: boost(TITANS.cyborg.air, 1.4),
+      // canhão sônico no máximo: feixe mais largo e mais forte
+      special: boost(TITANS.cyborg.special, 1.6, { wide: 1.6, depth: 52, shout: 'BOOYAH! Potência máxima!' }),
+    },
+    raven: {
+      dashAtk: boost(TITANS.raven.dashAtk, 1.4),
+      light: [boost(TITANS.raven.light[0], 1.5), boost(TITANS.raven.light[1], 1.45), boost(TITANS.raven.light[2], 1.4)],
+      // telecinese: arranca um pedaço do chão envolto em energia negra e arremessa
+      heavy: {
+        anim: 'rvHeavy', hands: 'open', s: 11, a: 1, r: 18, shout: 'Telecinese!', shoutColor: '#c8a8ff',
+        onFrame(f, t, g) {
+          if (t === 2) g.debrisBurst(f.x + f.facing * 40, f.y - 10, 5, '#5a5060');
+          if (t !== this.s) return;
+          heroShot(f, g, { kind: 'tkRock', x: f.x + f.facing * 50, z: f.z + handZ(f, 70) + 20, vx: f.facing * 10.5, r: 32, dmg: 22, kb: 8, knockdown: true, launch: 8, blastR: 95, blastDmg: 10, blastColor: DARK, life: 80, trailN: 8 });
+          A().play('dark');
+        },
+      },
+      air: boost(TITANS.raven.air, 1.4),
+      // "Azarath Metrion Zinthos!": tentáculos de sombra saem do chão embaixo de todos os inimigos
+      special: {
+        anim: 'rvSpecial', hands: 'open', cost: 40, s: 20, a: 1, r: 26, shout: 'Azarath Metrion Zinthos!', shoutColor: '#c8a8ff',
+        onFrame(f, t, g) {
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 30, vr: 0.1 });
+          if (t === this.s) { g.addEffect(new ShadowTendrils(g, f)); A().play('dark'); g.shake = 12; }
+        },
+      },
+    },
+    beastboy: {
+      dashAtk: boost(TITANS.beastboy.dashAtk, 1.4),
+      light: [boost(TITANS.beastboy.light[0], 1.5), boost(TITANS.beastboy.light[1], 1.45), boost(TITANS.beastboy.light[2], 1.4)],
+      finishers: TITANS.beastboy.finishers.map((d) => boost(d, 1.45)),
+      // elefante: fica de pé nas patas de trás e pisa com tudo (onda no chão)
+      heavy: {
+        form: 'elephant', pose: 'slam', s: 18, a: 5, r: 18, dmg: 28, reach: [-60, 190], depth: 70, knockdown: true, launch: 9, kb: 10, big: true, shout: 'Elefante!', shoutColor: '#8fd463',
+        onFrame(f, t, g) {
+          if (t === 1) { morphIn(f, g, 70); A().play('roar'); }
+          if (t === this.s) {
+            const x = f.x + f.facing * 90;
+            g.shake = 16; g.groundRing(x, f.y, '#8dff5a'); g.particles.spawn('ring', x, f.y, { size: 210, color: '#d6ffc0', life: 20, flat: 0.35 });
+            g.debrisBurst(x, f.y - 10, 10, '#8e8880'); A().play('shockwave');
+            g.particles.spawn('text', x, f.y - 170, { text: 'TROMP!', size: 44, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 36, rot: TT.rand(-0.2, 0.2) });
+          }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 70, true);
+        },
+      },
+      air: boost(TITANS.beastboy.air, 1.45),
+      // A Fera (episódio "A Fera Interior"): avança dando uma sequência de garradas
+      special: {
+        cost: 35, form: 'beast', pose: 'claw', s: 12, a: 44, r: 14, lunge: 2.4, dmg: 14, rehit: 8, reach: [0, 160], depth: 58, kb: 3, stun: 22, big: true, // atordoa a cada garrada (todas acertam)
+        shout: 'GRRRAAAAH!', shoutColor: '#8fd463', sound0: 'roar',
+        onFrame(f, t, g) {
+          if (t === 1) morphIn(f, g, 80);
+          if (t >= this.s && t < this.s + this.a && (t - this.s) % 8 === 0) {
+            A().play('whoosh');
+            g.particles.spawn('text', f.x + f.facing * 120, f.y - 160 + TT.rand(-20, 20), { text: TT.choice(['SLASH!', 'RAAR!', 'SHRAK!']), size: 32, color: '#d6ffc0', color2: '#2b6418', vy: -0.6, life: 24, rot: TT.rand(-0.3, 0.3) });
+          }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 80, true);
+        },
+      },
+    },
+  };
+  // Definição completa de cada Titã com os golpes novos (o resto — vida, velocidade, cores — é igual).
+  TT.TITANS_PLUS = {};
+  for (const k in TITANS) TT.TITANS_PLUS[k] = Object.assign({}, TITANS[k], PLUS[k], { plus: true });
+
   const BUFFERED = ['light', 'heavy', 'special', 'jump', 'dash'];
   // Formas animais do Mutano: nome da função de desenho em render.js.
-  const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam' };
+  const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam', elephant: 'drawElephant', beast: 'drawBeast' };
 
   class Titan extends Fighter {
     constructor(game, key) {
@@ -510,6 +692,9 @@
       this.dmgMul = 1;
       if (this.def.floaty) this.grav = TT.GRAVITY * 0.72;
     }
+
+    // Golpes novos (fase 7 em diante) ou os originais.
+    setPower(on) { this.def = (on ? TT.TITANS_PLUS : TITANS)[this.key]; this.combo = 0; this.comboWindow = 0; }
 
     reset() {
       this.hp = this.maxHp; this.ko = false; this.dead = false; this.atk = null;
@@ -808,7 +993,7 @@
       const k = a.t - d.s, fade = TT.clamp((d.a - k) / 6, 0, 1), grow = Math.min(1, (k + 1) / 4);
       const L = len * grow;
       if (fade <= 0) return; // feixe já terminou (evita raios negativos no canvas)
-      const w = (eyes ? 13 : 46) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
+      const w = (eyes ? 13 : 46) * (d.wide || 1) * (0.85 + Math.sin(k * 0.9) * 0.15) * fade;
       const col = eyes ? GREEN : SONIC;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -966,6 +1151,32 @@
       { pose: 'jab', s: 20, a: 8, r: 20, lunge: 7, dmg: 9, reach: [0, 76], depth: 30, kb: 4, sound0: 'jump' },
       { pose: 'jab', s: 30, a: 4, r: 26, dmg: 12, zoneHit: true, knockdown: true, launch: 5, kb: 6, sound0: 'jump', sound: 'land',
         zone(f) { return [{ k: 'ell', x: f.x + f.facing * 60, y: f.y, rx: 110, ry: 44 }]; } },
+    ],
+  };
+  // Comando do Slade (fase 7): robô de elite com bastão; estocada em investida (faixa marcada) e giro do bastão (círculo).
+  ENEMIES.commando = {
+    name: 'Comando do Slade', style: 'commando', hp: 80, speed: 3.0, range: 150, score: 220, aggr: 1.2,
+    attacks: [
+      { pose: 'jab', weapon: 'staff', s: 20, a: 9, r: 18, lunge: 10, dmg: 12, reach: [0, 100], depth: 26, kb: 6, sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 220, y: f.y, d: 26 }]; } },
+      { pose: 'spin', weapon: 'staff', s: 22, a: 10, r: 20, dmg: 11, zoneHit: true, knockdown: true, launch: 6, kb: 7, sound0: 'whoosh',
+        zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 125, ry: 48 }]; },
+        onFrame(f, t) { if (t >= this.s && t < this.s + this.a && t % 3 === 0) f.facing *= -1; } }, // gira o bastão
+    ],
+  };
+  // Demônio de Fogo (fase 7): criatura de pedra e lava de Trigon; bola de fogo no círculo marcado e garrada de perto.
+  ENEMIES.demon = {
+    name: 'Demônio de Fogo', style: 'demon', hp: 64, speed: 2.6, range: 150, score: 200, aggr: 1.1,
+    attacks: [
+      { pose: 'throw', s: 28, a: 4, r: 22, dmg: 12, zoneHit: true, knockdown: true, launch: 6, kb: 6, fire: true, sound0: 'roar',
+        zone(f) { return [{ k: 'ell', x: f.x + f.facing * 150, y: f.y, rx: 82, ry: 34 }]; },
+        onFrame(f, t, g, a) {
+          if (t !== this.s || !a.zones) return;
+          const z = a.zones[0];
+          g.explosion(z.x, z.y, 10, 0.8, FIRE);
+          g.particles.spawn('text', z.x, z.y - 140, { text: 'FWOOSH!', size: 34, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+        } },
+      { pose: 'claw', s: 16, a: 5, r: 18, lunge: 6, dmg: 10, reach: [0, 82], kb: 4, sound0: 'whoosh', fire: true },
     ],
   };
   TT.ENEMIES = ENEMIES;
@@ -1463,6 +1674,58 @@
     }
   }
   TT.CardSoldier = CardSoldier;
+
+  // Comando do Slade (fase 7): mesma tática de bate e recua, sempre com o bastão na mão.
+  class SladeCommando extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'commando'); }
+    draw(ctx, camX) { Fighter.prototype.draw.call(this, ctx, camX); }
+  }
+  TT.SladeCommando = SladeCommando;
+
+  // Labareda cartoon (cabeça dos demônios, fogo de Trigon). s = altura.
+  function drawFlame(ctx, x, y, s, t, seed) {
+    const w = Math.sin(t * 0.3 + seed) * s * 0.12;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const [col, k] of [['rgba(255,90,20,0.85)', 1], ['rgba(255,190,60,0.9)', 0.62], ['rgba(255,250,200,0.95)', 0.3]]) {
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.32 * k, y);
+      ctx.quadraticCurveTo(x - s * 0.4 * k, y - s * 0.5 * k, x + w, y - s * k);
+      ctx.quadraticCurveTo(x + s * 0.4 * k, y - s * 0.45 * k, x + s * 0.32 * k, y);
+      ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+    }
+    ctx.restore();
+  }
+  TT.drawFlame = drawFlame;
+
+  // Demônio de Fogo (fase 7): corpo de rocha com rachaduras de lava e a cabeça em chamas.
+  class FireDemon extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'demon'); this.seed = Math.random() * 6; }
+    die(dir, d) {
+      super.die(dir, d);
+      for (let i = 0; i < 10; i++) this.game.particles.spawn('spark', this.x + TT.rand(-20, 20), this.y - TT.rand(20, 110), { vx: TT.rand(-4, 4), vy: TT.rand(-6, -1), color: TT.choice(['#ff7a1a', '#ffd23a', '#ffffff']), size: 4, life: 20, grav: 0.15 });
+    }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, x = this.x - camX, y = this.y - this.z;
+      // chamas saindo da cabeça e brilho das rachaduras
+      const hx = x + this.facing * 4, hy = y - this.height + 6;
+      TT.drawGlow(ctx, FIRE, hx, hy - 10, 60, 0.55);
+      drawFlame(ctx, hx - this.facing * 6, hy - 6, 46, t, this.seed);
+      // bola de fogo: cresce na mão e cai no círculo marcado no fim do aviso
+      const a = this.atk;
+      if (a && a.def === this.def.attacks[0] && this.state === 'attack' && a.zones) {
+        const d = a.def, z = a.zones[0];
+        if (a.t < d.s - 10) TT.drawGlow(ctx, FIRE, x + this.facing * 30, y - 130, 14 + 20 * (a.t / d.s), 1);
+        else if (a.t < d.s) {
+          const u = (a.t - (d.s - 10)) / 10, fx = z.x - camX + (1 - u) * -this.facing * 40, fy = z.y - 320 * (1 - u);
+          TT.drawGlow(ctx, FIRE, fx, fy, 46, 1);
+          drawFlame(ctx, fx, fy + 18, 50, t, 1);
+        }
+      }
+    }
+  }
+  TT.FireDemon = FireDemon;
 
   // Raio em zigue-zague entre dois pontos (para efeitos elétricos).
   function drawArc(ctx, x0, y0, x1, y1, col, w, segs) {
@@ -3008,6 +3271,206 @@
   }
   TT.Mumbo = Mumbo;
 
+  // ---- Slade: o mestre do crime de Jump City (fase 7), agora com o fogo de Trigon
+  // Fraqueza: depois do salto com o bastão ele aterrissa de joelho — guarda aberta, leva dano dobrado.
+  class Slade extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'SLADE';
+      this.style = TT.STYLES.sladeBoss;
+      this.hp = this.maxHp = 3000; // mais vida que os outros chefes: os Titãs já usam os golpes novos
+      this.radius = 40; this.height = 220; this.shadowW = 54;
+      this.poiseMax = 170;
+      this.def = { score: 12000 };
+      this.openT = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0;
+      this.out = {};
+      this.taunts = ['Previsível.', 'Vocês ainda têm muito a aprender.', 'Robin... sempre um passo atrás.', 'Eu já previ cada movimento seu.'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      this.ATK = {
+        // sequência de bastão: três pancadas no arco à frente
+        combo: { pose: 'swipe', weapon: 'staff', s: 26, a: 15, r: 22, rehit: 5, dmg: 7, kb: 3, stun: 14, zoneHit: true, color: '#ff7a1a', sound0: 'whoosh',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 200, ry: 60, f: f.facing }]; },
+          onFrame(f, t, g) {
+            if (t < this.s || t >= this.s + this.a || (t - this.s) % 5 !== 0) return;
+            A().play('whoosh');
+            g.particles.spawn('text', f.x + f.facing * 120, f.y - 170 + TT.rand(-20, 20), { text: TT.choice(['WHAK!', 'THWAK!', 'KRAK!']), size: 30, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 22, rot: TT.rand(-0.3, 0.3) });
+          } },
+        // bombas de disco: caem nos círculos marcados (um em cima de cada Titã) e explodem
+        bombs: { pose: 'throw', s: 34, a: 1, r: 24, color: '#ffae3a',
+          zone(f, g) {
+            const zs = [], hs = g.heroes(), n = f.phase2() ? 4 : 3, R = 80;
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: R, ry: R * 0.42 });
+            let guard = 0;
+            while (zs.length < n && guard++ < 30) {
+              const tp = groundTarget(g, TT.choice(hs) || f, 360, 110);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 2 * R || Math.abs(z.y - tp.y) > R)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: R, ry: R * 0.42 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t !== this.s) return;
+            a.zones.forEach((z, i) => {
+              const T = 30 + i * 6, z0 = 200, gr = 0.6, x0 = f.x + f.facing * 30;
+              g.addProjectile(new Projectile(g, {
+                kind: 'sladeBomb', team: 'enemy', owner: f, x: x0, y: f.y, z: z0,
+                vx: (z.x - x0) / T, vy: (z.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
+                r: 20, dmg: 0, blastDmg: 13, life: 120, explodeOnGround: z.rx, zone: z, flight: T, impactWord: 'BOOM!',
+              }));
+            });
+            a.zones = null; // daqui em diante cada bomba desenha o seu alvo
+            A().play('whoosh');
+          } },
+        // salto com o bastão: o círculo segue o Titã até a metade do aviso; ele salta e cai em cima (depois fica de joelho)
+        leap: { pose: 'bigSlam', weapon: 'staff', s: 50, a: 6, r: 10, dmg: 17, knockdown: true, launch: 9, kb: 7, zoneHit: true, color: '#ff3b30',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = clampX(g, p.x, 70); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = clampX(g, f.x + f.facing * 300, 70); a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 105, ry: 42 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
+            const half = Math.round(this.s * 0.5), z = a.zones[0];
+            if (t < half) a.zones = [this.aim(f, g, a)];
+            if (t === 2) g.say(f, 'Previsível.', '#ffb070');
+            if (t === half) { a.x0 = f.x; a.y0 = f.y; A().play('jump'); g.dust(f.x, f.y, 8, '#c9b9a8'); }
+            if (t >= half && t <= this.s) {
+              const u = (t - half) / (this.s - half);
+              f.grav = 0; f.vx = f.vy = f.vz = 0;
+              f.x = TT.lerp(a.x0, z.x, u); f.y = TT.lerp(a.y0, z.y, u); f.z = Math.sin(u * Math.PI) * 360;
+            }
+            if (t === this.s) { f.z = 0; f.grav = TT.GRAVITY; g.impact(z.x, z.y, 'KRAK!', '#ff7a1a', 1.2); A().play('boom'); }
+            if (t === this.s + this.a + this.r - 1) f.openGuard();
+          } },
+        // (fase 2) fogo de Trigon: anel de chamas em volta dele (fique colado nele ou bem longe)
+        fire: { pose: 'castUp', s: 40, a: 10, r: 24, dmg: 14, knockdown: true, launch: 8, kb: 6, zoneHit: true, fire: true, color: '#ff4a1a', sound0: 'dark', sound: 'boom',
+          zone(f) { return [{ k: 'ring', x: f.x, y: f.y, r0: 95, r1: 290, ry: 0.4 }]; },
+          onFrame(f, t, g) {
+            if (t === this.s) { g.shake = Math.max(g.shake, 14); g.particles.spawn('text', f.x, f.y - 290, { text: 'FWOOOSH!', size: 44, color: '#ffe14a', color2: '#c4300a', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) }); }
+          } },
+        // (fase 2) chama dois comandos
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#ff7a1a',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Comandos... acabem com eles.', '#ffb070');
+            for (const side of [-1, 1]) {
+              const e = new SladeCommando(g, side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 50; g.addEnemy(e);
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('alarm');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    // Guarda aberta = dano dobrado.
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    openGuard() {
+      this.atk = null; this.grav = TT.GRAVITY; this.z = 0;
+      this.setState('open'); this.setAnim('hurt');
+      this.openT = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.game.say(this, 'Hmpf... impressionante.', '#ffb070');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return; // não interrompe a fraqueza
+      super.onArmorHit(dmg, d);
+    }
+    die(dir, d) { this.grav = TT.GRAVITY; super.die(dir, d); }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (--this.openT <= 0) { this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25; }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'Trigon me deu um novo poder. Vejam!', '#ff7a1a');
+        g.impact(this.x, this.y, 'FOGO!', '#ff4a1a', 1.1);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 190), p.y, p2 ? 2.8 : 2.2);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o salto com o bastão (e a guarda aberta logo depois)
+        if (this.atkCount % 3 === 2) pick = 'leap';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = ['bombs'];
+          if (adx < 250 && Math.abs(dy) < 50) opts.push('combo', 'combo');
+          if (p2) opts.push('fire', 'fire');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(36, 64) : this.nextCool(60, 95);
+        if (pick !== 'leap' && Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ffb070');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      this.pose.weapon = 'staff'; // sempre com o bastão
+      const open = this.state === 'open';
+      if (open) { this.pose.lean = 0.45; this.pose.bob = 26; this.pose.tilt = 0.2; this.pose.legF = [1.45, 0.1]; this.pose.legB = [-0.2, -1.6]; this.pose.armF = [0.6, 0.2]; }
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z, p2 = this.phase2();
+      ctx.save(); ctx.globalAlpha = al;
+      // aura de fogo de Trigon na fase 2 (e brilho do olho durante a apresentação)
+      if (p2 && this.state !== 'dying') TT.drawGlow(ctx, '#ff4a1a', x, y - 110, 130 + Math.sin(t * 0.15) * 14, 0.4);
+      if (al < 1 && this.out.hx != null) TT.drawGlow(ctx, '#ff7a1a', this.out.hx, this.out.hy, 30, 1 - al * 0.5);
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      // chamas nos ombros na fase 2
+      if (p2 && this.out.hx != null && this.state !== 'dying') {
+        drawFlame(ctx, this.out.hx - this.facing * 30, this.out.hy + 40, 38, t, 0);
+        drawFlame(ctx, this.out.hx + this.facing * 18, this.out.hy + 44, 30, t, 2);
+      }
+      // bastão girando durante a sequência (rastro laranja)
+      if (d === this.ATK.combo && a.t >= d.s && a.t < d.s + d.a + 3 && this.out.fx != null) {
+        const u = ((a.t - d.s) % 5) / 5;
+        ctx.save(); ctx.globalAlpha = al * (1 - u) * 0.8; ctx.strokeStyle = '#ffb070'; ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.ellipse(x + this.facing * 60, y - 110, 150, 70, 0, this.facing > 0 ? -1.3 : Math.PI - 1.3, this.facing > 0 ? 1.3 : Math.PI + 1.3); ctx.stroke();
+        ctx.restore();
+      }
+      // bomba de disco piscando na mão durante a preparação
+      if (d === this.ATK.bombs && k >= 0 && this.out.fx != null && (a.t >> 2) % 2 === 0) TT.drawGlow(ctx, '#ff7a1a', this.out.fx, this.out.fy, 18 + 14 * k, 1);
+      // anel de chamas
+      if (d === this.ATK.fire && a.zones && a.t >= d.s && a.t < d.s + d.a + 8) {
+        const z = a.zones[0], u = Math.min(1, (a.t - d.s) / 4), fade = a.t > d.s + d.a ? 1 - (a.t - d.s - d.a) / 8 : 1;
+        ctx.save(); ctx.globalAlpha = al * fade;
+        for (let i = 0; i < 20; i++) {
+          const ang = i / 20 * Math.PI * 2, r = (z.r0 + z.r1) / 2 + Math.sin(i * 2.3) * (z.r1 - z.r0) * 0.3;
+          drawFlame(ctx, z.x - camX + Math.cos(ang) * r, z.y + Math.sin(ang) * r * z.ry, 90 * u, t, i);
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 10);
+      if (open) {
+        Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height + 40);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'GUARDA ABERTA! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#ffd0a0', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.Slade = Slade;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -3093,14 +3556,15 @@
         tr.push(this.x, this.y - this.z);
         if (tr.length > this.trailN * 2) tr.splice(0, 2);
       }
+      if (this.homing && this.t > 5) this.steer(g);
       this.x += this.vx; this.y += this.vy;
       this.vz -= this.grav; this.z += this.vz;
       if (this.minZ != null && this.z < this.minZ) { this.z = this.minZ; this.vz = 0; }
       this.spin += 0.5;
-      if (--this.life <= 0) this.remove = true;
+      if (--this.life <= 0) { this.remove = true; if (this.blastEnd) this.explode(); return; }
       if (this.explodeOnGround && this.z <= 0) {
         this.z = 0; this.remove = true;
-        g.blast(this.x, this.y, this.explodeOnGround, this.blastDmg || this.dmg, this.team, this.owner);
+        g.blast(this.x, this.y, this.explodeOnGround, this.blastDmg || this.dmg, this.team, this.owner, this.blastColor);
         if (this.impactWord) g.impact(this.x, this.y, this.impactWord, '#ff7a2a', 0.5);
         return;
       }
@@ -3112,6 +3576,14 @@
         if (this.t % 4 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 30, life: 12 });
       } else if (this.kind === 'missile') {
         if (this.t % 2 === 0) g.particles.spawn('dust', this.x, this.y - this.z - 30, { color: 'rgba(200,200,200,0.7)', size: 8, life: 18 });
+      } else if (this.kind === 'heroMissile') {
+        if (this.t % 2 === 0) g.particles.spawn('dust', this.x - this.vx * 2, this.y - this.z, { color: 'rgba(220,230,255,0.75)', size: 9, life: 16 });
+      } else if (this.kind === 'icedisk') {
+        if (this.t % 3 === 0) g.particles.spawn('star', this.x - this.vx, this.y - this.z + TT.rand(-6, 6), { color: '#e6fbff', size: 6, life: 14, rot: Math.random() });
+      } else if (this.kind === 'tkRock') {
+        if (this.t % 3 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 34, life: 12 });
+      } else if (this.kind === 'sladeBomb') {
+        if (this.t % 3 === 0) g.particles.spawn('dust', this.x, this.y - this.z, { color: 'rgba(90,90,100,0.7)', size: 7, life: 14 });
       }
       if (!this.dmg) return;
       const sx = this.x - g.camX;
@@ -3126,9 +3598,33 @@
         const ok = t.takeHit(this, this, this.facing);
         if (ok) {
           g.onHit(this.owner || this, t, this);
+          if (this.blastR) { this.remove = true; this.explode(); break; }
           if (!this.pierce) { this.remove = true; break; }
         }
       }
+    }
+    // Míssil teleguiado: depois de subir, persegue o inimigo mais próximo à frente (na altura do peito).
+    steer(g) {
+      let tg = this.tgt;
+      if (!tg || tg.dead || tg.remove) {
+        tg = this.tgt = null; let bd = 1e9;
+        for (const e of g.enemies) {
+          if (e.dead || (e.x - this.x) * this.facing < -30 || Math.abs(e.x - g.camX - TT.W / 2) > TT.W / 2) continue;
+          const d = Math.abs(e.x - this.x) + Math.abs(e.y - this.y) * 2;
+          if (d < bd) { bd = d; tg = e; }
+        }
+        this.tgt = tg;
+      }
+      if (!tg) return;
+      this.grav = 0;
+      const dx = tg.x - this.x, dy = tg.y - this.y, dz = tg.z + (tg.height || 100) * 0.5 - this.z, L = Math.hypot(dx, dy, dz) || 1, sp = 11;
+      this.vx += (dx / L * sp - this.vx) * 0.22; this.vy += (dy / L * sp - this.vy) * 0.22; this.vz += (dz / L * sp - this.vz) * 0.22;
+    }
+    // Explosão dos projéteis novos dos Titãs (discos, mísseis, pedra da telecinese).
+    explode() {
+      if (!this.blastR || this.exploded) return;
+      this.exploded = true;
+      this.game.blast(this.x, this.y, this.blastR, this.blastDmg || this.dmg, this.team, this.owner, this.blastColor);
     }
     get dmgMul() { return 1; }
     // Rastro: linha que afina e some a partir do histórico de posições.
@@ -3172,6 +3668,51 @@
           this.drawTrail(ctx, camX, '#8a5cff', 16);
           drawRavenCrow(ctx, x, y, this.facing, 1.35, this.t, 1);
           break;
+        case 'icedisk': { // disco congelante: azul-gelo com brilho
+          this.drawTrail(ctx, camX, '#bfefff', 7);
+          TT.drawGlow(ctx, ICE, x, y, 34, 0.8);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin); ctx.scale(1, 0.55);
+          ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fillStyle = '#e8fbff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+          ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fillStyle = '#5fc8ff'; ctx.fill();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(-Math.cos(a) * 12, -Math.sin(a) * 12); ctx.stroke(); }
+          ctx.restore();
+          break;
+        }
+        case 'bombdisk': { // disco explosivo: vermelho com luz piscando
+          this.drawTrail(ctx, camX, '#ffb08a', 6);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin); ctx.scale(1, 0.6);
+          ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fillStyle = '#3a3440'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+          ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fillStyle = '#d7262e'; ctx.fill();
+          ctx.restore();
+          if ((this.t >> 2) % 2 === 0) TT.drawGlow(ctx, '#ff4a2a', x, y, 22, 1);
+          break;
+        }
+        case 'heroMissile': { // mini-míssil do ombro do Ciborgue (aponta na direção do voo)
+          this.drawTrail(ctx, camX, '#bfe6ff', 6);
+          const ang = Math.atan2(-(this.vz), this.vx);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+          ctx.fillStyle = '#d9dde6'; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(8, -6); ctx.lineTo(-14, -6); ctx.lineTo(-14, 6); ctx.lineTo(8, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#3b78d8'; ctx.fillRect(-8, -6, 5, 12);
+          ctx.restore();
+          TT.drawGlow(ctx, SONIC, x - Math.cos(ang) * 20, y - Math.sin(ang) * 20, 16, 1);
+          break;
+        }
+        case 'tkRock': // pedaço do chão envolto na energia negra da Ravena
+          this.drawTrail(ctx, camX, '#8a5cff', 20);
+          TT.drawGlow(ctx, DARK, x, y, 64, 0.7);
+          drawBoulder(ctx, x, y, 1.15, this.spin * 0.2);
+          ctx.save(); ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
+          ctx.beginPath(); ctx.ellipse(x, y, 40, 30, this.spin * 0.1, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+          break;
+        case 'sladeBomb': { // bomba de disco do Slade (luz laranja piscando)
+          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.6); ctx.scale(1, 0.6);
+          ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fillStyle = '#2a2d33'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+          ctx.fillStyle = '#80868f'; ctx.fillRect(-16, -3, 32, 6);
+          ctx.restore();
+          if ((this.t >> 2) % 2 === 0) TT.drawGlow(ctx, FIRE, x, y, 26, 1);
+          break;
+        }
         case 'laser':
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           ctx.strokeStyle = '#ff3030'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x - this.vx * 3, y); ctx.lineTo(x, y); ctx.stroke();
@@ -3290,6 +3831,76 @@
     get y2() { return this.y; }
   }
   TT.RavenBlast = RavenBlast;
+
+  // Tentáculos de sombra da Ravena (golpe novo): uma poça negra aparece embaixo de cada inimigo da tela
+  // e, logo depois, tentáculos de energia negra saem do chão e arremessam todos para cima.
+  class ShadowTendrils {
+    constructor(game, owner) {
+      Object.assign(this, { game, owner, t: 0, remove: false, hits: new Set(), ERUPT: 10, END: 48 });
+      const g = game, spots = [];
+      for (const e of g.enemies) if (!e.dead && Math.abs(e.x - g.camX - TT.W / 2) < TT.W / 2 + 30) spots.push({ x: e.x, y: e.y, e });
+      for (let k = 0; spots.length < 4 && k < 4; k++) {
+        spots.push({ x: owner.x + owner.facing * (150 + k * 150), y: TT.clamp(owner.y + (k % 2 ? 50 : -50), TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 4) });
+      }
+      this.spots = spots.slice(0, 10);
+      for (const s of this.spots) s.seed = Math.random() * 10;
+      this.y = Math.max(...this.spots.map((s) => s.y)) + 1;
+    }
+    update() {
+      const g = this.game;
+      this.t++;
+      // até a erupção cada poça acompanha o seu inimigo
+      if (this.t < this.ERUPT) for (const s of this.spots) if (s.e && !s.e.dead) { s.x = s.e.x; s.y = s.e.y; }
+      if (this.t === this.ERUPT) {
+        g.shake = Math.max(g.shake, 14); A().play('dark'); A().play('boom');
+        for (const e of g.enemies) {
+          if (e.dead || e.z > 90 || this.hits.has(e)) continue;
+          if (!this.spots.some((s) => Math.pow((e.x - s.x) / 95, 2) + Math.pow((e.y - s.y) / 40, 2) <= 1)) continue;
+          this.hits.add(e);
+          const d = { dmg: 42, kb: 3, knockdown: true, launch: 13, big: true };
+          if (e.takeHit(this.owner, d, TT.sign(e.x - this.owner.x) || 1)) g.onHit(this.owner, e, d);
+        }
+        for (const s of this.spots) for (let i = 0; i < 5; i++) g.particles.spawn('feather', s.x + TT.rand(-40, 40), s.y - TT.rand(20, 160), { color: '#1a0f2e', size: 10, vy: -2, life: 30, vr: 0.2 });
+      }
+      if (this.t > this.END) this.remove = true;
+    }
+    // poça negra com borda violeta (cresce até a erupção)
+    drawGround(ctx, camX) {
+      const k = Math.min(1, this.t / this.ERUPT), fade = this.t > this.END - 12 ? (this.END - this.t) / 12 : 1;
+      ctx.save(); ctx.globalAlpha = Math.max(0, fade);
+      for (const s of this.spots) {
+        ctx.beginPath(); ctx.ellipse(s.x - camX, s.y, 90 * k, 36 * k, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(16,6,34,0.8)'; ctx.fill();
+        ctx.strokeStyle = '#a77bff'; ctx.lineWidth = 4; ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // tentáculos: espinhos curvos de sombra que sobem rápido e afundam devagar
+    draw(ctx, camX) {
+      const t = this.t - this.ERUPT;
+      if (t < 0) return;
+      const up = TT.easeOut(Math.min(1, t / 5)), down = TT.clamp((t - 18) / 18, 0, 1), h = 170 * up * (1 - down);
+      if (h < 2) return;
+      ctx.save(); ctx.lineJoin = 'round';
+      for (const s of this.spots) {
+        const x = s.x - camX;
+        for (let i = 0; i < 5; i++) {
+          const ox = (i - 2) * 26, hh = h * (0.6 + 0.4 * Math.abs(Math.sin(s.seed + i * 1.7))), bend = Math.sin(s.seed + i + t * 0.15) * 22;
+          ctx.beginPath();
+          ctx.moveTo(x + ox - 12, s.y);
+          ctx.quadraticCurveTo(x + ox - 8 + bend, s.y - hh * 0.5, x + ox + bend * 1.4, s.y - hh);
+          ctx.quadraticCurveTo(x + ox + 8 + bend, s.y - hh * 0.5, x + ox + 12, s.y);
+          ctx.closePath();
+          ctx.fillStyle = '#120a22'; ctx.fill();
+          ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 5; ctx.stroke();
+          ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 1.6; ctx.stroke();
+        }
+        TT.drawGlow(ctx, DARK, x, s.y - h * 0.4, 70 + h * 0.3, 0.45);
+      }
+      ctx.restore();
+    }
+  }
+  TT.ShadowTendrils = ShadowTendrils;
 
   // Corvo de energia negra: corpo, asas com penas, contorno violeta + branco e olhos brilhantes.
   // front = true desenha de frente (asas abertas); senão, de perfil voando.

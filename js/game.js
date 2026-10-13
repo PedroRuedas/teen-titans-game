@@ -80,7 +80,7 @@
       this.energy = 30; this.flashEnergy = 0;
       this.combo = 0; this.comboT = 0;
       this.tokens = this.baseTokens(2);
-      this.banner = null;
+      this.banner = null; this.powerBanner = 0;
       this.boss = null; this.bossShown = 0;
       this.drill = null;
       this.superT = 0;
@@ -98,7 +98,9 @@
       this.bg = TT.makeBackground(this.stage.id);
       this.applyScale();
       this.stageStartScore = this.score;
-      for (const t of this.team) t.reset();
+      // a partir da primeira fase "powerUp" (fase 7) os Titãs usam os golpes novos
+      this.powered = TT.STAGES.slice(0, i + 1).some((s) => s.powerUp);
+      for (const t of this.team) { t.setPower(this.powered); t.reset(); }
       this.slots[0].ai = 0;
       const p = this.player;
       p.x = 220; p.y = 590; p.facing = 1;
@@ -108,6 +110,7 @@
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
       this.banner = { text: this.stage.name, sub: this.stage.subtitle, t: 0, dur: 200 };
+      if (this.stage.powerUp) this.powerBanner = 1; // depois do título da fase: "GOLPES NOVOS!"
       for (const l of this.bg.layers) l.warm(0);
       A().playSong(this.stage.song);
     }
@@ -118,7 +121,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -230,6 +233,11 @@
         b = new TT.BrotherBlood(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'psy';
+      } else if (sec.boss === 'slade') {
+        // sai das sombras: primeiro só o olho brilhando, depois o corpo inteiro
+        b = new TT.Slade(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'shadow';
       } else if (sec.boss === 'mumbo') {
         // aparece com um "TA-DÁ!" numa nuvem de fumaça
         b = new TT.Mumbo(this, this.camX + 880, 590);
@@ -285,6 +293,14 @@
         if (k < 60 && k % 6 === 0) { this.particles.spawn('star', b.x + TT.rand(-90, 90), b.y - TT.rand(20, 260), { vy: -1, color: TT.choice(['#7af0ff', '#ff7af0', '#ffe14a', '#ffffff']), size: 12, life: 22, vr: 0.2 }); A().play('birdarang'); }
         if (k === 60) { b.alpha = 1; this.poof(b.x, b.y - 120); this.poof(b.x, b.y - 40); this.impact(b.x, b.y, 'TA-DÁ!', '#ff7af0', 1.3); }
         if (k === 95) this.say(b, 'Que comece o espetáculo!', '#bff3ff');
+      }
+      if (this.introKind === 'shadow') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 50) / 40, 0, 1);
+        if (k === 20) A().play('dark');
+        if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
+        if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
+        if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
       }
       if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
@@ -377,6 +393,17 @@
         // raio de azar da Jinx: estrelinhas rosa e "AZAR!"
         for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.fire && t.team === 'hero') {
+        // fogo de Trigon (demônios e Slade): faíscas laranja e "QUEIMOU!"
+        for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-4, 4), vy: TT.rand(-7, -2), color: TT.choice(['#ff7a1a', '#ffd23a', '#ffffff']), size: 4, life: 16, grav: 0.1 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'QUEIMOU!', size: 32, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.freeze && t.team === 'enemy' && !t.isBoss && !t.dead && t.state === 'hurt') {
+        // disco congelante do Robin: o inimigo fica preso num bloco de gelo
+        t.frozen = d.stun || 80;
+        for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 44, rot: TT.rand(-0.1, 0.1) });
       }
       if (d.bunny && t.team === 'hero' && !t.ko) {
         // feitiço do Mumbo: o Titã vira coelho por um tempo (só anda e pula)
@@ -515,21 +542,22 @@
     debrisBurst(x, y, n, color) {
       for (let i = 0; i < n; i++) this.particles.spawn('debris', x + TT.rand(-20, 20), y + TT.rand(-20, 20), { vx: TT.rand(-7, 7), vy: TT.rand(-11, -3), grav: 0.55, color, size: TT.rand(6, 13), vr: TT.rand(-0.3, 0.3), life: TT.randi(30, 50), floor: y + 60 });
     }
-    explosion(x, y, z, sc) {
+    // col = cor da explosão (padrão laranja; starbolt verde, telecinese violeta...).
+    explosion(x, y, z, sc, col) {
       sc = sc || 1;
       const sy = y - z;
-      this.particles.spawn('glow', x, sy, { size: 150 * sc, color: '#ff9a3a', life: 16 });
+      this.particles.spawn('glow', x, sy, { size: 150 * sc, color: col || '#ff9a3a', life: 16 });
       this.particles.spawn('ring', x, sy, { size: 90 * sc, color: '#ffe9a8', life: 14 });
       for (let i = 0; i < 14 * sc; i++) {
         const a = Math.random() * Math.PI * 2, s = TT.rand(3, 10) * sc;
-        this.particles.spawn('spark', x, sy, { vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, color: TT.choice(['#ffcf5a', '#ff7a2a', '#fff']), size: 5, life: TT.randi(12, 22), grav: 0.2 });
+        this.particles.spawn('spark', x, sy, { vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, color: TT.choice(col ? [col, '#ffffff', '#fff6b0'] : ['#ffcf5a', '#ff7a2a', '#fff']), size: 5, life: TT.randi(12, 22), grav: 0.2 });
       }
       for (let i = 0; i < 6 * sc; i++) this.particles.spawn('dust', x + TT.rand(-30, 30), sy + TT.rand(-30, 30), { vx: TT.rand(-2, 2), vy: TT.rand(-3, -0.5), color: 'rgba(80,60,70,0.8)', size: TT.rand(14, 24) * sc, life: TT.randi(26, 40) });
       this.shake = Math.max(this.shake, 9 * sc);
       A().play('boom');
     }
-    blast(x, y, radius, dmg, team, owner) {
-      this.explosion(x, y, 10, radius / 90);
+    blast(x, y, radius, dmg, team, owner, col) {
+      this.explosion(x, y, 10, radius / 90, col);
       const targets = team === 'hero' ? this.enemies : this.heroes();
       for (const t of targets) {
         if (!t || t.dead || t.ko) continue;
@@ -654,6 +682,13 @@
     updatePlay(inp) {
       if (inp.wasPressed('pause')) { this.state = 'pause'; this.pauseIdx = 0; return; }
       if (this.banner) { this.banner.t++; if (this.banner.t > this.banner.dur) this.banner = null; }
+      else if (this.powerBanner) {
+        // fase 7: anuncia os golpes novos logo depois do título da fase
+        this.powerBanner = 0;
+        this.banner = { text: 'GOLPES NOVOS!', sub: 'Os Titãs liberaram os poderes máximos: mais dano!', t: 0, dur: 170, power: true };
+        for (const p of this.players()) { this.particles.spawn('ring', p.x, p.y - 60, { color: p.def.color, size: 120, life: 22 }); this.popText(p.x, p.y - 170, 'PODER MÁXIMO!', '#ffe14a', true); }
+        A().play('super');
+      }
       if (this.whiteFlash > 0) this.whiteFlash--;
       if (this.flashEnergy > 0) this.flashEnergy--;
       this.shake *= 0.86; if (this.shake < 0.3) this.shake = 0;
@@ -692,8 +727,8 @@
         const p = this.team[sl.ai];
         p.think(inp.pl[sl.id]);
         p.physics();
-        // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos
-        if (b && !b.dead && p.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
+        // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos (não quando o chefe está no ar, como no salto do Slade)
+        if (b && !b.dead && p.z < 40 && b.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
           const dx = p.x - b.x, min = (b.radius + p.radius) * 0.75;
           if (Math.abs(dx) < min) p.x = b.x + (dx >= 0 ? min : -min);
         }
@@ -914,6 +949,21 @@
           ctx.fillRect(x, y, 3, 3);
         }
         ctx.globalCompositeOperation = 'source-over';
+      } else if (this.stage.id === 7) {
+        // brasas do fogo de Trigon subindo; no covil, faíscas das engrenagens caindo
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 20; i++) {
+          const x = ((i * 241 - camX * 0.5 + Math.sin(f * 0.03 + i) * 16) % W + W) % W, y = 700 - ((f * (0.8 + (i % 4) * 0.3) + i * 67) % 660);
+          ctx.fillStyle = 'rgba(255,' + (110 + (i % 3) * 40) + ',40,' + (0.3 + 0.25 * Math.sin(f * 0.07 + i)) + ')';
+          ctx.fillRect(x, y, 3, 3);
+        }
+        if (camX > 2400) for (let i = 0; i < 4; i++) {
+          if (((f + i * 47) % 160) > 26) continue;
+          const k = ((f + i * 47) % 160) / 26, x = ((i * 389 - camX * 0.2) % W + W) % W;
+          ctx.fillStyle = 'rgba(255,200,120,' + (1 - k) + ')';
+          for (let j = 0; j < 4; j++) ctx.fillRect(x + j * 7 - 10, 120 + k * 260 + j * 9, 2, 6);
+        }
+        ctx.globalCompositeOperation = 'source-over';
       } else if (this.stage.id === 5) {
         // partículas de energia psíquica vermelha subindo (mais densas no salão do Irmão Sangue)
         ctx.globalCompositeOperation = 'lighter';
@@ -1086,7 +1136,7 @@
         ctx.save();
         ctx.globalAlpha = a;
         const y = bn.boss ? 250 : 210;
-        ctx.fillStyle = bn.boss ? 'rgba(120,0,20,0.75)' : 'rgba(20,10,60,0.72)';
+        ctx.fillStyle = bn.boss ? 'rgba(120,0,20,0.75)' : bn.power ? 'rgba(150,70,0,0.78)' : 'rgba(20,10,60,0.72)';
         ctx.beginPath(); ctx.moveTo(0, y - 60); ctx.lineTo(W, y - 76); ctx.lineTo(W, y + 56); ctx.lineTo(0, y + 70); ctx.closePath(); ctx.fill();
         ctx.fillStyle = bn.boss ? '#ff3b30' : '#ffe14a';
         ctx.fillRect(0, y - 66, W * inK, 5); ctx.fillRect(W * (1 - inK), y + 60, W, 5);

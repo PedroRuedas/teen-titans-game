@@ -203,6 +203,13 @@
       [16, { bob: 4, lean: 0.58, armF: [0.4, 1.9], armB: [-0.5, 0.4], legF: [0.85, 0.3], legB: [-0.85, -1.25] }],
       [30, CY],
     ],
+    cyMissiles: [ // golpe novo: abre os lançadores do ombro e dispara três mísseis
+      [0, CY],
+      [8, { bob: 4, lean: -0.12, armF: [0.9, 2.3], armB: [0.8, 2.2], legF: [0.6, 0.3], legB: [-0.55, -0.75] }, 'out'],
+      [12, { bob: 6, lean: -0.22, armF: [0.7, 2.2], armB: [0.6, 2.1], legF: [0.66, 0.32], legB: [-0.6, -0.82], squash: 0.04 }],
+      [24, { bob: 5, lean: -0.2, armF: [0.7, 2.2], armB: [0.6, 2.1], legF: [0.64, 0.32], legB: [-0.6, -0.8] }],
+      [38, CY],
+    ],
     cyCannon: [ // especial: canhão sônico
       [0, CY],
       [14, { lean: -0.05, armF: [1.5, 1.55], armB: [1.0, 1.6], legF: [0.6, 0.35], legB: [-0.6, -0.75] }],
@@ -296,6 +303,13 @@
       [3, M(SF, { lean: 0.85, bob: -18, armF: [1.62, 1.6], armB: [-0.6, -0.3], legF: [-0.7, -0.75], legB: [-0.9, -1.0], auraF: 1, circleF: 0.6 })],
       [15, M(SF, { lean: 0.8, bob: -18, armF: [1.6, 1.58], armB: [-0.6, -0.3], legF: [-0.7, -0.75], legB: [-0.9, -1.0], auraF: 1, circleF: 0.7 })],
       [27, M(SF, { auraF: 0, circleF: 0 })],
+    ],
+    sfRain: [ // golpe novo: sobe com os braços erguidos e faz chover starbolts
+      [0, SF],
+      [12, M(SF, { bob: -40, lean: -0.1, armF: [2.6, 2.9], armB: [2.5, 2.8], auraF: 1, auraB: 1, circleF: 0.8, circleB: 0.8 }), 'out'],
+      [16, M(SF, { bob: -46, lean: 0.05, armF: [2.2, 2.5], armB: [2.9, 3.0], auraF: 1, auraB: 1, circleF: 1.3, circleB: 1.3 })],
+      [46, M(SF, { bob: -46, lean: 0.05, armF: [2.9, 3.0], armB: [2.2, 2.5], auraF: 1, auraB: 1, circleF: 1.3, circleB: 1.3 })],
+      [62, M(SF, { auraF: 0, auraB: 0, circleF: 0, circleB: 0 })],
     ],
     sfEyes: [
       [0, SF],

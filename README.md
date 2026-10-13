@@ -1,9 +1,10 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): seis fases
-(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.** e
-**O Show do Mumbo**), os 5 Titãs jogáveis com troca
-em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): sete fases
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
+**O Show do Mumbo** e **O Covil do Slade**), os 5 Titãs jogáveis com troca
+em tempo real (e **golpes novos** a partir da fase 7), inimigos da série, **3 níveis de dificuldade** e
+**co-op local para 2 jogadores**.
 
 **Jogue online:** https://jovens-titas-jump-city.netlify.app
 
@@ -68,6 +69,19 @@ Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
 | **Ravena** | **flutua** e desliza, levita no pulo, vira **corvo de alma** na esquiva | **mãos de energia negra com círculo mágico**, e no fim abre um **portal** de onde sai a garra | corvo de energia | *"Azarath Metrion Zinthos!"* |
 | **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
 
+### Golpes novos (fase 7 em diante)
+
+Na fase 7 os Titãs liberam os poderes máximos: **todos os golpes dão mais dano** e o golpe forte e o
+especial de cada um mudam, com referências da série:
+
+| Titã | Forte (novo) | Especial (novo) | Também |
+|---|---|---|---|
+| **Robin** | **disco congelante**: atravessa a fila e prende os inimigos num bloco de gelo | **discos explosivos** (três, explodem no impacto) | o fim do combo vira o **bastão elétrico**, com descarga no chão |
+| **Mutano** | **elefante**: empina e pisa com tudo | **A Fera** (de *A Fera Interior*): avança dando seis garradas | animais do combo mais fortes |
+| **Ciborgue** | **mísseis do ombro**, teleguiados, que explodem no impacto | **canhão sônico na potência máxima** (mais largo e mais forte) | canhão à queima-roupa com mais alcance |
+| **Ravena** | **telecinese**: arranca um pedaço do chão e arremessa | *"Azarath Metrion Zinthos!"* agora faz **tentáculos de sombra** saírem do chão embaixo de todos os inimigos da tela | — |
+| **Estelar** | **starbolt gigante**, que explode no impacto | **chuva de starbolts** em cima de cada inimigo da tela | dois starbolts de uma vez no combo e no ar |
+
 Os modelos seguem o traço da **série animada de 2003** (a mesma do jogo de PS2): corpos esguios,
 rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos são arte vetorial
 (caminhos SVG em `js/faces.js`) e a capa do Robin tem física de tecido.
@@ -118,6 +132,15 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    **"MUMBO JUMBO!"**, que transforma o Titã em **coelho** por alguns segundos (só anda e pula).
    **Fraqueza:** depois dos coelhos da cartola ele **deixa a varinha cair** — fica sem magia e leva
    dano dobrado!
+7. **O Covil do Slade**: Jump City em ruínas sob o céu vermelho de Trigon (com os quatro olhos dele no
+   céu e os cidadãos virados pedra, como em *O Fim*), o covil subterrâneo cheio de engrenagens, canos e
+   telões com a máscara, e o salão do trono com o "S" gigante. **Os Titãs ganham os golpes novos.**
+   Inimigos: **Robôs do Slade**, **Comandos do Slade** (armadura cobre e bastão; estocada em investida e
+   giro do bastão) e **Demônios de Fogo** de Trigon (bola de fogo no círculo marcado e garrada). O chefe
+   é o **Slade**, com mais vida que todos: sequência de bastão, bombas de disco nos círculos marcados e
+   o **salto com o bastão** (o círculo segue você até a metade do aviso). Abaixo de 50% ganha o fogo
+   de Trigon: **anel de chamas** em volta dele (fique colado nele ou bem longe) e chama comandos.
+   **Fraqueza:** depois do salto ele aterrissa de joelho — **guarda aberta**, leva dano dobrado!
 
 ## Música e vozes
 
@@ -172,19 +195,22 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 121 verificações e todas passam:
+página e chame a função serve.) A suíte tem 142 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
+- Golpes novos: só a partir da fase 7, e cada golpe novo dá mais dano que o original; disco
+  congelante prende o inimigo no gelo.
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
-  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus, do Irmão Sangue e do Mumbo;
-  golpes da Jinx, do Mammoth, do Soldado-Carta e do Coelho Mágico com aviso no chão; Titã virando coelho.
+  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus, do Irmão Sangue, do Mumbo
+  e do Slade; golpes da Jinx, do Mammoth, do Soldado-Carta, do Coelho Mágico, do Comando do Slade e do
+  Demônio de Fogo com aviso no chão; Titã virando coelho; Slade chamando comandos.
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante! e regressões.
-- 3 partidas completas (6 fases) do início ao fim com um bot.
-- Os seis chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (7 fases) do início ao fim com um bot.
+- Os sete chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
@@ -203,6 +229,6 @@ Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Control Freak, Slade…).
+- Mais fases (Control Freak, Irmão Sangue de volta, Trigon…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.
