@@ -118,7 +118,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -230,6 +230,11 @@
         b = new TT.BrotherBlood(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'psy';
+      } else if (sec.boss === 'mumbo') {
+        // aparece com um "TA-DÁ!" numa nuvem de fumaça
+        b = new TT.Mumbo(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'magic';
       } else {
         b = new TT.GizmoMech(this, this.camX + W + 200, 590);
         b.facing = -1;
@@ -274,6 +279,12 @@
         if (k < 70 && k % 10 === 0) { this.particles.spawn('ring', b.x, b.y, { size: 60 + k * 2, color: '#ff3b4a', life: 18, flat: 0.4 }); A().play('dark'); }
         if (k === 70) { this.impact(b.x, b.y, 'H.I.V.E.!', '#ff3b4a', 1.2); }
         if (k === 95) this.say(b, 'Bem-vindos à H.I.V.E., Titãs.', '#ff8a9a');
+      }
+      if (this.introKind === 'magic') {
+        const k = 170 - this.bossIntro;
+        if (k < 60 && k % 6 === 0) { this.particles.spawn('star', b.x + TT.rand(-90, 90), b.y - TT.rand(20, 260), { vy: -1, color: TT.choice(['#7af0ff', '#ff7af0', '#ffe14a', '#ffffff']), size: 12, life: 22, vr: 0.2 }); A().play('birdarang'); }
+        if (k === 60) { b.alpha = 1; this.poof(b.x, b.y - 120); this.poof(b.x, b.y - 40); this.impact(b.x, b.y, 'TA-DÁ!', '#ff7af0', 1.3); }
+        if (k === 95) this.say(b, 'Que comece o espetáculo!', '#bff3ff');
       }
       if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
@@ -366,6 +377,12 @@
         // raio de azar da Jinx: estrelinhas rosa e "AZAR!"
         for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.bunny && t.team === 'hero' && !t.ko) {
+        // feitiço do Mumbo: o Titã vira coelho por um tempo (só anda e pula)
+        t.bunny = 150;
+        this.poof(t.x, t.y - 50);
+        this.particles.spawn('text', t.x, hy - 70, { text: 'VIROU COELHO!', size: 30, color: '#ffffff', color2: '#c04ab0', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
       }
       if (d.hypno && t.team === 'hero') {
         // hipnose do Irmão Sangue: Titã fica tonto por um tempo
@@ -887,6 +904,16 @@
         ctx.globalCompositeOperation = 'source-over';
         const fl = (f % 240) < 4 ? 0.06 : 0;
         if (fl) { ctx.fillStyle = 'rgba(120,230,255,' + fl + ')'; ctx.fillRect(0, 0, W, H); }
+      } else if (this.stage.id === 6) {
+        // purpurina mágica caindo (dentro da cartola fica colorida e mais densa)
+        ctx.globalCompositeOperation = 'lighter';
+        const inHat = camX > 5500, n = inHat ? 26 : 10, cols = ['255,240,160', '160,240,255', '255,160,240'];
+        for (let i = 0; i < n; i++) {
+          const x = ((i * 197 - camX * 0.4 + Math.sin(f * 0.02 + i) * 20) % W + W) % W, y = (f * (0.5 + (i % 4) * 0.2) + i * 83) % 700;
+          ctx.fillStyle = 'rgba(' + (inHat ? cols[i % 3] : cols[0]) + ',' + (0.35 + 0.3 * Math.sin(f * 0.1 + i)) + ')';
+          ctx.fillRect(x, y, 3, 3);
+        }
+        ctx.globalCompositeOperation = 'source-over';
       } else if (this.stage.id === 5) {
         // partículas de energia psíquica vermelha subindo (mais densas no salão do Irmão Sangue)
         ctx.globalCompositeOperation = 'lighter';

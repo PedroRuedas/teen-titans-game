@@ -81,5 +81,21 @@
         { type: 'boss', camX: 6000, boss: 'blood', intro: 'O diretor da Academia H.I.V.E.' },
       ],
     },
+    {
+      id: 6,
+      name: 'FASE 6 — O SHOW DO MUMBO',
+      subtitle: 'Mumbo prendeu Jump City dentro da cartola mágica!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'mumbo',
+      crates: [[1150, 600, 'pizza'], [2350, 560, 'energy'], [3650, 640, 'pizza'], [4950, 580, 'energy'], [5500, 620, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['card', 'card', 'card'], ['bunny', 'card', 'card']] },
+        { type: 'arena', camX: 1500, waves: [['card', 'bunny', 'card', 'card'], ['bunny', 'bunny', 'card']] },
+        { type: 'arena', camX: 2950, waves: [['card', 'card', 'card', 'bunny'], ['bunny', 'bunny', 'card', 'card']] },
+        { type: 'arena', camX: 4300, waves: [['bunny', 'card', 'card', 'card'], ['card', 'card', 'bunny', 'bunny', 'card']] },
+        { type: 'boss', camX: 6000, boss: 'mumbo', intro: 'O mágico do mal' },
+      ],
+    },
   ];
 })();

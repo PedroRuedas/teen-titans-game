@@ -5,7 +5,7 @@ window.TT_AUDIO_FILES = {
   // Abertura de Teen Titans (toca no título e nas fases). Ex.: 'audio/tema.mp3'
   tema: '',
 
-  // Outras trilhas por nome: boss, overload, plasmus, blood, victory. Ex.: boss: 'audio/chefe.mp3'
+  // Outras trilhas por nome: boss, overload, plasmus, blood, mumbo, victory. Ex.: boss: 'audio/chefe.mp3'
   musica: {},
 
   // Falas: 'titã:texto exato da fala' -> arquivo. 'titã:*' vale para todas as falas daquele Titã.

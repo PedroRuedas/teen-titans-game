@@ -52,7 +52,7 @@ async page => {
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
 
-  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 5) e ENTER começa nela
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 6) e ENTER começa nela
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
@@ -65,7 +65,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 5 no título e começar nela', pick.sel === 4 && /ACADEMIA/.test(pick.label) && pick.st === 'play' && pick.stage === 4, pick);
+  ok('menu: escolher a fase 6 no título e começar nela', pick.sel === 5 && /MUMBO/.test(pick.label) && pick.st === 'play' && pick.stage === 5, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -353,6 +353,63 @@ async page => {
     g.enemies.length = 0;
     return out;
   });
+  // 4b4d) Mumbo (fase 6): varinha cai depois dos coelhos da cartola (parado, dano dobrado);
+  //       o feitiço "MUMBO JUMBO!" transforma o Titã em coelho (não ataca) até o feitiço acabar
+  const mumbo = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(5); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.hat);
+    for (let t = 0; t < 160 && b.state !== 'fumble'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.fumbleDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'fumble'; t++) g.step();
+    out.after = b.state;
+    // feitiço: Titã parado dentro do círculo vira coelho
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.spell);
+    for (let t = 0; t < 90; t++) { p.vx = p.vy = 0; g.step(); }
+    out.bunny = p.bunny;
+    p.invul = 0; p.setState('idle');
+    g.input.pressed.add('light'); g.step(); g.step();
+    out.attackAsBunny = p.state === 'attack';
+    for (let t = 0; t < 200 && p.bunny > 0; t++) g.step();
+    for (let t = 0; t < 30; t++) g.step();
+    out.bunnyAfter = p.bunny;
+    p.setState('idle'); g.input.pressed.add('light'); g.step(); g.step();
+    out.attackAfter = p.state === 'attack';
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('Mumbo: varinha cai após os coelhos da cartola (parado, dano dobrado) e depois ele a recupera', mumbo.st === 'fumble' && mumbo.fumbleDmg === mumbo.normal * 2 && mumbo.moved < 1 && mumbo.after !== 'fumble', mumbo);
+  ok('Mumbo: "MUMBO JUMBO!" transforma o Titã em coelho (sem atacar) até o feitiço passar', mumbo.bunny > 0 && !mumbo.attackAsBunny && mumbo.bunnyAfter === 0 && mumbo.attackAfter, mumbo);
+
+  // 4b4e) Inimigos da fase 6: estocada do Soldado-Carta e salto do Coelho Mágico acertam só depois do aviso
+  const s6 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['card', 0, 160], ['bunny', 1, 100]]) {
+      TT.debug.start(5); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s6) ok('fase 6: golpe ' + k + ' acerta após o aviso', s6[k].zone && s6[k].inside && s6[k].hitT >= s6[k].s, s6[k]);
   for (const k in s5) if (k !== 'armor') ok('fase 5: golpe ' + k + ' acerta após o aviso', s5[k].zone && s5[k].inside && s5[k].hitT >= s5[k].s, s5[k]);
   ok('fase 5: Mammoth não cai com golpe comum (super armadura)', s5.armor !== 'down' && s5.armor !== 'hurt', s5.armor);
 
@@ -370,7 +427,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 5 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 6 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -453,6 +510,16 @@ async page => {
       for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
       return { x: bb.x, y: bb.y };
     } }));
+    // Mumbo (fase 6)
+    C(5, 'wand', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(5, 'cards', (b) => ({ x: b.x - 400, y: b.y }), (b) => ({ x: b.x - 400, y: b.y + 40 }));
+    C(5, 'spell', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(5, 'hat', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -473,7 +540,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 140000) {
+      while (g.state !== 'victory' && steps < 170000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -492,11 +559,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (5 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:4') && full.seen.includes('clear:4'), full);
+    ok('jogo completo (6 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:5') && full.seen.includes('clear:5'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4]) {
+  for (const st of [0, 1, 2, 3, 4, 5]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

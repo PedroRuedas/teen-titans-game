@@ -513,7 +513,7 @@
 
     reset() {
       this.hp = this.maxHp; this.ko = false; this.dead = false; this.atk = null;
-      this.downTime = 34; this.buffer = null; this.bufferT = 0;
+      this.downTime = 34; this.buffer = null; this.bufferT = 0; this.bunny = 0;
       this.z = 0; this.vx = this.vy = this.vz = 0; this.flash = 0; this.invul = 0;
       this.setState('idle'); this.setAnim('idle');
     }
@@ -527,6 +527,11 @@
       const g = this.game;
       if (this.bufferT > 0) this.bufferT--; else this.buffer = null;
       if (this.comboWindow > 0) this.comboWindow--; else this.combo = 0;
+      // virou coelho (feitiço do Mumbo): só anda e pula até o feitiço acabar
+      if (this.bunny > 0) {
+        if (--this.bunny === 0 || this.ko) { this.bunny = 0; g.poof(this.x, this.y - 50); A().play('switch'); }
+        if (this.buffer && this.buffer !== 'jump') this.buffer = null;
+      }
 
       let mx = (inp.isDown('right') ? 1 : 0) - (inp.isDown('left') ? 1 : 0);
       let my = (inp.isDown('down') ? 1 : 0) - (inp.isDown('up') ? 1 : 0);
@@ -717,6 +722,12 @@
       if (this.invul > 0 && this.state !== 'getup' && this.state !== 'dash' && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.55;
       const fl = this.flash > 3;
       const FORM = f && FORMS[f];
+      if (this.bunny > 0 && !this.ko) {
+        const sq = this.state === 'down' ? -0.35 : this.state === 'hurt' ? -0.15 : 0;
+        TT.drawRabbit(ctx, sx, sy, this.facing, this.animT, 0.62, { flash: fl, acc: this.def.color, sq, earsBack: this.state !== 'idle' && this.state !== 'air' });
+        ctx.globalAlpha = 1;
+        return;
+      }
       if (FORM && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
         TT[FORM](ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
       } else if (this.state === 'dash' && this.key === 'beastboy') {
@@ -937,6 +948,24 @@
       { pose: 'slam', s: 30, a: 3, r: 28, dmg: 13, zoneHit: true, knockdown: true, launch: 6, kb: 7, sound: 'shockwave',
         zone(f) { return [{ k: 'ell', x: f.x + f.facing * 20, y: f.y, rx: 175, ry: 64 }]; },
         onFrame(f, t, g) { if (t === this.s) { g.impact(f.x + f.facing * 20, f.y, 'PISÃO!', '#e2702a', 0.8); g.dust(f.x, f.y, 10, '#b9a7c9'); } } },
+    ],
+  };
+  // Soldado-Carta (fase 6): carta de baralho viva; estocada de lança em investida (marcada) e cutucada de perto.
+  ENEMIES.card = {
+    name: 'Soldado-Carta', style: 'hive', hp: 50, speed: 2.9, range: 150, score: 160, aggr: 1.15,
+    attacks: [
+      { pose: 'jab', s: 22, a: 9, r: 18, lunge: 9, dmg: 10, reach: [0, 96], depth: 26, kb: 5, sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 210, y: f.y, d: 26 }]; } },
+      { pose: 'jab', s: 14, a: 4, r: 16, dmg: 7, reach: [0, 84], kb: 3 },
+    ],
+  };
+  // Coelho Mágico (fase 6): coelho gigante saído da cartola; bote curto e salto esmagador (marcado no chão).
+  ENEMIES.bunny = {
+    name: 'Coelho Mágico', style: 'hive', hp: 60, speed: 2.6, range: 70, score: 180, aggr: 1.1,
+    attacks: [
+      { pose: 'jab', s: 20, a: 8, r: 20, lunge: 7, dmg: 9, reach: [0, 76], depth: 30, kb: 4, sound0: 'jump' },
+      { pose: 'jab', s: 30, a: 4, r: 26, dmg: 12, zoneHit: true, knockdown: true, launch: 5, kb: 6, sound0: 'jump', sound: 'land',
+        zone(f) { return [{ k: 'ell', x: f.x + f.facing * 60, y: f.y, rx: 110, ry: 44 }]; } },
     ],
   };
   TT.ENEMIES = ENEMIES;
@@ -1306,6 +1335,134 @@
     drawGround(ctx, camX) { Boss.prototype.drawGround.call(this, ctx, camX); }
   }
   TT.Mammoth = Mammoth;
+
+  // Coelho de desenho (inimigo da fase 6 e Titã transformado pelo feitiço do Mumbo).
+  // o.sq = achatamento, o.acc = cor do lenço (Titã), o.red = olhos vermelhos (coelho do mal).
+  function drawRabbit(ctx, x, y, facing, t, s, o) {
+    o = o || {};
+    const fl = !!o.flash, C = (c) => (fl ? '#ffffff' : c), sq = o.sq || 0;
+    ctx.save(); ctx.translate(x, y); ctx.scale(facing * s * (1 - sq * 0.6), s * (1 + sq));
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = OUT; ctx.lineWidth = 3.5;
+    const ear = Math.sin(t * 0.12) * 0.08 + (o.earsBack ? -0.5 : 0);
+    // orelhas
+    for (const [ox, rot, back] of [[-6, -0.25 + ear, true], [10, 0.12 + ear, false]]) {
+      ctx.save(); ctx.translate(ox, -92); ctx.rotate(rot);
+      ctx.beginPath(); ctx.ellipse(0, -30, 11, 32, 0, 0, Math.PI * 2); ctx.fillStyle = C(back ? '#d9d6e2' : '#f6f4fa'); ctx.fill(); ctx.stroke();
+      if (!fl) { ctx.beginPath(); ctx.ellipse(1, -28, 5, 24, 0, 0, Math.PI * 2); ctx.fillStyle = '#ffb3cf'; ctx.fill(); }
+      ctx.restore();
+    }
+    // pé de trás, corpo e rabo
+    ctx.beginPath(); ctx.ellipse(-18, -6, 24, 10, 0, 0, Math.PI * 2); ctx.fillStyle = C('#d9d6e2'); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-6, -40, 34, 36, 0, 0, Math.PI * 2); ctx.fillStyle = C('#f6f4fa'); ctx.fill(); ctx.stroke();
+    if (!fl) { ctx.fillStyle = 'rgba(120,110,150,0.25)'; ctx.beginPath(); ctx.ellipse(-22, -36, 16, 28, 0.2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.beginPath(); ctx.arc(-38, -36, 9, 0, Math.PI * 2); ctx.fillStyle = C('#ffffff'); ctx.fill(); ctx.stroke();
+    // cabeça
+    ctx.beginPath(); ctx.ellipse(16, -82, 25, 21, 0, 0, Math.PI * 2); ctx.fillStyle = C('#f6f4fa'); ctx.fill(); ctx.stroke();
+    if (o.acc) { // lenço na cor do Titã
+      ctx.beginPath(); ctx.moveTo(-6, -64); ctx.quadraticCurveTo(14, -54, 34, -66); ctx.lineTo(30, -58); ctx.quadraticCurveTo(14, -48, -4, -56); ctx.closePath();
+      ctx.fillStyle = C(o.acc); ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    if (!fl) {
+      ctx.fillStyle = o.red ? '#e01a3a' : '#2a1838';
+      ctx.beginPath(); ctx.ellipse(22, -88, 4.5, 6, 0, 0, Math.PI * 2); ctx.ellipse(34, -87, 3.5, 5, 0, 0, Math.PI * 2); ctx.fill();
+      if (o.red) { ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(16, -97); ctx.lineTo(27, -93); ctx.moveTo(31, -94); ctx.lineTo(39, -97); ctx.stroke(); }
+      ctx.fillStyle = '#ff8fb5'; ctx.beginPath(); ctx.ellipse(40, -79, 4, 3, 0, 0, Math.PI * 2); ctx.fill(); // focinho
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.fillRect(33, -73, 5, 7); ctx.strokeRect(33, -73, 5, 7); // dentões
+      ctx.strokeStyle = 'rgba(40,30,60,0.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(40, -78); ctx.lineTo(54, -82); ctx.moveTo(40, -77); ctx.lineTo(54, -75); ctx.stroke(); // bigodes
+    }
+    // pé da frente e patinha
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.ellipse(10, -4, 26, 10, 0, 0, Math.PI * 2); ctx.fillStyle = C('#f6f4fa'); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(20, -44, 8, 12, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  TT.drawRabbit = drawRabbit;
+
+  // Coelho Mágico (fase 6): anda aos pulinhos; o salto esmagador cai na área marcada.
+  class MagicBunny extends Enemy {
+    constructor(game, x, y) {
+      super(game, 'bunny', x, y);
+      this.radius = 30; this.height = 130; this.shadowW = 38;
+    }
+    startAttack(def) {
+      super.startAttack(def);
+      this.atk.zones = def.zone ? def.zone.call(def, this, this.game, this.atk) : null;
+    }
+    die(dir, d) {
+      super.die(dir, d);
+      this.game.poof(this.x, this.y - 50);
+      this.game.particles.spawn('text', this.x, this.y - 140, { text: 'PUF!', size: 30, color: '#ffffff', color2: '#8a5cff', vy: -0.6, life: 30 });
+    }
+    drawGround(ctx, camX) { Boss.prototype.drawGround.call(this, ctx, camX); }
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk;
+      let hop = this.anim === 'walk' ? Math.abs(Math.sin(t * 0.22)) * 16 : 0, sq = 0;
+      if (a && this.state === 'attack') {
+        const d = a.def;
+        if (a.t < d.s) sq = -0.22 * (a.t / d.s);
+        else if (a.t < d.s + d.a) { const u = (a.t - d.s) / d.a; hop = Math.sin(u * Math.PI) * (d === this.def.attacks[1] ? 110 : 40); sq = 0.12; }
+      }
+      if (this.state === 'down') sq = -0.35;
+      const x = this.x - camX, y = this.y - this.z - hop;
+      drawRabbit(ctx, x, y, this.facing, t, 1.05, { flash: this.flash > 3, sq, red: true, earsBack: this.state === 'hurt' || this.state === 'down' });
+      const tell = a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', x + this.facing * 20, y - 80, 14 + 20 * tell, 0.35 + 0.5 * tell);
+    }
+  }
+  TT.MagicBunny = MagicBunny;
+
+  // Soldado-Carta (fase 6): carta de baralho com pernas e braços finos e uma lança.
+  class CardSoldier extends ShockTrooper {
+    constructor(game, x, y) {
+      super(game, x, y, 'card');
+      this.suit = TT.choice(['♠', '♥', '♣', '♦']);
+      this.red = this.suit === '♥' || this.suit === '♦';
+      this.rank = TT.choice(['J', 'Q', 'K', '10', '7']);
+      this.radius = 26; this.height = 120;
+    }
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk, fl = this.flash > 3, ink = this.red ? '#d0202a' : '#1a1a22';
+      const x = this.x - camX, y = this.y - this.z;
+      ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (this.state === 'down') { ctx.translate(0, -12); ctx.rotate(-Math.PI / 2 * (this.z > 0 ? 0.5 : 1)); ctx.translate(0, 12); }
+      const walk = this.anim === 'walk' ? Math.sin(t * 0.25) : 0, bob = Math.abs(walk) * 3;
+      // pernas e braços (traços pretos)
+      ctx.strokeStyle = OUT; ctx.lineWidth = 4.5;
+      ctx.beginPath(); ctx.moveTo(-8, -34 - bob); ctx.lineTo(-8 - walk * 12, -2); ctx.lineTo(-2 - walk * 12, 0);
+      ctx.moveTo(8, -34 - bob); ctx.lineTo(8 + walk * 12, -2); ctx.lineTo(14 + walk * 12, 0); ctx.stroke();
+      // lança: recua na preparação e avança no golpe
+      let thrust = 0;
+      if (a && this.state === 'attack') { const d = a.def; thrust = a.t < d.s ? -16 * (a.t / d.s) : a.t < d.s + d.a ? 34 : 10; }
+      const hx = 30 + thrust, hy = -78 - bob;
+      ctx.beginPath(); ctx.moveTo(-24, -84 - bob); ctx.lineTo(-34, -60 - bob); ctx.moveTo(24, -84 - bob); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = '#8a5a36'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(hx - 50, hy + 4); ctx.lineTo(hx + 40, hy - 2); ctx.stroke();
+      ctx.fillStyle = fl ? '#fff' : '#c9d0dc'; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(hx + 38, hy - 9); ctx.lineTo(hx + 60, hy - 3); ctx.lineTo(hx + 38, hy + 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      // a carta
+      ctx.save(); ctx.translate(0, -70 - bob); ctx.rotate(walk * 0.05); ctx.scale(this.facing, 1); // a face da carta nunca fica espelhada
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-27, -40, 54, 78, 7); else ctx.rect(-27, -40, 54, 78);
+      ctx.fillStyle = fl ? '#ffffff' : '#f6f2e6'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!fl) {
+        ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.strokeRect(-22, -35, 44, 68);
+        ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = 'bold 12px Arial'; ctx.fillText(this.rank, -15, -27); ctx.fillText(this.suit, -15, -16);
+        ctx.font = 'bold 30px Arial'; ctx.fillText(this.suit, 0, 18);
+        // carinha brava
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = OUT; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(2, -14, 6, 7, 0, 0, Math.PI * 2); ctx.ellipse(16, -14, 5, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(4, -13, 2.5, 0, Math.PI * 2); ctx.arc(17, -13, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-4, -24); ctx.lineTo(8, -20); ctx.moveTo(12, -20); ctx.lineTo(22, -24); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.restore();
+      const tell = a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', x + this.facing * 40, y - 80, 14 + 20 * tell, 0.35 + 0.5 * tell);
+    }
+  }
+  TT.CardSoldier = CardSoldier;
 
   // Raio em zigue-zague entre dois pontos (para efeitos elétricos).
   function drawArc(ctx, x0, y0, x1, y1, col, w, segs) {
@@ -2612,6 +2769,244 @@
     }
   }
   TT.BrotherBlood = BrotherBlood;
+
+  // Cartola no chão (de onde saem os coelhos do Mumbo). s = escala.
+  function drawTopHat(ctx, x, y, s, fl) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, 0, 46, 13, 0, 0, Math.PI * 2); ctx.fillStyle = fl ? '#fff' : '#14131c'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-30, -2); ctx.lineTo(-33, -58); ctx.quadraticCurveTo(0, -66, 33, -58); ctx.lineTo(30, -2); ctx.closePath();
+    ctx.fillStyle = fl ? '#fff' : '#1c1b26'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c4162a'; ctx.fillRect(-31, -18, 62, 9);
+    ctx.beginPath(); ctx.ellipse(0, -59, 33, 8, 0, 0, Math.PI * 2); ctx.fillStyle = '#05040a'; ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  TT.drawTopHat = drawTopHat;
+
+  // Carta de baralho voando (leque de cartas do Mumbo).
+  function drawFlyingCard(ctx, x, y, rot, red) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.fillStyle = '#f6f2e6'; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+    ctx.fillRect(-11, -16, 22, 32); ctx.strokeRect(-11, -16, 22, 32);
+    ctx.fillStyle = red ? '#d0202a' : '#1a1a22'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(red ? '♥' : '♠', 0, 1);
+    ctx.restore();
+  }
+
+  // ---- Mumbo: o mágico do mal (fase 6)
+  // Fraqueza: depois de tirar os coelhos da cartola, deixa a varinha cair — fica sem magia e leva dano dobrado.
+  class Mumbo extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'MUMBO';
+      this.style = TT.STYLES.mumbo;
+      this.hp = this.maxHp = 1300;
+      this.radius = 44; this.height = 250; this.shadowW = 60;
+      this.poiseMax = 150;
+      this.def = { score: 10000 };
+      this.fumbleT = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.wandX = 0;
+      this.out = {};
+      this.taunts = ['Respeitável público!', 'Nada na manga... TUDO na cartola!', 'Para o meu próximo truque...', 'Abracadabra, Titãs!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      const edge = (f, g) => (f.facing > 0 ? g.camX + TT.W + 40 : g.camX - 40);
+      this.ATK = {
+        // raio da varinha: faixa de estrelas até a borda da tela
+        wand: { pose: 'beam', s: 36, a: 14, r: 24, dmg: 13, knockdown: true, launch: 6, kb: 8, zoneHit: true, zr: 60, color: '#7af0ff', sound: 'starbolt',
+          zone(f, g) { return [{ k: 'rect', x0: f.x + f.facing * 50, x1: edge(f, g), y: f.y, d: 30, arrows: true }]; },
+          onFrame(f, t, g) { if (t === this.s) g.impact(f.x + f.facing * 240, f.y, 'ZING!', '#7af0ff', 0.8); } },
+        // leque de cartas: três faixas atravessando a arena (fique no vão entre elas)
+        cards: { pose: 'throw', s: 34, a: 12, r: 22, dmg: 11, knockdown: true, launch: 5, kb: 6, zoneHit: true, zr: 70, color: '#ffe14a', sound0: 'whoosh', sound: 'birdarang',
+          zone(f, g) {
+            const c = TT.clamp(f.y, TT.FLOOR_TOP + 106, TT.FLOOR_BOTTOM - 106);
+            return [-80, 0, 80].map((o) => ({ k: 'rect', x0: f.x + f.facing * 40, x1: edge(f, g), y: c + o, d: 24 }));
+          } },
+        // coelhos da cartola: brotam do chão nos círculos marcados (depois a varinha cai)
+        hat: { pose: 'castUp', s: 44, a: 8, r: 30, dmg: 12, knockdown: true, launch: 9, kb: 5, zoneHit: true, zr: 40, color: '#c08cff',
+          zone(f, g) {
+            const zs = [], hs = g.heroes(), n = f.phase2() ? 4 : 3;
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: 75, ry: 30 });
+            let guard = 0;
+            while (zs.length < n && guard++ < 30) {
+              const tp = groundTarget(g, TT.choice(hs) || f, 340, 100);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 160 || Math.abs(z.y - tp.y) > 64)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: 75, ry: 30 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === 4) A().play('dark');
+            if (t === this.s) {
+              for (const z of a.zones) { g.poof(z.x, z.y - 40); g.particles.spawn('text', z.x, z.y - 150, { text: 'POP!', size: 34, color: '#ffffff', color2: '#8a5cff', vy: -0.6, life: 34, rot: TT.rand(-0.2, 0.2) }); }
+              g.shake = Math.max(g.shake, 8); A().play('boom');
+            }
+            if (t === this.s + this.a + this.r - 1) f.fumble();
+          } },
+        // "MUMBO JUMBO!": o círculo segue o Titã até a metade do aviso; quem fica dentro vira coelho
+        spell: { pose: 'cast', s: 46, a: 6, r: 22, dmg: 5, stun: 12, kb: 1, zoneHit: true, bunny: true, color: '#ff7af0',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = clampX(g, p.x, 60); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x + f.facing * 300; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 100, ry: 40 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
+            if (t < this.s * 0.5) a.zones = [this.aim(f, g, a)];
+            if (t === 2) { g.say(f, 'Mumbo...', '#ffc0f6'); A().play('dark'); }
+            if (t === this.s) {
+              const z = a.zones[0];
+              g.say(f, 'MUMBO JUMBO!', '#ff7af0');
+              for (let i = 0; i < 8; i++) g.particles.spawn('star', z.x + TT.rand(-60, 60), z.y - TT.rand(10, 120), { vx: TT.rand(-3, 3), vy: TT.rand(-4, -1), color: TT.choice(['#ff7af0', '#ffffff', '#7af0ff']), size: 10, life: 22, vr: 0.2 });
+              A().play('starbolt');
+            }
+          } },
+      };
+      this.applyDifficulty();
+    }
+    // Sem varinha = dano dobrado.
+    get dmgTaken() { return this.fumbleT > 0 ? 2 : 1; }
+    fumble() {
+      this.atk = null;
+      this.setState('fumble'); this.setAnim('hurt');
+      this.fumbleT = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.wandX = this.x + this.facing * 80;
+      this.game.say(this, 'Minha varinha!', '#bff3ff');
+      A().play('land');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'fumble') return; // não interrompe a fraqueza
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'fumble') {
+        this.vx = this.vy = 0;
+        if (--this.fumbleT <= 0) { this.fumbleT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 30; g.poof(this.wandX, this.y - 20); }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      this.alpha = 1;
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y;
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'E agora... o GRANDE FINAL!', '#ff7af0');
+        g.impact(this.x, this.y, 'TA-DÁ!', '#ff7af0', 1);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      this.approach(this.sideTarget(p, 240), p.y, p2 ? 2.3 : 1.7);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vêm os coelhos da cartola (e a varinha cai logo depois)
+        if (this.atkCount % 3 === 2) pick = 'hat';
+        else {
+          const opts = ['cards', 'spell'];
+          if (Math.abs(dy) < 40) opts.push('wand', 'wand');
+          if (p2) opts.push('spell', 'cards');
+          pick = TT.choice(opts);
+        }
+        this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 105);
+        if (Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#bff3ff');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      const fumbling = this.state === 'fumble';
+      this.pose.noWand = fumbling;
+      if (fumbling) { this.pose.lean = 0.35; this.pose.tilt = 0.3; this.pose.armF = [1.2, 1.5]; }
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      // cartola no chão e coelhos saindo dela
+      if (d === this.ATK.hat && a.zones && a.t < d.s + d.a + d.r) {
+        const grow = TT.easeOut(Math.min(1, a.t / (d.s * 0.5)));
+        for (const z of a.zones) {
+          const zx = z.x - camX;
+          drawTopHat(ctx, zx, z.y, 0.9 * grow, false);
+          if (a.t >= d.s) {
+            const u = Math.min(1, (a.t - d.s) / 5), down = a.t > d.s + d.a ? (a.t - d.s - d.a) / d.r : 0;
+            ctx.save(); ctx.beginPath(); ctx.rect(zx - 80, z.y - 300, 160, 250); ctx.clip();
+            TT.drawRabbit(ctx, zx, z.y - 46 + 120 * (1 - u) + 140 * down, 1, t, 0.85, { red: true });
+            ctx.restore();
+          } else if (a.t % 6 === 0) this.game.particles.spawn('star', z.x + TT.rand(-30, 30), z.y - TT.rand(40, 70), { vy: -1, color: '#ffffff', size: 7, life: 14 });
+        }
+      }
+      ctx.save(); ctx.globalAlpha = al;
+      // brilhos mágicos em volta
+      if ((t >> 2) % 3 === 0 && !fumbling) TT.drawGlow(ctx, TT.choice(['#7af0ff', '#ff7af0', '#ffe14a']), x + TT.rand(-60, 60), y - TT.rand(40, 260), 10, 0.8);
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      const o = this.out, tipX = o.fx != null ? o.fx + this.facing * 44 : x, tipY = o.fy != null ? o.fy - 8 : y - 150;
+      // raio da varinha: estrelas em linha até a borda
+      if (d === this.ATK.wand && o.fx != null) {
+        if (a.t < d.s) TT.drawGlow(ctx, '#7af0ff', tipX, tipY, 14 + 34 * Math.max(0, k), 0.9);
+        else if (a.t < d.s + d.a) {
+          const end = this.facing > 0 ? TT.W + 60 : -60, w = 20 * (1 - Math.abs((a.t - d.s) / d.a - 0.5));
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+          ctx.strokeStyle = 'rgba(122,240,255,0.5)'; ctx.lineWidth = w * 2.2; ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(end, tipY + 8); ctx.stroke();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = w * 0.5; ctx.stroke();
+          ctx.restore();
+          for (let i = 0; i < 6; i++) {
+            const sx = tipX + this.facing * (((a.t * 30 + i * 140) % 900)), sy = tipY + Math.sin(a.t * 0.5 + i) * 10;
+            TT.drawBurst(ctx, sx, sy, 12, 5, i % 2 ? '#ffe14a' : '#ffffff', OUT, a.t * 0.2 + i);
+          }
+        }
+      }
+      // leque de cartas na mão e cartas voando nas faixas
+      if (d === this.ATK.cards && a.zones && o.fx != null) {
+        if (a.t < d.s) for (let i = 0; i < 5; i++) drawFlyingCard(ctx, o.fx + this.facing * 10, o.fy - 10, this.facing * (-0.6 + i * 0.3), i % 2 === 0);
+        else if (a.t < d.s + d.a) {
+          const u = (a.t - d.s) / d.a;
+          a.zones.forEach((z, j) => {
+            for (let i = 0; i < 3; i++) {
+              const cx = z.x0 - camX + (z.x1 - z.x0) * TT.clamp(u * 1.2 - i * 0.12, 0, 1);
+              drawFlyingCard(ctx, cx, z.y - 70, a.t * 0.6 + i + j, (i + j) % 2 === 0);
+            }
+          });
+        }
+      }
+      // feitiço: fio de magia da varinha até o alvo marcado
+      if (d === this.ATK.spell && a.zones && a.t < d.s + d.a) {
+        const z = a.zones[0], zx = z.x - camX, zy = z.y - 60;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(255,122,240,' + (0.3 + 0.5 * Math.max(0, k)) + ')'; ctx.lineWidth = 3 + 4 * Math.max(0, k);
+        ctx.setLineDash([12, 10]); ctx.lineDashOffset = -t * 2;
+        ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.quadraticCurveTo((tipX + zx) / 2, Math.min(tipY, zy) - 90, zx, zy); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        for (let i = 0; i < 3; i++) { const ang = t * 0.2 + i * 2.1; TT.drawBurst(ctx, zx + Math.cos(ang) * 34, zy - 30 + Math.sin(ang) * 12, 9, 5, '#ffc0f6', OUT, ang); }
+      }
+      ctx.restore();
+      // varinha caída no chão
+      if (fumbling) {
+        const wx = this.wandX - camX, wy = this.y + 6;
+        ctx.save(); ctx.translate(wx, wy); ctx.rotate(0.15);
+        ctx.fillStyle = '#1c1b26'; ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.fillRect(-30, -4, 60, 8); ctx.strokeRect(-30, -4, 60, 8);
+        ctx.fillStyle = '#f4f4f8'; ctx.fillRect(18, -4, 12, 8); ctx.strokeRect(18, -4, 12, 8);
+        ctx.restore();
+        TT.drawGlow(ctx, '#bff3ff', wx + 24, wy, 16 + Math.sin(t * 0.3) * 4, 0.7);
+      }
+      this.drawTell(ctx, x, y, y - this.height - 10);
+      if (fumbling) {
+        Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height + 20);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'VARINHA NO CHÃO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#bff3ff', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.Mumbo = Mumbo;
 
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {

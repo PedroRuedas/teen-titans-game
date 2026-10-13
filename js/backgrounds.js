@@ -1118,7 +1118,220 @@
     });
   }
 
+  // =============================================================== FASE 6 — O Show do Mumbo
+  // Rua do teatro à noite (letreiro com lâmpadas), bastidores do palco e o mundo dentro da cartola.
+  const S6_STAGE = 2700, S6_HAT = 5850;
+  const MB = '#86aee6', PURP = '#3a1a5e', GOLD = '#f2c94a';
+
+  function star5(g, x, y, r, col) {
+    g.beginPath();
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    g.closePath(); g.fillStyle = col; g.fill();
+  }
+  // Rostinho do Mumbo para cartazes (pele azul, nariz comprido, cartola).
+  function mumboFace(g, x, y, s) {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.strokeStyle = OUT; g.lineWidth = 2.5;
+    g.fillStyle = MB; g.beginPath(); g.arc(0, 0, 20, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(8, -2); g.quadraticCurveTo(30, 2, 34, 10); g.quadraticCurveTo(22, 12, 10, 8); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#f2f2f6'; g.beginPath(); g.ellipse(-16, 4, 7, 12, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = OUT; g.beginPath(); g.arc(6, -4, 2.5, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1c1b26'; g.fillRect(-16, -50, 32, 36); g.strokeRect(-16, -50, 32, 36);
+    g.fillRect(-26, -16, 52, 6); g.strokeRect(-26, -16, 52, 6);
+    g.fillStyle = '#c4162a'; g.fillRect(-16, -24, 32, 6);
+    g.restore();
+  }
+
+  function s6Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#0c0a24'); sky.addColorStop(1, '#3a2460');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 80, 301, (cx, r) => { g.fillStyle = 'rgba(255,245,220,' + (0.3 + r() * 0.5) + ')'; g.fillRect(cx + r() * 80, r() * 260, 2, 2); });
+    // holofotes do show cruzando o céu
+    cells(x0, x1, 700, 303, (cx, r) => {
+      const bx = cx + 200 + r() * 300, ang = -0.5 + r();
+      g.fillStyle = 'rgba(255,240,180,0.08)';
+      g.beginPath(); g.moveTo(bx, 440); g.lineTo(bx + Math.sin(ang) * 500 - 60, 0); g.lineTo(bx + Math.sin(ang) * 500 + 60, 0); g.closePath(); g.fill();
+    });
+    // silhuetas dos prédios de Jump City
+    cells(x0, x1, 130, 305, (cx, r) => {
+      const w = 90 + r() * 40, h = 120 + r() * 160;
+      g.fillStyle = '#1a1438'; g.fillRect(cx, 440 - h, w, h);
+      g.fillStyle = 'rgba(255,220,130,0.5)';
+      for (let y = 450 - h; y < 430; y += 22) for (let x = cx + 10; x < cx + w - 10; x += 18) if (r() > 0.6) g.fillRect(x, y, 7, 10);
+    });
+    g.fillStyle = '#120e28'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s6Mid(g, x0, x1) {
+    cells(x0, x1, 420, 311, (cx, r) => { // prédios mais próximos com caixas d'água
+      const w = 170 + r() * 80, h = 190 + r() * 90, x = cx + r() * 100;
+      g.fillStyle = '#2a2050'; g.fillRect(x, 470 - h, w, h);
+      g.fillStyle = '#231a44'; g.fillRect(x + w - 30, 470 - h, 30, h);
+      g.fillStyle = 'rgba(255,214,120,0.6)';
+      for (let y = 490 - h; y < 450; y += 30) for (let xx = x + 14; xx < x + w - 40; xx += 26) if (r() > 0.5) g.fillRect(xx, y, 12, 16);
+      if (r() > 0.5) { g.fillStyle = '#1a1438'; g.fillRect(x + 30, 440 - h, 36, 30); g.fillRect(x + 34, 470 - h - 2, 4, 4); g.fillRect(x + 58, 470 - h - 2, 4, 4); }
+    });
+  }
+
+  function s6Near(g, x0, x1) {
+    // --- rua do teatro
+    if (x0 < S6_STAGE) clipX(g, x0, Math.min(x1, S6_STAGE), () => {
+      cells(x0, x1, 1300, 321, (cx) => {
+        const tx = cx + 300;
+        // fachada de tijolos
+        g.fillStyle = '#6a2a3a'; g.fillRect(tx - 40, 120, 760, FT - 120);
+        g.strokeStyle = 'rgba(40,10,20,0.45)'; g.lineWidth = 2;
+        for (let y = 130, row = 0; y < FT; y += 18, row++) { g.beginPath(); g.moveTo(tx - 40, y); g.lineTo(tx + 720, y); g.stroke(); for (let x = tx - 40 + (row % 2) * 18; x < tx + 720; x += 36) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 18); g.stroke(); } }
+        g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(tx - 40, 120, 760, FT - 120);
+        // letreiro com lâmpadas
+        g.fillStyle = '#1c1b26'; g.fillRect(tx + 60, 140, 560, 110); g.strokeRect(tx + 60, 140, 560, 110);
+        g.fillStyle = GOLD; for (let x = tx + 70; x < tx + 620; x += 22) { g.beginPath(); g.arc(x, 148, 4, 0, Math.PI * 2); g.arc(x, 242, 4, 0, Math.PI * 2); g.fill(); }
+        TT.drawText(g, 'MUMBO', tx + 340, 182, 52, GOLD, OUT, 'center', 6);
+        TT.drawText(g, 'O MAGNÍFICO • HOJE!', tx + 340, 224, 22, '#ffffff', OUT, 'center', 4);
+        const gl = g.createRadialGradient(tx + 340, 195, 30, tx + 340, 195, 360);
+        gl.addColorStop(0, 'rgba(255,220,120,0.25)'); gl.addColorStop(1, 'rgba(255,220,120,0)');
+        g.fillStyle = gl; g.fillRect(tx - 20, 0, 720, FT);
+        // portas e cartazes do Mumbo
+        g.fillStyle = '#3a1a22'; g.fillRect(tx + 250, 300, 180, FT - 300); g.strokeRect(tx + 250, 300, 180, FT - 300);
+        g.fillStyle = '#c99a3a'; g.fillRect(tx + 336, 300, 8, FT - 300);
+        for (const px of [tx + 90, tx + 490]) {
+          g.fillStyle = PURP; g.fillRect(px, 290, 110, 150); g.strokeStyle = GOLD; g.lineWidth = 5; g.strokeRect(px, 290, 110, 150);
+          mumboFace(g, px + 55, 380, 1.1);
+          star5(g, px + 20, 310, 9, GOLD); star5(g, px + 92, 420, 7, GOLD);
+          TT.drawText(g, 'MÁGICA!', px + 55, 425, 15, '#ffffff', OUT, 'center', 3);
+        }
+        // bilheteria
+        g.fillStyle = '#c4162a'; g.fillRect(tx + 640, 330, 70, FT - 330); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(tx + 640, 330, 70, FT - 330);
+        g.fillStyle = '#ffe9a0'; g.fillRect(tx + 652, 345, 46, 40); g.strokeRect(tx + 652, 345, 46, 40);
+      });
+      // muro baixo entre os prédios (para a rua não ficar vazia)
+      cells(x0, x1, 1300, 323, (cx) => {
+        const wx = cx + 1060, ww = 540;
+        g.fillStyle = '#4a3a5a'; g.fillRect(wx, 340, ww, FT - 340);
+        g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(wx, 340, ww, FT - 340);
+        g.fillStyle = '#ffffff'; g.fillRect(wx + 120, 370, 90, 60); g.strokeRect(wx + 120, 370, 90, 60);
+        TT.drawText(g, 'ESGOTADO', wx + 165, 400, 14, '#c4162a');
+        // poste
+        g.fillStyle = '#1c1b26'; g.fillRect(wx + 400, 230, 10, FT - 230);
+        g.fillStyle = '#ffe9a0'; g.beginPath(); g.arc(wx + 405, 226, 14, 0, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+      });
+      // calçada e rua
+      g.fillStyle = '#7a7088'; g.fillRect(x0, FT, x1 - x0, 60);
+      g.strokeStyle = 'rgba(40,30,50,0.4)'; g.lineWidth = 2;
+      for (let x = Math.floor(x0 / 80) * 80; x < x1; x += 80) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x - 10, FT + 60); g.stroke(); }
+      g.fillStyle = '#9a90a8'; g.fillRect(x0, FT + 56, x1 - x0, 8);
+      g.fillStyle = '#3a3448'; g.fillRect(x0, FT + 64, x1 - x0, H - FT - 64);
+      g.fillStyle = '#e8d070'; for (let x = Math.floor(x0 / 120) * 120; x < x1; x += 120) g.fillRect(x, 650, 60, 6);
+    });
+    // --- bastidores e palco
+    if (x1 > S6_STAGE && x0 < S6_HAT) clipX(g, Math.max(x0, S6_STAGE), Math.min(x1, S6_HAT), () => {
+      g.fillStyle = '#2a1e2a'; g.fillRect(x0, 0, x1 - x0, FT);
+      g.fillStyle = '#3a2a36'; for (let x = Math.floor(x0 / 60) * 60; x < x1; x += 60) g.fillRect(x, 0, 8, FT); // tábuas da parede
+      cells(x0, x1, 260, 331, (cx, r) => { // cordas e sacos de areia
+        const x = cx + r() * 200;
+        g.strokeStyle = '#c9a66a'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 120 + r() * 120); g.stroke();
+        if (r() > 0.5) { g.fillStyle = '#a07a4a'; g.beginPath(); g.ellipse(x, 250, 14, 20, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke(); }
+      });
+      cells(x0, x1, 640, 333, (cx, r) => {
+        if (cx < S6_STAGE - 100 || cx + 600 > S6_HAT) return;
+        // cortina roxa do palco ao fundo
+        g.fillStyle = '#4a1f6a'; g.fillRect(cx + 20, 60, 260, FT - 60);
+        g.strokeStyle = '#2e1244'; g.lineWidth = 6; for (let x = cx + 40; x < cx + 280; x += 34) { g.beginPath(); g.moveTo(x, 60); g.lineTo(x + 4, FT); g.stroke(); }
+        g.fillStyle = GOLD; g.fillRect(cx + 20, 60, 260, 16);
+        // armário mágico com estrelas
+        const bx = cx + 330;
+        g.fillStyle = '#2c3a8a'; g.fillRect(bx, 250, 110, FT - 250); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(bx, 250, 110, FT - 250);
+        g.fillStyle = '#1e2a6a'; g.fillRect(bx + 10, 262, 90, FT - 274);
+        for (const [sx, sy] of [[bx + 30, 300], [bx + 80, 340], [bx + 40, 400], [bx + 76, 430]]) star5(g, sx, sy, 10, GOLD);
+        // cartas gigantes encostadas e cartola no suporte
+        g.save(); g.translate(cx + 500, FT - 4); g.rotate(-0.12);
+        g.fillStyle = '#f6f2e6'; g.fillRect(-40, -130, 80, 130); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(-40, -130, 80, 130);
+        g.fillStyle = r() > 0.5 ? '#d0202a' : '#1a1a22'; g.font = 'bold 54px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(r() > 0.5 ? '♥' : '♠', 0, -62);
+        g.restore();
+        g.fillStyle = '#5a4030'; g.fillRect(cx + 572, 380, 8, FT - 380);
+        TT.drawTopHat(g, cx + 576, 384, 0.8, false);
+      });
+      // holofotes no teto
+      cells(x0, x1, 480, 337, (cx) => {
+        const lx = cx + 200;
+        g.fillStyle = '#1c1b26'; g.fillRect(lx - 16, 0, 32, 30);
+        g.fillStyle = 'rgba(255,240,190,0.12)'; g.beginPath(); g.moveTo(lx - 14, 30); g.lineTo(lx + 14, 30); g.lineTo(lx + 120, FT); g.lineTo(lx - 120, FT); g.closePath(); g.fill();
+      });
+      // palco de tábuas
+      g.fillStyle = '#8a5a36'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.strokeStyle = 'rgba(50,25,10,0.45)'; g.lineWidth = 2;
+      for (let y = FT + 28; y < H; y += 28) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+      for (let y = FT, row = 0; y < H; y += 28, row++) for (let x = Math.floor(x0 / 160) * 160 + (row % 2) * 80; x < x1; x += 160) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 28); g.stroke(); }
+      cells(x0, x1, 480, 339, (cx) => { g.fillStyle = 'rgba(255,240,190,0.14)'; g.beginPath(); g.ellipse(cx + 200, 600, 140, 40, 0, 0, Math.PI * 2); g.fill(); });
+      const sh = g.createLinearGradient(0, FT, 0, H);
+      sh.addColorStop(0, 'rgba(30,10,20,0.4)'); sh.addColorStop(1, 'rgba(30,10,20,0.05)');
+      g.fillStyle = sh; g.fillRect(x0, FT, x1 - x0, H - FT);
+    });
+    // --- dentro da cartola: espiral roxa e azul, cartas e cartolas flutuando
+    if (x1 > S6_HAT) clipX(g, Math.max(x0, S6_HAT), x1, () => {
+      g.fillStyle = '#2a1050'; g.fillRect(x0, 0, x1 - x0, FT);
+      cells(x0, x1, 900, 341, (cx) => { // espiral hipnótica
+        const sx = cx + 450, sy = 200;
+        for (let k = 0; k < 16; k++) {
+          const a0 = k * Math.PI / 8;
+          g.fillStyle = k % 2 ? '#3a1a70' : '#1e5a8a';
+          g.beginPath(); g.moveTo(sx, sy); g.arc(sx, sy, 700, a0, a0 + Math.PI / 8); g.closePath(); g.fill();
+        }
+        const gl = g.createRadialGradient(sx, sy, 10, sx, sy, 260);
+        gl.addColorStop(0, 'rgba(255,255,255,0.55)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gl; g.fillRect(sx - 260, sy - 260, 520, 520);
+      });
+      cells(x0, x1, 220, 343, (cx, r) => { // objetos flutuando
+        const x = cx + r() * 160, y = 60 + r() * 330, kind = r();
+        if (kind < 0.4) {
+          g.save(); g.translate(x, y); g.rotate(r() * 1.2 - 0.6);
+          g.fillStyle = '#f6f2e6'; g.fillRect(-22, -32, 44, 64); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(-22, -32, 44, 64);
+          const red = r() > 0.5; g.fillStyle = red ? '#d0202a' : '#1a1a22'; g.font = 'bold 28px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(red ? '♦' : '♣', 0, 2);
+          g.restore();
+        } else if (kind < 0.65) TT.drawTopHat(g, x, y + 30, 0.55 + r() * 0.3, false);
+        else star5(g, x, y, 10 + r() * 10, r() > 0.5 ? GOLD : '#ffffff');
+      });
+      // chão: xadrez preto e branco tingido de roxo
+      for (let y = FT, row = 0; y < H; y += 36, row++) for (let x = Math.floor(x0 / 64) * 64; x < x1; x += 64) {
+        g.fillStyle = ((x / 64) + row) % 2 ? '#1e1430' : '#d8cfee'; g.fillRect(x, y, 64, 36);
+      }
+      const sh = g.createLinearGradient(0, FT, 0, H);
+      sh.addColorStop(0, 'rgba(60,20,120,0.55)'); sh.addColorStop(1, 'rgba(60,20,120,0.15)');
+      g.fillStyle = sh; g.fillRect(x0, FT, x1 - x0, H - FT);
+    });
+    // passagens: porta dos bastidores e a boca da cartola gigante
+    if (x0 < S6_STAGE + 90 && x1 > S6_STAGE - 90) {
+      g.fillStyle = '#1c1b26'; g.fillRect(S6_STAGE - 80, 120, 160, FT - 120);
+      g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(S6_STAGE - 80, 120, 160, FT - 120);
+      g.fillStyle = '#6a3a2a'; g.fillRect(S6_STAGE - 66, 160, 132, FT - 160); g.lineWidth = 3; g.strokeRect(S6_STAGE - 66, 160, 132, FT - 160);
+      g.fillStyle = GOLD; star5(g, S6_STAGE, 220, 22, GOLD);
+      TT.drawText(g, 'CAMARIM', S6_STAGE, 140, 18, GOLD);
+    }
+    if (x0 < S6_HAT + 160 && x1 > S6_HAT - 160) {
+      g.fillStyle = '#14131c'; g.fillRect(S6_HAT - 150, 0, 300, FT);
+      g.fillStyle = '#c4162a'; g.fillRect(S6_HAT - 150, 300, 300, 40);
+      g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(S6_HAT - 150, -4, 300, FT + 4);
+      g.fillStyle = 'rgba(160,120,255,0.35)'; g.beginPath(); g.ellipse(S6_HAT, FT - 70, 90, 140, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  // Primeiro plano: cortina vermelha de veludo presa com corda dourada.
+  function s6Fg(g, x0, x1) {
+    cells(x0, x1, 1500, 351, (cx) => {
+      const x = cx + 750;
+      g.fillStyle = '#9a1222'; g.beginPath(); g.moveTo(x - 40, 0); g.lineTo(x + 60, 0); g.quadraticCurveTo(x + 30, 260, x + 50, H); g.lineTo(x - 30, H); g.quadraticCurveTo(x - 10, 260, x - 40, 0); g.closePath(); g.fill();
+      g.strokeStyle = '#5a0a14'; g.lineWidth = 5; for (const o of [-10, 15, 35]) { g.beginPath(); g.moveTo(x + o, 0); g.quadraticCurveTo(x + o - 10, 260, x + o + 5, H); g.stroke(); }
+      g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 40, 0); g.quadraticCurveTo(x - 10, 260, x - 30, H); g.stroke();
+      g.fillStyle = GOLD; g.fillRect(x - 36, 300, 92, 12); g.strokeRect(x - 36, 300, 92, 12);
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 6) {
+      return { layers: [new Layer(0.1, s6Far, 20), new Layer(0.38, s6Mid, 21), new Layer(1, s6Near, 22)], fg: new Layer(1.18, s6Fg, 23), id };
+    }
     if (id === 5) {
       return { layers: [new Layer(0.1, s5Far, 16), new Layer(0.38, s5Mid, 17), new Layer(1, s5Near, 18)], fg: new Layer(1.18, s5Fg, 19), id };
     }

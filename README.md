@@ -1,7 +1,8 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): cinco fases
-(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma** e **Academia H.I.V.E.**), os 5 Titãs jogáveis com troca
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): seis fases
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.** e
+**O Show do Mumbo**), os 5 Titãs jogáveis com troca
 em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
 ## Como jogar
@@ -107,6 +108,14 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    cibernético, **hipnose** (o círculo segue você; quem fica dentro fica tonto) e telecinese que
    arremessa carteiras e armários nos círculos marcados; abaixo de 50% chama alunos para ajudar.
    **Fraqueza:** depois da telecinese a **mente fica esgotada** — ele para e leva dano dobrado!
+6. **O Show do Mumbo**: rua do teatro à noite (letreiro "MUMBO — O MAGNÍFICO"), bastidores do palco e o
+   mundo **dentro da cartola**, com espiral hipnótica e cartas e cartolas flutuando. Inimigos:
+   **Soldados-Carta** (cartas de baralho vivas com lança; estocada em investida) e **Coelhos Mágicos**
+   gigantes (bote e salto esmagador). O chefe é o **Mumbo**: raio da varinha, leque de cartas em três
+   faixas (fique no vão entre elas!), coelhos que saem de cartolas nos círculos marcados e o feitiço
+   **"MUMBO JUMBO!"**, que transforma o Titã em **coelho** por alguns segundos (só anda e pula).
+   **Fraqueza:** depois dos coelhos da cartola ele **deixa a varinha cair** — fica sem magia e leva
+   dano dobrado!
 
 ## Música e vozes
 
@@ -161,25 +170,25 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 108 verificações e todas passam:
+página e chame a função serve.) A suíte tem 121 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
-  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus e do Irmão Sangue;
-  golpes da Jinx e do Mammoth (fase 5) com aviso no chão.
+  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus, do Irmão Sangue e do Mumbo;
+  golpes da Jinx, do Mammoth, do Soldado-Carta e do Coelho Mágico com aviso no chão; Titã virando coelho.
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante! e regressões.
-- 3 partidas completas (5 fases) do início ao fim com um bot.
-- Os cinco chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (6 fases) do início ao fim com um bot.
+- Os seis chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Mumbo, Control Freak, Slade…).
+- Mais fases (Control Freak, Slade…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.
