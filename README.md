@@ -257,7 +257,7 @@ página e chame a função serve.) A suíte tem 160 verificações e todas passa
 ## Publicar na web (Netlify)
 
 O jogo fica em https://jovens-titas-jump-city.netlify.app. Para publicar uma versão nova, copie
-`index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
+`index.html`, `manifest.webmanifest`, `sw.js`, `_headers`, `icons/`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
 
 ```
 npx netlify-cli deploy --prod --no-build --dir site
