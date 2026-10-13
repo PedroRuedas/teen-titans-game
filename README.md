@@ -46,6 +46,16 @@ Titã do parceiro), a câmera segue o meio dos dois e ninguém sai da tela. Pont
 compartilhados. Se um jogador ficar sem Titã livre, ele volta na próxima área; o jogo só acaba quando
 **todos** os Titãs caírem.
 
+### Instalar como app (celular e computador)
+
+O jogo é um **app instalável** (PWA), com o ícone do "T" amarelo da aba do navegador:
+
+- **Android (Chrome):** abra o link, toque em **INSTALAR APP** no menu do título (ou no menu ⋮ do Chrome
+  → *Instalar app*). O ícone aparece na tela inicial e o jogo abre em tela cheia, deitado.
+- **iPhone (Safari):** botão Compartilhar → *Adicionar à Tela de Início*.
+- **Computador (Chrome/Edge):** ícone de instalar na barra de endereço, ou **INSTALAR APP** no título.
+- Depois de aberto uma vez, o jogo **funciona sem internet**.
+
 ### Celular e tablet (botões na tela)
 
 Abra o link do jogo no navegador do celular, **na horizontal**. Os botões aparecem sozinhos em aparelhos
@@ -192,6 +202,7 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
 
 ```
 index.html        página do jogo
+manifest.webmanifest, sw.js, icons/   app instalável (ícones, modo offline)
 js/util.js        constantes, matemática, teclado e gamepad
 js/audio.js       efeitos, músicas e vozes sintetizados
 audio/arquivos.js seus próprios arquivos de música e voz (opcional)
@@ -217,12 +228,14 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 157 verificações e todas passam:
+página e chame a função serve.) A suíte tem 160 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
+- App instalável: manifesto sem erros, service worker guarda o jogo e ele abre sem internet, item
+  INSTALAR APP abre a instalação do navegador.
 - Voltar ao menu inicial pela pausa (com confirmação) e pelo game over.
 - Botões na tela: o item do menu liga/desliga e muda a opacidade (e salva); o analógico navega nos
   menus e anda; ATAQUE, FORTE, ESPECIAL, PULO, TROCAR e pausa funcionam.
@@ -243,8 +256,8 @@ página e chame a função serve.) A suíte tem 157 verificações e todas passa
 
 ## Publicar na web (Netlify)
 
-O jogo fica em https://jovens-titas-jump-city.netlify.app. Para publicar uma versão nova, copie só
-`index.html`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
+O jogo fica em https://jovens-titas-jump-city.netlify.app. Para publicar uma versão nova, copie
+`index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
 
 ```
 npx netlify-cli deploy --prod --no-build --dir site

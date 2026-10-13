@@ -820,6 +820,38 @@ async page => {
   ok('menu inicial pela pausa (com confirmação)', quit.paused === 'pause' && quit.item === 'quit' && quit.armed[0] === 'pause' && quit.armed[1] === 'CONFIRMAR' && quit.disarmed && quit.title[0] === 'title' && quit.title[1] === 0 && quit.title[2] === 0, quit);
   ok('menu inicial pelo game over (Esc); ENTER ainda tenta de novo', quit.fromGameOver === 'title' && quit.retry[0] === 'play' && quit.retry[1] === 2, quit);
 
+  // 6a3) APP INSTALÁVEL: manifesto sem erros, service worker guarda o jogo, abre sem internet e o item
+  //      INSTALAR APP aparece no título quando o navegador oferece a instalação
+  await page.goto('http://localhost:8765/?pwa=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.game);
+  // o service worker só controla a página a partir da próxima visita: espera ele ficar ativo e recarrega
+  await page.waitForFunction(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!(r && r.active); }, null, { timeout: 15000 }).catch(() => {});
+  await page.goto('http://localhost:8765/?pwa=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.game);
+  await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+  const cdp = await page.context().newCDPSession(page);
+  const man = await cdp.send('Page.getAppManifest');
+  const inst = (await cdp.send('Page.getInstallabilityErrors')).installabilityErrors.map((e) => e.errorId).filter((id) => id !== 'in-incognito');
+  const swInfo = await ev(async () => { const keys = await caches.keys(); const c = keys.length ? await caches.open(keys[0]) : null; return { controller: !!navigator.serviceWorker.controller, files: c ? (await c.keys()).length : 0 }; });
+  await page.context().setOffline(true);
+  const offline = await page.reload().then(() => page.waitForFunction(() => window.TT && TT.game && TT.game.state === 'title', null, { timeout: 10000 }))
+    .then(() => true).catch(() => false);
+  await page.context().setOffline(false);
+  if (!offline) { await page.goto('http://localhost:8765/?pwa2=' + Date.now()); await page.waitForFunction(() => window.TT && TT.game); }
+  const installItem = await ev(() => {
+    const g = TT.game; let prompted = 0;
+    const e = new Event('beforeinstallprompt'); e.prompt = () => { prompted++; }; e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+    const items = g.titleItems();
+    g.state = 'title'; g.stateT = 50; g.showControls = false; g.menuIdx = items.indexOf('install'); g.input.endStep();
+    g.input.pressed.add('menu'); g.step();
+    return { has: items.includes('install'), label: g.menuLabel('install').text, prompted };
+  });
+  ok('app instalável: manifesto sem erros e ícones', man.errors.length === 0 && inst.length === 0 && /Jovens Tit/.test(man.url ? 'Jovens Titãs' : ''), { errors: man.errors, inst });
+  ok('app instalável: service worker guarda o jogo e ele abre sem internet', swInfo.controller && swInfo.files >= 20 && offline, { swInfo, offline });
+  ok('app instalável: item INSTALAR APP aparece e abre a instalação', installItem.has && installItem.label === 'INSTALAR APP' && installItem.prompted === 1, installItem);
+  await ev(async () => { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); });
+
   // 6b) CO-OP LOCAL (2 jogadores) — recarrega a página para não herdar estado dos testes anteriores
   await page.goto('http://localhost:8765/?coop=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);

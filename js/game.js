@@ -630,9 +630,22 @@
     }
 
     // Itens do menu do título.
-    titleItems() { return this.touch ? ['play', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'stage', 'players', 'diff', 'controls']; }
+    titleItems() {
+      const it = this.touch ? ['play', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'stage', 'players', 'diff', 'controls'];
+      if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
+      return it;
+    }
     // Itens do menu de pausa.
     pauseItems() { return this.touch ? ['resume', 'diff', 'touch', 'quit'] : ['resume', 'diff', 'quit']; }
+
+    // Abre a janela de instalação do navegador (o item só aparece quando o navegador oferece).
+    installApp() {
+      const p = this.installPrompt;
+      if (!p) return;
+      A().play('select');
+      p.prompt();
+      p.userChoice.then((r) => { if (r && r.outcome === 'accepted') { this.installPrompt = null; this.menuIdx = 0; } }).catch(() => {});
+    }
 
     // Volta para a tela de título (a fase em andamento é abandonada).
     goTitle() {
@@ -668,6 +681,7 @@
         if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
         if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
+        if (it === 'install') { this.installApp(); return; }
         A().play('select');
         this.score = 0;
         this.startStage(this.stageSel || 0);
@@ -1181,7 +1195,7 @@
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
       const items = this.titleItems();
-      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 572, items.length > 5 ? 24 : 27);
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, items.length > 6 ? 566 : 572, items.length > 6 ? 21 : items.length > 5 ? 24 : 27);
       const tip = this.touch && this.touch.visible ? 'analógico escolhe e muda  •  ATAQUE confirma' : '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som';
       TT.drawText(ctx, tip, W / 2, 708, 16, '#bfc4e8', OUT, 'center', 4);
     }
@@ -1197,6 +1211,7 @@
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
         case 'touch': return this.touch.label();
+        case 'install': return { text: 'INSTALAR APP', color: '#6fe3ff' };
         case 'quit': return this.quitArm ? { text: 'SAIR DA FASE?', value: 'CONFIRMAR', color: '#ff5a4a' } : { text: 'MENU INICIAL' };
         default: return { text: String(it) };
       }

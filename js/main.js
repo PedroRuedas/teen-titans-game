@@ -148,6 +148,14 @@
       if (!errShown) { errShown = true; console.error(e); }
     }
     requestAnimationFrame(frame);
+    // App instalável: o service worker guarda o jogo para abrir sem internet (só em http/https, não em file://).
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      const reg = () => navigator.serviceWorker.register('sw.js').catch(() => {});
+      if (document.readyState === 'complete') reg(); else window.addEventListener('load', reg);
+    }
+    // O navegador avisa quando dá para instalar: aparece o item INSTALAR APP no título.
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); game.installPrompt = e; });
+    window.addEventListener('appinstalled', () => { game.installPrompt = null; game.menuIdx = 0; });
     // retratos grandes da cutscene do avante: desenhados antes, para a cena não engasgar ao começar
     setTimeout(() => { for (const k of TT.TITAN_ORDER) TT.portrait(k, 260); }, 800);
 
