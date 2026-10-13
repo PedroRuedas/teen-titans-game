@@ -1182,6 +1182,88 @@
     },
   });
 
+  // Soldado Congelador da Irmandade (fase 8): roupa térmica branca e azul, capuz com pelo, óculos de neve.
+  S.freezer = mkStyle({
+    skin: '#e9eef6', torso: '#e9eef6', arm: '#e9eef6', glove: '#3b78d8', hand: '#3b78d8', leg: '#c9d3e2', boot: '#2a3550',
+    shW: 33, hipW: 25, armW: 9.5, legW: 10,
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = C('#3b78d8'); ctx.fillRect(-18, -th + 12, 36, 6); // faixa azul
+      ctx.fillStyle = C('#5c6169'); ctx.fillRect(-18, -10, 36, 6);
+      if (!FLASH) { // emblema da Irmandade (um "B" num círculo vermelho)
+        ctx.beginPath(); ctx.arc(0, -th + 26, 6, 0, TAU2); ctx.fillStyle = '#d7263e'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('B', 0, -th + 26.5);
+      }
+    },
+    drawFront(ctx, P, hf) { // arma congelante de cano grosso, com a ponta azul
+      ctx.fillStyle = C('#8a909a'); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.rect(hf.ex - 4, hf.ey - 9, 34, 12); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C('#9fe8ff'); ctx.beginPath(); ctx.arc(hf.ex + 32, hf.ey - 3, 6, 0, TAU2); ctx.fill(); ctx.stroke();
+    },
+    drawHead(ctx, r) {
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.12, 0, TAU2); ctx.fillStyle = C('#e9eef6'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke(); // capuz
+      if (FLASH) return;
+      ctx.beginPath(); ctx.ellipse(r * 0.3, r * 0.05, r * 0.82, r * 0.78, 0, 0, TAU2); ctx.fillStyle = '#d8c8b0'; ctx.fill(); // borda de pelo
+      ctx.beginPath(); ctx.ellipse(r * 0.38, r * 0.08, r * 0.6, r * 0.6, 0, 0, TAU2); ctx.fillStyle = '#f0c8a0'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.8; ctx.stroke();
+      ctx.fillStyle = '#2a3550'; ctx.fillRect(-r * 0.05, -r * 0.3, r * 0.95, r * 0.34); // óculos de neve
+      ctx.fillStyle = '#5fc8ff'; ctx.fillRect(r * 0.08, -r * 0.24, r * 0.32, r * 0.22); ctx.fillRect(r * 0.5, -r * 0.24, r * 0.32, r * 0.22);
+      ctx.fillStyle = '#c9d3e2'; ctx.fillRect(r * 0.05, r * 0.2, r * 0.75, r * 0.32); // máscara de frio
+    },
+  });
+
+  // Madame Rouge (fase 8): espiã elástica — roupa preta justa, luvas, botas e cinto vermelhos, coque escuro.
+  S.rouge = mkStyle({
+    headR: 17, torsoH: 31, shW: 23, waistW: 13, hipW: 18, legL: [29, 28], armL: [20, 19], legW: 6.5, armW: 6, handR: 4.8, footR: 8,
+    skin: '#f3dcd2', torso: '#1c1a22', arm: '#1c1a22', glove: '#d7263e', hand: '#d7263e', leg: '#1c1a22', boot: '#d7263e',
+    legOpt: { split: 1.4, sole: '#7a1020' }, armOpt: { split: 1.55 },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = C('#d7263e'); ctx.fillRect(-12, -9, 24, 4); // cinto
+      if (!FLASH) { ctx.fillStyle = '#d7263e'; ctx.beginPath(); ctx.moveTo(-9, -th + 2); ctx.lineTo(9, -th + 2); ctx.lineTo(0, -th + 12); ctx.closePath(); ctx.fill(); } // gola em V
+    },
+    drawHead(ctx, r, pose) {
+      ctx.beginPath(); ctx.ellipse(-r * 0.45, -r * 0.95, r * 0.55, r * 0.45, -0.4, 0, TAU2); ctx.fillStyle = C('#2a1c22'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke(); // coque
+      headCircle(ctx, r, '#f3dcd2');
+      ctx.beginPath(); ctx.moveTo(-r * 0.95, r * 0.25); ctx.bezierCurveTo(-r * 1.15, -r * 0.6, -r * 0.4, -r * 1.15, r * 0.4, -r * 1.0);
+      ctx.bezierCurveTo(r * 0.9, -r * 0.85, r * 1.0, -r * 0.5, r * 0.95, -r * 0.35); ctx.quadraticCurveTo(r * 0.3, -r * 0.55, -r * 0.3, -r * 0.25); ctx.quadraticCurveTo(-r * 0.6, 0, -r * 0.95, r * 0.25); ctx.closePath();
+      ctx.fillStyle = C('#2a1c22'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (FLASH) return;
+      for (const ex of [r * 0.18, r * 0.62]) { // olhos semicerrados com sombra roxa
+        ctx.fillStyle = '#6a3a7a'; ctx.beginPath(); ctx.ellipse(ex, -r * 0.14, r * 0.17, r * 0.09, 0, 0, TAU2); ctx.fill();
+        ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(ex + r * 0.04, -r * 0.08, r * 0.08, r * 0.06, 0, 0, TAU2); ctx.fill();
+      }
+      if (pose.mouth === 'open' || pose.mouth === 'shout') mouth(ctx, r, pose, r * 0.5, r * 0.55);
+      else { ctx.fillStyle = '#c4162a'; ctx.beginPath(); ctx.ellipse(r * 0.48, r * 0.5, r * 0.18, r * 0.07, -0.1, 0, TAU2); ctx.fill(); } // batom vermelho
+    },
+  });
+
+  // Monsieur Mallah (chefe da fase 8): gorila enorme de pelo cinza-marrom, boina vermelha e cinturão de munição.
+  S.mallah = mkStyle({
+    scale: 1.6, headR: 19, torsoH: 46, shW: 54, waistW: 34, hipW: 30, chest: 6, legL: [18, 17], armL: [30, 28], legW: 14, armW: 15, handR: 12, footR: 11, headOff: 10, neck: 1,
+    skin: '#5a4a44', torso: '#5a4a44', arm: '#5a4a44', glove: '#3a302c', hand: '#3a302c', leg: '#4a3c36', boot: '#3a302c',
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      if (!FLASH) { ctx.fillStyle = '#7a6a62'; ctx.beginPath(); ctx.ellipse(6, -th * 0.5, 20, th * 0.38, 0, 0, TAU2); ctx.fill(); } // peito mais claro
+      ctx.save(); ctx.rotate(-0.55); // cinturão de munição na diagonal
+      ctx.fillStyle = C('#3a2a1c'); ctx.fillRect(-36, -th * 0.5 - 4, 72, 9);
+      if (!FLASH) { ctx.fillStyle = '#d4a52a'; for (let i = -30; i < 32; i += 9) ctx.fillRect(i, -th * 0.5 - 3, 5, 7); }
+      ctx.restore();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#5a4a44');
+      if (!FLASH) { // focinho de gorila, sobrancelha saliente
+        ctx.beginPath(); ctx.ellipse(r * 0.5, r * 0.32, r * 0.62, r * 0.5, 0.1, 0, TAU2); ctx.fillStyle = '#3a302c'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(r * 0.75, r * 0.12, r * 0.07, r * 0.05, 0, 0, TAU2); ctx.ellipse(r * 0.95, r * 0.14, r * 0.06, r * 0.05, 0, 0, TAU2); ctx.fill();
+        ctx.fillStyle = '#2a201c'; ctx.fillRect(-r * 0.1, -r * 0.38, r * 1.0, r * 0.16);
+        ctx.fillStyle = '#ffe9b0'; ctx.beginPath(); ctx.arc(r * 0.45, -r * 0.14, r * 0.1, 0, TAU2); ctx.fill(); ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(r * 0.48, -r * 0.13, r * 0.05, 0, TAU2); ctx.fill();
+        if (pose.mouth === 'open' || pose.mouth === 'shout') { ctx.fillStyle = '#5a1020'; ctx.beginPath(); ctx.ellipse(r * 0.6, r * 0.5, r * 0.3, r * 0.16, 0, 0, TAU2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(r * 0.42, r * 0.38, r * 0.36, r * 0.07); }
+      }
+      ctx.beginPath(); ctx.ellipse(-r * 0.1, -r * 0.9, r * 1.05, r * 0.42, -0.25, 0, TAU2); // boina vermelha inclinada
+      ctx.fillStyle = C('#c4162a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!FLASH) { ctx.fillStyle = '#c4162a'; ctx.fillRect(-r * 0.15, -r * 1.42, r * 0.12, r * 0.22); }
+    },
+  });
+
   S.cinderblock = mkStyle({
     scale: 2.0, skin: '#9b958d', torso: '#8e8880', arm: '#968f86', glove: '#7d776f', hand: '#8a847c', leg: '#857f77', boot: '#6f6a63',
     shW: 62, hipW: 44, torsoH: 46, headR: 17, legL: [20, 20], armL: [22, 22], armW: 17, legW: 17, handR: 12, footR: 10, headOff: 8,
@@ -1636,6 +1718,9 @@
     }
     ctx.restore(); FLASH = false;
   };
+
+  // Guepardo como forma de ataque (combo do Mutano): mesma figura da esquiva, na assinatura das formas.
+  TT.drawCheetahAtk = function (ctx, x, y, facing, t, s, end, flash) { TT.drawCheetah(ctx, x, y, facing, t, flash); };
 
   TT.drawCheetah = function (ctx, x, y, facing, t, flash) {
     FLASH = !!flash;

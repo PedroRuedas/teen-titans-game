@@ -666,9 +666,166 @@
   TT.TITANS_PLUS = {};
   for (const k in TITANS) TT.TITANS_PLUS[k] = Object.assign({}, TITANS[k], PLUS[k], { plus: true });
 
+  // ---------------------------------------------------------------- Combos novos (a partir da fase 8)
+  // Mantém os golpes novos e acrescenta: combo de 5 golpes (J J J J J) e o COMBO FINAL (J J + K), um
+  // golpe próprio de cada Titã com efeitos elaborados. O 3º e o 4º golpe não derrubam, para o combo
+  // inteiro entrar; o 5º é o finalizador da fase 7.
+  const P = TT.TITANS_PLUS;
+  // Junta um efeito extra ao onFrame de um golpe existente.
+  const withFx = (d, k, fx) => { const b = boost(d, k), orig = d.onFrame; b.onFrame = function (f, t, g, a) { if (orig) orig.call(this, f, t, g, a); fx.call(this, f, t, g, a); }; return b; };
+  // Nome do combo final na tela (e um anel na cor do Titã).
+  const comboName = (f, g, text) => { g.comboTag = { text, col: f.def.color, fx: f.def.fx || f.def.color, t: 0 }; g.particles.spawn('ring', f.x, f.y - f.z - 80, { color: f.def.fx || f.def.color, size: 140, life: 18 }); };
+  // Faíscas em estrela na mão da frente (golpes de energia).
+  const fistBurst = (f, g, col, n) => {
+    const R = f.rigOut, x = R && R.fx != null ? R.fx + g.camX : f.x + f.facing * 60, y = R && R.fy != null ? R.fy : f.y - f.z - 100;
+    for (let i = 0; i < (n || 8); i++) { const ang = Math.random() * Math.PI * 2, sp = TT.rand(3, 9); g.particles.spawn('star', x, y, { vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, color: TT.choice([col, '#ffffff']), size: TT.rand(6, 11), life: TT.randi(12, 20), rot: Math.random(), vr: 0.2 }); }
+    g.particles.spawn('glow', x, y, { color: col, size: 90, life: 10 });
+    g.particles.spawn('ring', x, y, { color: '#ffffff', size: 60, life: 10 });
+  };
+  const COMBO = {
+    robin: {
+      light: [P.robin.light[0], P.robin.light[1],
+        { pose: 'uppercut', weapon: 'staff', smear: 'slam', s: 5, a: 4, r: 9, dmg: 11, reach: [0, 108], kb: 2, stun: 24, sound0: 'whoosh',
+          onFrame(f, t, g) { if (t === this.s) { g.afterimage(f, '#ff5a3a'); fistBurst(f, g, '#ffd23a', 6); } } },
+        // chute giratório: Robin gira (acerta dos dois lados) e deixa imagens vermelhas para trás
+        { pose: 'kick', smear: 'kick', s: 4, a: 10, r: 10, dmg: 4, rehit: 3, reach: [-40, 112], depth: 40, kb: 1, stun: 22, sound0: 'whoosh',
+          onFrame(f, t, g) {
+            // o giro é visual: as imagens alternam de lado (o Robin não vira de verdade, para o 5º golpe sair para a frente)
+            if (t >= this.s && t < this.s + this.a && t % 2 === 0) g.afterimage(f, '#ff5a3a', (t >> 1) % 2 === 0);
+            if (t === this.s + 4) g.particles.spawn('text', f.x, f.y - 170, { text: 'TCHÁ!', size: 34, color: '#ffe14a', color2: '#d7262e', vy: -0.6, life: 24, rot: TT.rand(-0.2, 0.2) });
+          } },
+        withFx(P.robin.light[2], 1.1, (f, t, g) => { if (t === 2) g.afterimage(f, '#ff5a3a'); }),
+      ],
+      // GOLPE RELÂMPAGO: atravessa a fila de inimigos num risco vermelho; um instante depois todos os
+      // atravessados explodem em faíscas com o "R" do Robin
+      ender: { name: 'GOLPE RELÂMPAGO', pose: 'jab', weapon: 'staff', smear: 'jab', s: 7, a: 12, r: 18, dmg: 6, rehit: 4, reach: [-60, 110], depth: 54, kb: 0, stun: 46, lunge: 32, big: true, sound0: 'whoosh',
+        onFrame(f, t, g, a) {
+          if (t === 1) { comboName(f, g, this.name); a.x0 = f.x; a.marked = new Set(); f.invul = Math.max(f.invul, 34); }
+          if (t < this.s) g.particles.spawn('glow', f.x + TT.rand(-20, 20), f.y - 80 + TT.rand(-30, 30), { color: '#ff5a3a', size: 30, life: 8 });
+          if (t >= this.s && t < this.s + this.a) { g.afterimage(f, '#ff5a3a'); for (const e of a.hits) a.marked.add(e); }
+          if (t === this.s + this.a) { for (const e of a.hits) a.marked.add(e); g.addEffect(new SlashLine(g, a.x0, f.x, f.y, '#ff5a3a')); A().play('birdarang'); }
+          if (t === this.s + this.a + 6) g.addEffect(new DelayedBursts(g, f, [...a.marked], { dmg: 24, col: '#ff5a3a', word: 'SHING!', emblem: 'R' }));
+        } },
+    },
+    starfire: {
+      light: [P.starfire.light[0], P.starfire.light[1],
+        { pose: 'uppercut', hands: 'open', smear: 'slam', s: 5, a: 4, r: 9, dmg: 11, reach: [0, 84], kb: 2, stun: 24, sound0: 'whoosh', glow: GREEN,
+          onFrame(f, t, g) { if (t === this.s) fistBurst(f, g, GREEN, 10); } },
+        // giro de energia: dois anéis verdes em órbita acertam os dois lados
+        { pose: 'spin', hands: 'open', s: 4, a: 10, r: 10, dmg: 4, rehit: 3, reach: [-60, 100], depth: 44, kb: 1, stun: 22, sound0: 'whoosh', glow: GREEN,
+          onFrame(f, t, g) {
+            if (t >= this.s && t < this.s + this.a) {
+              const ang = t * 0.9;
+              for (const s of [0, Math.PI]) g.particles.spawn('glow', f.x + Math.cos(ang + s) * 70, f.y - f.z - 90 + Math.sin(ang + s) * 22, { color: GREEN, size: 34, life: 8 });
+              if (t % 2 === 0) g.afterimage(f, GREEN);
+            }
+          } },
+        // espiral de starbolts: seis estrelas saem girando em leque
+        { anim: 'sfCharge', hands: 'open', s: 12, a: 1, r: 14,
+          onFrame(f, t, g) {
+            if (t < this.s && t % 2 === 0) g.particles.spawn('glow', f.x + f.facing * 46 + TT.rand(-24, 24), f.y - f.z - 92 + TT.rand(-24, 24), { color: GREEN, size: 18, life: 10, vx: -f.facing * 1.5 });
+            if (t === this.s) {
+              for (let i = 0; i < 6; i++) spawnBolt(f, g, false, (i - 2.5) * 0.9, { dmg: 6, kb: 5, knockdown: true, launch: 5, vx: f.facing * (11 + (i % 3) * 1.5) });
+              fistBurst(f, g, GREEN, 12);
+            }
+          } },
+      ],
+      // SUPERNOVA: a raiva tamaraneana — ela brilha, os olhos acendem e uma onda verde explode em volta
+      ender: { name: 'SUPERNOVA', pose: 'castUp', hands: 'open', s: 20, a: 1, r: 24, sound0: 'super', glow: GREEN, mouth: 'shout',
+        onFrame(f, t, g) {
+          if (t === 1) { comboName(f, g, this.name); f.vz = Math.max(f.vz, 4); f.z = Math.max(f.z, 1); }
+          if (t < this.s) {
+            const ang = Math.random() * Math.PI * 2, R = 160 * (1 - t / this.s) + 30;
+            g.particles.spawn('star', f.x + Math.cos(ang) * R, f.y - f.z - 90 + Math.sin(ang) * R * 0.6, { vx: -Math.cos(ang) * 6, vy: -Math.sin(ang) * 4, color: TT.choice([GREEN, '#ffffff']), size: 9, life: 12, rot: Math.random() });
+          }
+          if (t === this.s) { g.addEffect(new Nova(g, f, { x: f.x, y: f.y, r: 300, dmg: 36, col: GREEN, word: 'SUPERNOVA!' })); g.tintScreen(GREEN, 18); A().play('boom'); }
+        } },
+    },
+    cyborg: {
+      light: [P.cyborg.light[0], P.cyborg.light[1],
+        { anim: 'cyHook', smear: 'swipe', s: 6, a: 4, r: 10, dmg: 12, reach: [0, 88], kb: 2, stun: 24, sound0: 'whoosh',
+          onFrame(f, t, g) { if (t >= this.s && t < this.s + 3) for (let i = 0; i < 4; i++) g.particles.spawn('spark', f.x + f.facing * 60, f.y - f.z - 100, { vx: f.facing * TT.rand(2, 8), vy: TT.rand(-5, 2), color: TT.choice(['#9fd8ff', '#ffffff']), size: 4, life: 12 }); } },
+        // punho-foguete: o punho sai voando com chamas e atravessa a fila
+        { anim: 'cyPiston', s: 6, a: 1, r: 14, sound0: 'alarm',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            heroShot(f, g, { kind: 'rocketFist', z: f.z + handZ(f, 92), vx: f.facing * 15, r: 22, dmg: 13, kb: 3, stun: 24, pierce: true, life: 30, trailN: 10 });
+            g.particles.spawn('glow', f.x + f.facing * 60, f.y - f.z - 96, { color: '#ff9a3a', size: 70, life: 10 });
+            A().play('whoosh');
+          } },
+        withFx(P.cyborg.light[2], 1.1, () => {}),
+      ],
+      // RAJADA BOOYAH: os dois canhões alternam tiros sônicos e terminam numa explosão sônica azul
+      ender: { name: 'RAJADA BOOYAH', anim: 'cyCannon', form: 'cannon', s: 10, a: 30, r: 16, sound0: 'alarm', mouth: 'shout',
+        onFrame(f, t, g) {
+          if (t === 1) comboName(f, g, this.name);
+          if (t >= this.s && t < this.s + this.a - 6 && (t - this.s) % 4 === 0) {
+            const k = (t - this.s) / 4;
+            heroShot(f, g, { kind: 'sonicShot', z: f.z + handZ(f, 92) + (k % 2 ? 22 : -10), vx: f.facing * 17, vy: (k % 3 - 1) * 0.6, r: 16, dmg: 5, kb: 1.5, stun: 18, life: 40, trailN: 6 });
+            A().play('laser');
+          }
+          if (t === this.s + this.a - 4) {
+            g.addEffect(new Nova(g, f, { x: f.x + f.facing * 200, y: f.y, r: 190, dmg: 22, col: SONIC, word: 'BOOYAH!' }));
+            g.tintScreen(SONIC, 12); A().play('sonic');
+          }
+        } },
+    },
+    raven: {
+      light: [P.raven.light[0], P.raven.light[1],
+        { anim: 'rvSweep', hands: 'open', s: 6, a: 4, r: 10, dmg: 11, reach: [0, 104], kb: 2, stun: 24, sound0: 'whoosh', claw: true },
+        // mãos de sombra: duas mãos de energia negra sobem do chão à frente e agarram
+        { anim: 'rvPalm', hands: 'open', s: 7, a: 9, r: 12, dmg: 5, rehit: 4, reach: [40, 200], depth: 46, kb: 0.5, stun: 24, sound: 'dark',
+          onFrame(f, t, g) { if (t === this.s) g.addEffect(new ShadowHands(g, f.x + f.facing * 125, f.y, f.facing)); } },
+        withFx(P.raven.light[2], 1.1, () => {}),
+      ],
+      // ESFERAS DE AZARATH: cada inimigo à frente é preso numa esfera de energia negra, erguido e esmagado
+      ender: { name: 'ESFERAS DE AZARATH', anim: 'rvSpecial', hands: 'open', s: 14, a: 1, r: 28, sound0: 'dark', mouth: 'shout',
+        onFrame(f, t, g) {
+          if (t === 1) comboName(f, g, this.name);
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-50, 50), f.y - f.z - TT.rand(30, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 26, vr: 0.1 });
+          if (t === this.s) { g.addEffect(new DarkOrbs(g, f, { range: 460, dmg: 30 })); g.tintScreen('#5a2a9a', 14); }
+        } },
+    },
+    beastboy: {
+      light: [P.beastboy.light[0], P.beastboy.light[1],
+        { anim: 'bbClaw', smear: 'claw', s: 6, a: 4, r: 10, dmg: 11, reach: [0, 96], kb: 2, stun: 24, sound0: 'whoosh' },
+        // guepardo: avança dando arranhões rápidos
+        { form: 'cheetahAtk', pose: 'jab', s: 5, a: 12, r: 10, lunge: 3, dmg: 4, rehit: 4, reach: [0, 112], depth: 44, kb: 1, stun: 22, sound0: 'whoosh',
+          onFrame(f, t, g) {
+            if (t === 1) morphIn(f, g, 40);
+            if (t >= this.s && t < this.s + this.a && (t - this.s) % 4 === 0) {
+              g.particles.spawn('text', f.x + f.facing * 110, f.y - 120 + TT.rand(-20, 20), { text: TT.choice(['SWIPE!', 'SHRAK!']), size: 26, color: '#d6ffc0', color2: '#2b6418', vy: -0.6, life: 18, rot: TT.rand(-0.3, 0.3) });
+              g.afterimage(f, '#8dff5a');
+            }
+            if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 40, true);
+          } },
+        P.beastboy.light[2],
+      ],
+      finishers: P.beastboy.finishers.map((d) => boost(d, 1.1)),
+      // ESTOURO DA MANADA: rinoceronte em investida → gorila esmurrando o chão → T-Rex rugindo (onda de choque)
+      ender: { name: 'ESTOURO DA MANADA', pose: 'jab', s: 6, a: 46, r: 12, dmg: 8, rehit: 8, reach: [0, 170], depth: 58, kb: 2, stun: 26, big: true, sound0: 'roar',
+        formAt(t) {
+          if (t < 22) return { form: 'rhino', t: t + 3, s: 4, end: 24 };
+          if (t < 38) return { form: 'gorilla', t: t - 20, s: 10, end: 14 };
+          return { form: 'trex', t: t - 36, s: 6, end: 40 };
+        },
+        onFrame(f, t, g) {
+          if (t === 1) { comboName(f, g, this.name); morphIn(f, g, 60); }
+          if (t > this.s && t < 22) { f.vx = f.facing * 9; if (t % 3 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#c9b9a8'); g.shake = Math.max(g.shake, 3); } }
+          if (t === 22 || t === 38) { g.morph(f.x, f.y - 70); A().play('roar'); }
+          if (t === 30) { g.shake = 14; g.groundRing(f.x + f.facing * 110, f.y, '#8dff5a'); g.debrisBurst(f.x + f.facing * 110, f.y - 10, 10, '#8e8880'); g.particles.spawn('text', f.x + f.facing * 110, f.y - 170, { text: 'BLAM!', size: 44, color: '#ffe14a', color2: '#4f9d2d', vy: -0.6, life: 30 }); }
+          if (t === 44) { g.addEffect(new Nova(g, f, { x: f.x + f.facing * 60, y: f.y, r: 280, dmg: 22, col: '#8dff5a', word: 'ROOOAR!' })); g.tintScreen('#4f9d2d', 12); }
+          if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 70, true);
+        } },
+    },
+  };
+  TT.TITANS_COMBO = {};
+  for (const k in TITANS) TT.TITANS_COMBO[k] = Object.assign({}, P[k], COMBO[k], { combos: true });
+  TT.TITAN_POWERS = [TITANS, TT.TITANS_PLUS, TT.TITANS_COMBO];
+
   const BUFFERED = ['light', 'heavy', 'special', 'jump', 'dash'];
   // Formas animais do Mutano: nome da função de desenho em render.js.
-  const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam', elephant: 'drawElephant', beast: 'drawBeast' };
+  const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam', elephant: 'drawElephant', beast: 'drawBeast', cheetahAtk: 'drawCheetahAtk' };
 
   class Titan extends Fighter {
     constructor(game, key) {
@@ -693,8 +850,8 @@
       if (this.def.floaty) this.grav = TT.GRAVITY * 0.72;
     }
 
-    // Golpes novos (fase 7 em diante) ou os originais.
-    setPower(on) { this.def = (on ? TT.TITANS_PLUS : TITANS)[this.key]; this.combo = 0; this.comboWindow = 0; }
+    // Nível de poder: 0 = golpes originais, 1 = golpes novos (fase 7), 2 = golpes novos + combos (fase 8).
+    setPower(lv) { this.def = TT.TITAN_POWERS[lv === true ? 1 : lv || 0][this.key]; this.combo = 0; this.comboWindow = 0; }
 
     reset() {
       this.hp = this.maxHp; this.ko = false; this.dead = false; this.atk = null;
@@ -785,8 +942,13 @@
           this.vy *= 0.6;
           const a = this.atk;
           // encadeia o combo leve
-          if (a && a.def.combo != null && this.buffer === 'light' && a.t >= a.def.s + a.def.a - 1 && a.def.combo < 2) {
+          if (a && a.def.combo != null && this.buffer === 'light' && a.t >= a.def.s + a.def.a - 1 && a.def.combo < this.def.light.length - 1) {
             this.buffer = null; this.doCombo(); return;
+          }
+          // COMBO FINAL (fase 8): forte depois de pelo menos dois golpes do combo
+          if (a && a.def.combo != null && a.def.combo >= 1 && this.def.ender && this.buffer === 'heavy' && a.t >= a.def.s + a.def.a - 1) {
+            this.buffer = null; this.combo = 0; this.comboWindow = 0; this.vx = 0; this.vy = 0;
+            this.startAttack(this.def.ender); return;
           }
           // cancela em especial após acertar
           if (a && a.landed && this.buffer === 'special' && a.t >= a.def.s + a.def.a) { this.buffer = null; if (this.trySpecial()) return; }
@@ -800,13 +962,13 @@
     }
 
     doCombo() {
-      const i = this.comboWindow > 0 ? Math.min(this.combo, 2) : 0;
+      const n = this.def.light.length, i = this.comboWindow > 0 ? Math.min(this.combo, n - 1) : 0;
       let def = this.def.light[i];
-      if (i === 2 && this.def.finishers) def = TT.choice(this.def.finishers);
+      if (i === n - 1 && this.def.finishers) def = TT.choice(this.def.finishers);
       def.combo = i;
       this.vx = 0; this.vy = 0;
       this.startAttack(def);
-      this.combo = (i + 1) % 3;
+      this.combo = (i + 1) % n;
       this.comboWindow = def.s + def.a + def.r + 14;
     }
 
@@ -902,7 +1064,7 @@
     }
 
     draw(ctx, camX) {
-      const a = this.atk, f = a && a.def.form;
+      const a = this.atk, fa = a && a.def.formAt ? a.def.formAt(a.t) : null, f = fa ? fa.form : a && a.def.form;
       const sx = this.x - camX, sy = this.y - this.z;
       if (this.invul > 0 && this.state !== 'getup' && this.state !== 'dash' && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.55;
       const fl = this.flash > 3;
@@ -913,7 +1075,9 @@
         ctx.globalAlpha = 1;
         return;
       }
-      if (FORM && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+      if (FORM && fa && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+        TT[FORM](ctx, sx, sy, this.facing, fa.t, fa.s, fa.end, fl); // forma da vez numa sequência de animais
+      } else if (FORM && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
         TT[FORM](ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
       } else if (this.state === 'dash' && this.key === 'beastboy') {
         TT.drawCheetah(ctx, sx, sy, this.facing, this.animT, fl);
@@ -938,6 +1102,7 @@
           TT.drawGlow(ctx, '#ff7af0', sx + Math.cos(ang) * 26, sy - 150 + Math.sin(ang) * 8, 14, 0.9);
         }
       } else this.hypno = false;
+      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen); // raio congelante da Irmandade
     }
 
     // Rastro verde da Estelar voando na esquiva.
@@ -1177,6 +1342,28 @@
           g.particles.spawn('text', z.x, z.y - 140, { text: 'FWOOSH!', size: 34, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
         } },
       { pose: 'claw', s: 16, a: 5, r: 18, lunge: 6, dmg: 10, reach: [0, 82], kb: 4, sound0: 'whoosh', fire: true },
+    ],
+  };
+  // Soldado Congelador da Irmandade do Mal (fase 8): raio congelante em linha (marcado) que prende o Titã
+  // num bloco de gelo — como a Irmandade fez com os heróis no fim da série — e coronhada de perto.
+  ENEMIES.freezer = {
+    name: 'Soldado Congelador', style: 'freezer', hp: 76, speed: 3.0, range: 170, score: 240, aggr: 1.15,
+    attacks: [
+      { pose: 'beam', s: 30, a: 8, r: 20, dmg: 8, zoneHit: true, freezeHero: 55, stun: 55, kb: 0, sound0: 'alarm', sound: 'laser',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 360, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'swing', s: 14, a: 5, r: 16, lunge: 5, dmg: 9, reach: [0, 84], kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  // Madame Rouge (fase 8): espiã elástica da Irmandade; chute esticado de longe (faixa marcada) e giro
+  // com os braços esticados em volta dela (círculo marcado).
+  ENEMIES.rouge = {
+    name: 'Madame Rouge', style: 'rouge', hp: 120, speed: 3.6, range: 190, score: 800, aggr: 1.3,
+    attacks: [
+      { pose: 'kick', s: 22, a: 8, r: 18, dmg: 12, zoneHit: true, knockdown: true, launch: 6, kb: 8, stretch: 'leg', sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 300, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'spin', s: 22, a: 10, r: 18, dmg: 10, zoneHit: true, knockdown: true, launch: 6, kb: 7, stretch: 'arms', sound0: 'whoosh',
+        zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 150, ry: 54 }]; },
+        onFrame(f, t) { if (t >= this.s && t < this.s + this.a && t % 3 === 0) f.facing *= -1; } },
     ],
   };
   TT.ENEMIES = ENEMIES;
@@ -1674,6 +1861,55 @@
     }
   }
   TT.CardSoldier = CardSoldier;
+
+  // Soldado Congelador (fase 8): bate e recua; o raio congelante sai da arma em linha reta.
+  class FreezeTrooper extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'freezer'); }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.def !== this.def.attacks[0] || this.dead) return;
+      const d = a.def, x = this.x - camX + this.facing * 52, y = this.y - this.z - 82;
+      if (a.t < d.s) { TT.drawGlow(ctx, '#9fe8ff', x, y, 12 + 26 * (a.t / d.s), 1); return; }
+      if (a.t >= d.s + d.a + 4) return;
+      const k = Math.min(1, (a.t - d.s + 1) / 3), L = 330 * k, fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = fade;
+      ctx.strokeStyle = '#5fc8ff'; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + this.facing * L, this.y - 40); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + this.facing * L, this.y - 40); ctx.stroke();
+      ctx.restore();
+      for (let i = 0; i < 3; i++) { const u = Math.random() * k; this.game.particles.spawn('star', this.x + this.facing * (52 + u * 330), TT.lerp(this.y - this.z - 82, this.y - 40, u), { color: '#e6fbff', size: 7, life: 10, rot: Math.random() }); }
+    }
+  }
+  TT.FreezeTrooper = FreezeTrooper;
+
+  // Madame Rouge (fase 8): perna ou braços esticados (corpo elástico) durante o golpe.
+  class MadameRouge extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'rouge'); this.radius = 22; }
+    think() {
+      super.think();
+      if (!this.said && !this.entering && !this.dead) { this.said = true; this.game.say(this, 'Olá, Titãs... adeus, Titãs.', '#ff7a8a'); }
+    }
+    draw(ctx, camX) {
+      const a = this.atk, d = a && a.def, x = this.x - camX, y = this.y - this.z;
+      const act = a && this.state === 'attack' && d.stretch && a.t >= d.s && a.t < d.s + d.a + 4;
+      if (act) {
+        // membros elásticos: faixa preta com contorno e bota/luva vermelha na ponta
+        const k = Math.min(1, (a.t - d.s + 1) / 3) * (a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1);
+        const limbs = d.stretch === 'leg' ? [[this.facing, 280 * k, y - 46]] : [[1, 140 * k, y - 96], [-1, 140 * k, y - 96]];
+        ctx.save(); ctx.lineCap = 'round';
+        for (const [dir, L, ly] of limbs) {
+          const x1 = x + dir * L, wob = Math.sin(a.t * 0.9) * 10;
+          ctx.strokeStyle = OUT; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(x, ly); ctx.quadraticCurveTo((x + x1) / 2, ly + wob, x1, ly); ctx.stroke();
+          ctx.strokeStyle = '#1c1a22'; ctx.lineWidth = 10; ctx.stroke();
+          ctx.fillStyle = '#d7263e'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(x1, ly, 14, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      Fighter.prototype.draw.call(this, ctx, camX);
+    }
+  }
+  TT.MadameRouge = MadameRouge;
 
   // Comando do Slade (fase 7): mesma tática de bate e recua, sempre com o bastão na mão.
   class SladeCommando extends ShockTrooper {
@@ -3471,6 +3707,212 @@
   }
   TT.Slade = Slade;
 
+  // Cúpula de vidro com o Cérebro (o líder da Irmandade do Mal), presa num suporte de metal.
+  // open = tampa aberta e o cérebro faiscando (fraqueza). s = escala.
+  function drawBrainJar(ctx, x, y, s, t, open, flash) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = flash ? '#fff' : '#5c6169'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-30, 6, 60, 18, 5); else ctx.rect(-30, 6, 60, 18); ctx.fill(); ctx.stroke(); // base
+    ctx.fillStyle = '#3a3d47'; ctx.fillRect(-22, 12, 44, 5);
+    if (!flash) { ctx.fillStyle = (t >> 3) % 2 ? '#ff3b30' : '#ffe14a'; ctx.beginPath(); ctx.arc(20, 15, 3, 0, Math.PI * 2); ctx.fill(); }
+    // líquido verde e o cérebro rosa boiando
+    ctx.save(); ctx.beginPath(); ctx.ellipse(0, -14, 26, 28, 0, Math.PI, 0); ctx.lineTo(26, 6); ctx.lineTo(-26, 6); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = flash ? '#fff' : 'rgba(120,230,170,0.55)'; ctx.fillRect(-30, -50, 60, 60);
+    const bob = Math.sin(t * 0.08) * 2;
+    ctx.fillStyle = flash ? '#fff' : '#f2a6c0'; ctx.strokeStyle = '#a8506e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, -14 + bob, 17, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (!flash) {
+      ctx.strokeStyle = '#c96a8e'; ctx.lineWidth = 1.6;
+      for (const [a, b, c, d2] of [[-12, -18, -4, -10], [-6, -24, 2, -16], [4, -22, 12, -14], [-10, -8, 2, -6], [6, -10, 12, -6]]) { ctx.beginPath(); ctx.moveTo(a, b + bob); ctx.quadraticCurveTo((a + c) / 2 + 3, (b + d2) / 2 - 4 + bob, c, d2 + bob); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let i = 0; i < 3; i++) { const by = ((t * 0.6 + i * 14) % 36); ctx.beginPath(); ctx.arc(-12 + i * 12, 2 - by, 2, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.restore();
+    // vidro
+    ctx.beginPath(); ctx.ellipse(0, -14, 26, 28, 0, Math.PI, 0); ctx.lineTo(26, 6); ctx.lineTo(-26, 6); ctx.closePath();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+    if (!flash) { ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-6, -18, 18, 3.6, 4.4); ctx.stroke(); }
+    if (open) { // tampa aberta para o lado e faíscas
+      ctx.save(); ctx.translate(20, -40); ctx.rotate(0.9);
+      ctx.fillStyle = flash ? '#fff' : '#8a909a'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, 0, 16, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+      if (!flash) for (let i = 0; i < 3; i++) { const ang = t * 0.4 + i * 2.1; TT.drawArc(ctx, 0, -20, Math.cos(ang) * 30, -20 + Math.sin(ang) * 26, '#ffe14a', 2, 4); }
+    } else {
+      ctx.fillStyle = flash ? '#fff' : '#8a909a'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, -42, 10, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // tampa
+    }
+    ctx.restore();
+  }
+  TT.drawBrainJar = drawBrainJar;
+
+  // ---- Monsieur Mallah e o Cérebro (fase 8): o gorila de boina da Irmandade do Mal carrega o Cérebro
+  // no ombro. Fraqueza: depois do laser, a cúpula superaquece e ABRE — o cérebro fica exposto (dano dobrado).
+  class Mallah extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'MALLAH E O CÉREBRO';
+      this.style = TT.STYLES.mallah;
+      this.hp = this.maxHp = 2800; // os Titãs já têm golpes novos e combos
+      this.radius = 50; this.height = 250; this.shadowW = 80;
+      this.poiseMax = 200;
+      this.def = { score: 14000 };
+      this.openT = 0; this.atkCount = 0; this.p2Said = false; this.summonCool = 0; this.out = {};
+      this.taunts = ['Mestre, eles são persistentes.', 'Pelo Cérebro!', 'GRRRAH!', 'A Irmandade não perde.'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      this.ATK = {
+        // tapa de gorila em arco à frente
+        smash: { pose: 'bigSwing', s: 26, a: 6, r: 24, dmg: 16, knockdown: true, launch: 7, kb: 10, zoneHit: true, color: '#ff8a3a', sound0: 'roar',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 210, ry: 60, f: f.facing }]; },
+          onFrame(f, t, g) { if (t === this.s) { A().play('hitHeavy'); g.impact(f.x + f.facing * 130, f.y, 'WHAM!', '#ff8a3a', 1); } } },
+        // investida de gorila pela faixa até a borda da tela (bate e fica tonto)
+        charge: { pose: 'bigCharge', s: 30, a: 54, r: 26, dmg: 18, reach: [0, 90], depth: 50, kb: 12, knockdown: true, launch: 7, lunge: 11, sound0: 'roar', color: '#ff4a3a',
+          zone(f, g) {
+            const R = g.camX + TT.W - 70, L = g.camX + 70;
+            return [{ k: 'rect', x0: f.x - f.facing * 24, x1: f.facing > 0 ? R + 130 : L - 130, y: f.y, d: 50, arrows: true }];
+          },
+          onFrame(f, t, g) {
+            const run = t > this.s && t < this.s + this.a;
+            if (t === this.s) g.impact(f.x, f.y, 'UH-UH-UH!', '#ff4a3a', 0.5);
+            if (run && t % 4 === 0) { g.dust(f.x - f.facing * 50, f.y, 2, '#e8f2ff'); g.shake = Math.max(g.shake, 3); }
+            const L = g.camX + 70, R = g.camX + TT.W - 70;
+            if (run && ((f.facing > 0 && f.x > R) || (f.facing < 0 && f.x < L))) {
+              f.x = TT.clamp(f.x, L, R); f.atk = null; A().play('boom');
+              g.debrisBurst(f.x + f.facing * 60, f.y - 120, 10, '#bfefff');
+              g.impact(f.x + f.facing * 60, f.y, 'CRASH!', '#9fe8ff', 1.2);
+              f.setState('stagger'); f.setAnim('hurt'); f.st = -30; f.vx = -f.facing * 4;
+            }
+          } },
+        // laser do Cérebro em linha reta; depois a cúpula superaquece e abre (fraqueza)
+        beam: { pose: 'beam', s: 40, a: 14, r: 10, dmg: 15, knockdown: true, launch: 6, kb: 8, zoneHit: true, zr: 80, color: '#ff4ad0', sound0: 'alarm', sound: 'laser',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 760, y: f.y, d: 30, arrows: true }]; },
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'Monsieur Mallah: o laser!', '#ff9ad6');
+            if (t === this.s) { g.shake = Math.max(g.shake, 8); g.impact(f.x + f.facing * 400, f.y, 'ZZZAP!', '#ff4ad0', 0.8); }
+            if (t === this.s + this.a + this.r - 1) f.openJar();
+          } },
+        // (fase 2) raio congelante do Cérebro: círculos em cima de cada Titã; quem ficar dentro congela
+        freeze: { pose: 'castUp', s: 38, a: 6, r: 22, dmg: 10, freezeHero: 70, stun: 70, kb: 0, zoneHit: true, zr: 60, color: '#5fc8ff', sound0: 'alarm', sound: 'zap',
+          zone(f, g) {
+            const zs = [], R = 90;
+            for (const h of g.heroes()) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: R, ry: R * 0.42 });
+            let guard = 0;
+            while (zs.length < 3 && guard++ < 30) {
+              const tp = groundTarget(g, TT.choice(g.heroes()) || f, 380, 110);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 2 * R || Math.abs(z.y - tp.y) > R)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: R, ry: R * 0.42 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Congelem os Titãs!', '#9fe8ff');
+            if (t === this.s) for (const z of a.zones) {
+              for (let i = 0; i < 10; i++) g.particles.spawn('star', z.x + TT.rand(-z.rx, z.rx) * 0.8, z.y - TT.rand(0, 120), { vx: TT.rand(-2, 2), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 9, life: 22, rot: Math.random(), vr: 0.2 });
+              g.particles.spawn('ring', z.x, z.y - 10, { color: '#bfefff', size: 160, life: 16, flat: 0.42 });
+            }
+          } },
+        // (fase 2) chama dois soldados congeladores
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#9fe8ff',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Soldados! Para o Cérebro!', '#9fe8ff');
+            for (const side of [-1, 1]) {
+              const e = new FreezeTrooper(g, side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 60; g.addEnemy(e);
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('alarm');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    openJar() {
+      this.atk = null;
+      this.setState('open'); this.setAnim('hurt');
+      this.openT = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.game.say(this, 'Mallah! A cúpula superaqueceu!', '#ff9ad6');
+      A().play('zap');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return;
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (this.st % 6 === 0 && this.out.hx != null) g.particles.spawn('spark', this.out.hx + g.camX - this.facing * 40, this.out.hy + 10, { vx: TT.rand(-4, 4), vy: TT.rand(-6, -2), color: '#ffe14a', size: 4, life: 14, grav: 0.2 });
+        if (--this.openT <= 0) { this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25; }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) { this.p2Said = true; g.say(this, 'Chega! Raio congelante, Mallah!', '#9fe8ff'); g.impact(this.x, this.y, 'FRIO!', '#9fe8ff', 1.1); }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 170), p.y, p2 ? 2.6 : 2.1);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o laser do Cérebro (e a cúpula abre logo depois)
+        if (this.atkCount % 3 === 2) pick = 'beam';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = [];
+          if (adx < 240 && Math.abs(dy) < 50) opts.push('smash', 'smash');
+          if (Math.abs(dy) < 50 && adx > 300) opts.push('charge');
+          if (p2) opts.push('freeze', 'freeze');
+          if (!opts.length) opts.push('charge', 'smash');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(38, 66) : this.nextCool(60, 95);
+        if (pick !== 'beam' && Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ffb070');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = 1;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al = 0.6;
+      TT.computePose(this, this.pose);
+      const open = this.state === 'open';
+      if (this.state === 'stagger') { this.pose.lean = -0.3; this.pose.tilt = -0.3; }
+      if (open) { this.pose.lean = -0.15; this.pose.armF = [2.6, 2.9]; this.pose.armB = [2.4, 2.8]; } // mãos na cabeça, nervoso
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      ctx.save(); ctx.globalAlpha = al;
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      // a cúpula do Cérebro no ombro de trás
+      const jx = this.out.hx != null ? this.out.hx - this.facing * 44 : x - this.facing * 40, jy = this.out.hy != null ? this.out.hy + 14 : y - this.height + 40;
+      const charging = d === this.ATK.beam && k >= 0;
+      if (charging || open) TT.drawGlow(ctx, open ? '#ffe14a' : '#ff4ad0', jx, jy - 20, 50 + (charging ? 40 * k : 10), 0.8);
+      drawBrainJar(ctx, jx, jy, 1.1, t, open, this.flash > 3);
+      // laser do Cérebro
+      if (d === this.ATK.beam && a.t >= d.s && a.t < d.s + d.a + 3) {
+        const u = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 3 : 1, x1 = jx + this.facing * 760 * u, y1 = this.y - 50;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = al * fade;
+        ctx.strokeStyle = '#ff4ad0'; ctx.lineWidth = 34; ctx.beginPath(); ctx.moveTo(jx, jy - 18); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.strokeStyle = '#ffd0f2'; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(jx, jy - 18); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 30);
+      if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height - 10);
+      if (open && (t >> 3) % 2 === 0) TT.drawText(ctx, 'CÉREBRO EXPOSTO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#ffd0f2', OUT, 'center', 5);
+    }
+  }
+  TT.Mallah = Mallah;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -3705,6 +4147,24 @@
           ctx.save(); ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
           ctx.beginPath(); ctx.ellipse(x, y, 40, 30, this.spin * 0.1, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
           break;
+        case 'rocketFist': { // punho-foguete do Ciborgue: punho de metal com chama atrás
+          TT.drawGlow(ctx, '#ff9a3a', x - this.facing * 30, y, 44, 0.9);
+          drawFlame(ctx, x - this.facing * 34, y + 10, 30, this.t, 1);
+          ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+          ctx.fillStyle = '#d9dde6'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.rect(-22, -9, 16, 18); ctx.fill(); ctx.stroke(); // pulso
+          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-8, -15, 26, 30, 8); else ctx.rect(-8, -15, 26, 30); ctx.fill(); ctx.stroke(); // punho
+          ctx.strokeStyle = '#8a909a'; ctx.lineWidth = 2; for (const yy of [-6, 2, 9]) { ctx.beginPath(); ctx.moveTo(8, yy); ctx.lineTo(17, yy); ctx.stroke(); }
+          ctx.fillStyle = '#3b78d8'; ctx.fillRect(-20, -4, 10, 8);
+          ctx.restore();
+          break;
+        }
+        case 'sonicShot': // tiro curto do canhão sônico (anel + núcleo branco)
+          this.drawTrail(ctx, camX, SONIC, 12);
+          TT.drawGlow(ctx, SONIC, x, y, 40, 1);
+          ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(x, y, 8, 18, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+          break;
         case 'sladeBomb': { // bomba de disco do Slade (luz laranja piscando)
           ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.6); ctx.scale(1, 0.6);
           ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fillStyle = '#2a2d33'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
@@ -3901,6 +4361,191 @@
     }
   }
   TT.ShadowTendrils = ShadowTendrils;
+
+  // ================================================================ Efeitos dos combos (fase 8)
+  // Imagem residual: cópia da pose do Titã que some aos poucos, na cor dele (rastro de velocidade).
+  class Afterimage {
+    constructor(game, f, col, flip) {
+      this.game = game; this.remove = false; this.t = 0; this.life = 12; this.col = col;
+      this.style = f.style; this.facing = flip ? -f.facing : f.facing; this.x = f.x; this.y = f.y - 0.5; this.z = f.z;
+      this.pose = TT.newPose(); TT.setPose(this.pose, f.pose);
+      for (const k of ['weapon', 'hands', 'handF', 'handB', 'glow', 'mouth']) this.pose[k] = f.pose[k];
+      this.pose.glow = null;
+    }
+    update() { if (++this.t >= this.life) this.remove = true; }
+    draw(ctx, camX) {
+      const k = 1 - this.t / this.life, x = this.x - camX, y = this.y - this.z;
+      ctx.save();
+      ctx.globalAlpha = 0.42 * k;
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: true, t: 0 });
+      ctx.globalAlpha = 0.55 * k;
+      TT.drawGlow(ctx, this.col, x, y - 80, 70, 1);
+      ctx.restore();
+    }
+  }
+  TT.Afterimage = Afterimage;
+
+  // Risco de luz deixado pelo Golpe Relâmpago do Robin.
+  class SlashLine {
+    constructor(game, x0, x1, y, col) { Object.assign(this, { game, x0, x1, y: y + 1, col, t: 0, remove: false }); }
+    update() { if (++this.t > 22) this.remove = true; }
+    draw(ctx, camX) {
+      const k = this.t / 22, a = 1 - k, y = this.y - 85, x0 = this.x0 - camX, x1 = this.x1 - camX;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      ctx.strokeStyle = this.col; ctx.globalAlpha = 0.7 * a; ctx.lineWidth = 34 * (1 - k * 0.6);
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y - 6); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = a; ctx.lineWidth = 8 * (1 - k * 0.5);
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y - 6); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  TT.SlashLine = SlashLine;
+
+  // Explosões em sequência nos inimigos marcados (o atraso dá o "efeito samurai").
+  class DelayedBursts {
+    constructor(game, owner, list, o) { Object.assign(this, { game, owner, list, o, t: 0, remove: false, y: 0 }); }
+    update() {
+      const g = this.game, o = this.o;
+      this.t++;
+      this.list.forEach((e, i) => {
+        if (this.t !== 4 + i * 4 || e.dead) return;
+        const d = { dmg: o.dmg, kb: 6, knockdown: true, launch: 9, big: true };
+        const hy = e.y - e.z - (e.height || 100) * 0.55;
+        if (e.takeHit(this.owner, d, this.owner.facing)) g.onHit(this.owner, e, d);
+        g.explosion(e.x, e.y, (e.height || 100) * 0.55, 0.9, o.col);
+        g.particles.spawn('text', e.x, hy - 70, { text: o.word, size: 40, color: '#ffe14a', color2: o.col, vy: -0.6, life: 28, rot: TT.rand(-0.2, 0.2) });
+        if (o.emblem) g.particles.spawn('text', e.x, hy, { text: o.emblem, size: 70, color: o.col, vy: -0.3, life: 22 });
+        A().play('hitHeavy');
+      });
+      if (this.t > 8 + this.list.length * 4) this.remove = true;
+    }
+  }
+  TT.DelayedBursts = DelayedBursts;
+
+  // Onda de energia que se expande e acerta uma vez cada inimigo que alcança (Supernova, Booyah, rugido).
+  class Nova {
+    constructor(game, owner, o) {
+      Object.assign(this, { game, owner, o, t: 0, remove: false, hits: new Set(), x: o.x, y: o.y + 1, T: 16 });
+      game.shake = Math.max(game.shake, 16);
+      game.particles.spawn('text', o.x, o.y - 230, { text: o.word, size: 56, color: '#ffe14a', color2: o.col, vy: -0.5, life: 38, rot: TT.rand(-0.1, 0.1) });
+      for (let i = 0; i < 24; i++) {
+        const ang = i / 24 * Math.PI * 2, sp = TT.rand(8, 14);
+        game.particles.spawn('star', o.x, o.y - 90, { vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp * 0.6, color: TT.choice([o.col, '#ffffff']), size: TT.rand(8, 13), life: TT.randi(16, 26), rot: Math.random(), vr: 0.2 });
+      }
+    }
+    get r() { return this.o.r * TT.easeOut(Math.min(1, this.t / this.T)); }
+    update() {
+      const g = this.game, R = this.r;
+      this.t++;
+      for (const e of g.enemies) {
+        if (e.dead || this.hits.has(e)) continue;
+        if (Math.hypot(e.x - this.x, (e.y - this.y) / 0.42) > R + 20) continue;
+        this.hits.add(e);
+        const d = { dmg: this.o.dmg, kb: 8, knockdown: true, launch: 11, big: true };
+        if (e.takeHit(this.owner, d, TT.sign(e.x - this.x) || this.owner.facing)) g.onHit(this.owner, e, d);
+      }
+      if (this.t > this.T + 14) this.remove = true;
+    }
+    drawGround(ctx, camX) {
+      const R = this.r, k = this.t / (this.T + 14), x = this.x - camX;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5 * (1 - k); ctx.fillStyle = this.o.col;
+      ctx.beginPath(); ctx.ellipse(x, this.y, R, R * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.ellipse(x, this.y, R, R * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    draw(ctx, camX) {
+      const R = this.r, k = this.t / (this.T + 14), x = this.x - camX, y = this.y - 90;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.85 * (1 - k); ctx.strokeStyle = this.o.col; ctx.lineWidth = 26 * (1 - k) + 4;
+      ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6 * (1 - k) + 1;
+      ctx.beginPath(); ctx.ellipse(x, y, R * 0.92, R * 0.58, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      TT.drawGlow(ctx, this.o.col, x, y, 120 + R * 0.4, 0.7 * (1 - k));
+    }
+  }
+  TT.Nova = Nova;
+
+  // Mãos de sombra da Ravena saindo do chão (o dano vem do golpe; isto é o visual).
+  class ShadowHands {
+    constructor(game, x, y, facing) { Object.assign(this, { game, x, y: y + 1, facing, t: 0, remove: false }); }
+    update() { if (++this.t > 26) this.remove = true; }
+    drawGround(ctx, camX) {
+      const k = Math.min(1, this.t / 4) * (1 - TT.clamp((this.t - 18) / 8, 0, 1));
+      ctx.save(); ctx.fillStyle = 'rgba(16,6,34,0.8)'; ctx.strokeStyle = '#a77bff'; ctx.lineWidth = 3; ctx.globalAlpha = k;
+      ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 90, 30, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+    draw(ctx, camX) {
+      const up = TT.easeOut(Math.min(1, this.t / 6)), down = TT.clamp((this.t - 16) / 10, 0, 1), h = 150 * up * (1 - down);
+      if (h < 3) return;
+      ctx.save(); ctx.lineJoin = 'round';
+      for (const [ox, sc] of [[-34, 0.85], [30, 1]]) {
+        const x = this.x - camX + ox, top = this.y - h * sc, grab = Math.sin(this.t * 0.5) * 0.2;
+        ctx.beginPath(); ctx.moveTo(x - 14, this.y); ctx.quadraticCurveTo(x - 18, this.y - h * 0.5 * sc, x - 10, top + 20);
+        // dedos abertos em garra
+        for (let i = 0; i < 4; i++) { const ang = -Math.PI / 2 + (i - 1.5) * (0.42 + grab); ctx.lineTo(x + Math.cos(ang) * 34, top + Math.sin(ang) * 34); ctx.lineTo(x + Math.cos(ang + 0.2) * 12, top + Math.sin(ang + 0.2) * 12 + 6); }
+        ctx.lineTo(x + 10, top + 20); ctx.quadraticCurveTo(x + 18, this.y - h * 0.5 * sc, x + 14, this.y); ctx.closePath();
+        ctx.fillStyle = '#120a22'; ctx.fill(); ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 1.6; ctx.stroke();
+      }
+      ctx.restore();
+      TT.drawGlow(ctx, DARK, this.x - camX, this.y - h * 0.6, 80, 0.4);
+    }
+  }
+  TT.ShadowHands = ShadowHands;
+
+  // Esferas de Azarath: prende os inimigos à frente em esferas de energia negra, ergue e esmaga.
+  class DarkOrbs {
+    constructor(game, owner, o) {
+      Object.assign(this, { game, owner, o, t: 0, remove: false, y: owner.y + 1, CRUSH: 34 });
+      const g = game;
+      this.caught = g.enemies.filter((e) => !e.dead && (e.x - owner.x) * owner.facing > -40 && Math.abs(e.x - owner.x) < o.range && Math.abs(e.y - owner.y) < 140).slice(0, 8);
+      for (const e of this.caught) {
+        const d = { dmg: 6, kb: 0, stun: this.CRUSH + 10 };
+        if (e.takeHit(owner, d, owner.facing)) g.onHit(owner, e, d);
+      }
+      A().play('dark');
+    }
+    update() {
+      const g = this.game;
+      this.t++;
+      for (const e of this.caught) {
+        if (e.dead || this.t >= this.CRUSH) continue;
+        if (!e.isBoss) { e.z = Math.min(110, e.z + 5); e.vz = 0; e.vx = 0; } // erguido pela telecinese
+        if (this.t % 3 === 0) g.particles.spawn('glow', e.x + TT.rand(-30, 30), e.y - e.z - TT.rand(20, 120), { color: DARK, size: 30, life: 10 });
+      }
+      if (this.t === this.CRUSH) {
+        g.shake = Math.max(g.shake, 16); A().play('boom');
+        for (const e of this.caught) {
+          if (e.dead) continue;
+          const d = { dmg: this.o.dmg, kb: 4, knockdown: true, launch: 4, big: true }, cy = e.y - e.z - (e.height || 100) * 0.5;
+          if (!e.isBoss) e.vz = -6;
+          if (e.takeHit(this.owner, d, this.owner.facing)) g.onHit(this.owner, e, d);
+          for (let i = 0; i < 12; i++) { const ang = Math.random() * Math.PI * 2, sp = TT.rand(5, 12); g.particles.spawn('debris', e.x, cy, { vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 3, grav: 0.4, color: TT.choice(['#8a5cff', '#1a0f2e', '#d6c2ff']), size: TT.rand(6, 11), life: 26, floor: e.y }); }
+          g.particles.spawn('ring', e.x, cy, { color: '#d6c2ff', size: 120, life: 14 });
+          g.particles.spawn('text', e.x, cy - 80, { text: 'KRRSH!', size: 38, color: '#e8dcff', color2: '#5a2a9a', vy: -0.6, life: 26, rot: TT.rand(-0.2, 0.2) });
+        }
+      }
+      if (this.t > this.CRUSH + 6) this.remove = true;
+    }
+    draw(ctx, camX) {
+      if (this.t >= this.CRUSH) return;
+      const k = Math.min(1, this.t / 6), squeeze = this.t > this.CRUSH - 8 ? 1 - (this.t - (this.CRUSH - 8)) / 16 : 1;
+      for (const e of this.caught) {
+        if (e.dead) continue;
+        const h = Math.min(e.height || 100, 240), x = e.x - camX, y = e.y - e.z - h * 0.5, R = (h * 0.62 + 20) * k * squeeze;
+        ctx.save();
+        ctx.globalAlpha = 0.35; ctx.fillStyle = '#2a1050';
+        ctx.beginPath(); ctx.ellipse(x, y, R, R * 1.05, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.95; ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 6; ctx.stroke();
+        ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, R * 0.9, R * 0.95, this.t * 0.1, 0.3, 2.2); ctx.stroke();
+        ctx.restore();
+        TT.drawGlow(ctx, DARK, x, y, R * 1.6, 0.5);
+      }
+    }
+  }
+  TT.DarkOrbs = DarkOrbs;
 
   // Corvo de energia negra: corpo, asas com penas, contorno violeta + branco e olhos brilhantes.
   // front = true desenha de frente (asas abertas); senão, de perfil voando.

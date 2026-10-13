@@ -1,9 +1,9 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): sete fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): oito fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
-**O Show do Mumbo** e **O Covil do Slade**), os 5 Titãs jogáveis com troca
-em tempo real (e **golpes novos** a partir da fase 7), inimigos da série, **3 níveis de dificuldade** e
+**O Show do Mumbo**, **O Covil do Slade** e **A Base da Irmandade**), os 5 Titãs jogáveis com troca
+em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), inimigos da série, **3 níveis de dificuldade** e
 **co-op local para 2 jogadores**.
 
 **Jogue online:** https://jovens-titas-jump-city.netlify.app
@@ -106,6 +106,23 @@ especial de cada um mudam, com referências da série:
 | **Ravena** | **telecinese**: arranca um pedaço do chão e arremessa | *"Azarath Metrion Zinthos!"* agora faz **tentáculos de sombra** saírem do chão embaixo de todos os inimigos da tela | — |
 | **Estelar** | **starbolt gigante**, que explode no impacto | **chuva de starbolts** em cima de cada inimigo da tela | dois starbolts de uma vez no combo e no ar |
 
+### Combos novos (fase 8 em diante)
+
+Na fase 8 os Titãs mantêm os golpes novos e ganham **combos**:
+
+- **Combo de 5 golpes** (ataque × 5): o 3º e o 4º golpe são novos e não derrubam, para o combo entrar
+  inteiro; o 5º é o finalizador da fase 7.
+- **COMBO FINAL** (ataque, ataque, **forte**): um golpe próprio de cada Titã, com o nome numa faixa na
+  tela, imagens residuais, tela colorida e explosões:
+
+| Titã | 3º e 4º golpes | COMBO FINAL |
+|---|---|---|
+| **Robin** | bastão de baixo para cima; **chute giratório** com imagens vermelhas | **GOLPE RELÂMPAGO**: atravessa a fila num risco de luz e, um instante depois, cada inimigo atravessado explode com o "R" |
+| **Mutano** | garrada; **guepardo** dando arranhões rápidos | **ESTOURO DA MANADA**: rinoceronte em investida → gorila esmurrando o chão → T-Rex rugindo (onda de choque) |
+| **Ciborgue** | gancho com faíscas; **punho-foguete** que atravessa a fila | **RAJADA BOOYAH**: os canhões alternam tiros sônicos e terminam numa explosão sônica azul |
+| **Ravena** | varrida de energia negra; **mãos de sombra** saindo do chão | **ESFERAS DE AZARATH**: prende cada inimigo à frente numa esfera negra, ergue e esmaga |
+| **Estelar** | gancho de energia verde; **giro** com anéis em órbita (5º: espiral de seis starbolts) | **SUPERNOVA**: a raiva tamaraneana — ela brilha e uma onda verde explode em volta |
+
 Os modelos seguem o traço da **série animada de 2003** (a mesma do jogo de PS2): corpos esguios,
 rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos são arte vetorial
 (caminhos SVG em `js/faces.js`) e a capa do Robin tem física de tecido.
@@ -171,6 +188,14 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    o **salto com o bastão** (o círculo segue você até a metade do aviso). Abaixo de 50% ganha o fogo
    de Trigon: **anel de chamas** em volta dele (fique colado nele ou bem longe) e chama comandos.
    **Fraqueza:** depois do salto ele aterrissa de joelho — **guarda aberta**, leva dano dobrado!
+8. **A Base da Irmandade**: a base da Irmandade do Mal nas montanhas nevadas, sob a aurora boreal; o hangar
+   onde ela guarda **heróis congelados em blocos de gelo** (como no fim da série) e o laboratório do Cérebro,
+   com tanques e telões. Neva lá fora. **Os Titãs ganham os combos novos.** Inimigos: **Robôs do Slade**,
+   **Soldados Congeladores** (raio congelante em linha: quem é atingido fica preso no gelo) e a **Madame
+   Rouge** (corpo elástico: chute esticado de longe e giro com os braços esticados). O chefe é o
+   **Monsieur Mallah com o Cérebro** no ombro: tapa de gorila, investida até a parede (fica tonto se
+   bater), laser do Cérebro e, abaixo de 50%, raio congelante em círculos e chama congeladores.
+   **Fraqueza:** depois do laser a cúpula superaquece e **abre** — cérebro exposto, dano dobrado!
 
 ## Música e vozes
 
@@ -228,7 +253,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 160 verificações e todas passam:
+página e chame a função serve.) A suíte tem 183 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -239,6 +264,8 @@ página e chame a função serve.) A suíte tem 160 verificações e todas passa
 - Voltar ao menu inicial pela pausa (com confirmação) e pelo game over.
 - Botões na tela: o item do menu liga/desliga e muda a opacidade (e salva); o analógico navega nos
   menus e anda; ATAQUE, FORTE, ESPECIAL, PULO, TROCAR e pausa funcionam.
+- Combos novos (fase 8): o combo de 5 golpes entra inteiro em cada Titã e dá mais dano que o da fase 7;
+  ataque, ataque, forte solta o COMBO FINAL (com o nome na tela), que não existe antes da fase 8.
 - Golpes novos: só a partir da fase 7, e cada golpe novo dá mais dano que o original; disco
   congelante prende o inimigo no gelo.
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
@@ -248,8 +275,10 @@ página e chame a função serve.) A suíte tem 160 verificações e todas passa
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
   golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
-- 3 partidas completas (7 fases) do início ao fim com um bot.
-- Os sete chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (8 fases) do início ao fim com um bot.
+- Os oito chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- Fase 8: raio congelante, chute e giro da Madame Rouge com aviso no chão; cúpula do Mallah abre depois do
+  laser (dano dobrado), ele chama congeladores e o raio do Cérebro congela o Titã.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
@@ -268,6 +297,6 @@ Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Control Freak, Irmão Sangue de volta, Trigon…).
+- Mais fases (Control Freak, Trigon…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

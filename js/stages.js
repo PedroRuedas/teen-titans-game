@@ -115,5 +115,24 @@
         { type: 'boss', camX: 6000, boss: 'slade', intro: 'O mestre do crime de Jump City' },
       ],
     },
+    {
+      // Daqui em diante os Titãs têm os golpes novos E os combos novos (combos).
+      id: 8,
+      name: 'FASE 8 — A BASE DA IRMANDADE',
+      subtitle: 'A Irmandade do Mal está congelando os heróis do mundo. Os Titãs vão impedir!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'brain',
+      powerUp: true,
+      combos: true,
+      crates: [[1150, 620, 'pizza'], [2350, 560, 'energy'], [3650, 640, 'pizza'], [4950, 560, 'energy'], [5500, 620, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['freezer', 'freezer', 'slade'], ['freezer', 'slade', 'freezer', 'slade']] },
+        { type: 'arena', camX: 1500, waves: [['rouge', 'freezer', 'freezer'], ['freezer', 'freezer', 'slade', 'slade']] },
+        { type: 'arena', camX: 2950, waves: [['freezer', 'freezer', 'freezer', 'slade'], ['rouge', 'freezer', 'slade']] },
+        { type: 'arena', camX: 4300, waves: [['freezer', 'slade', 'slade', 'freezer'], ['rouge', 'freezer', 'freezer', 'slade', 'slade']] },
+        { type: 'boss', camX: 6000, boss: 'mallah', intro: 'O gorila e o gênio da Irmandade do Mal' },
+      ],
+    },
   ];
 })();

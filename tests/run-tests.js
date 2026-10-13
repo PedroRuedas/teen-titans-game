@@ -52,7 +52,7 @@ async page => {
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
 
-  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 7) e ENTER começa nela
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 8) e ENTER começa nela
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
@@ -65,7 +65,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 7 no título e começar nela', pick.sel === 6 && /SLADE/.test(pick.label) && pick.st === 'play' && pick.stage === 6, pick);
+  ok('menu: escolher a fase 8 no título e começar nela', pick.sel === 7 && /IRMANDADE/.test(pick.label) && pick.st === 'play' && pick.stage === 7, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -202,6 +202,46 @@ async page => {
     ok('golpes novos (fase 7) dão mais dano: ' + k, Object.keys(a).every((m) => b[m] > a[m]), { original: a, novo: b });
   }
 
+  // 3a1) Combos novos (fase 8): o combo de 5 golpes entra inteiro (cada golpe acerta) e dá mais dano que o
+  //      combo de 3 da fase 7; ATAQUE, ATAQUE, FORTE solta o COMBO FINAL (com o nome na tela), que só existe na fase 8
+  const combos = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {};
+    const mash = (p, plan, frames) => {
+      const e = new TT.Enemy(g, 'slade', p.x + 80, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 }); g.addEnemy(e);
+      const per = [], defs = []; let last = null, h = e.hp, k = 0, tag = null;
+      for (let f = 0; f < frames; f++) {
+        if (k < plan.length && f % 3 === 0) g.input.pressed.add(plan[k]);
+        g.step();
+        if (g.comboTag) tag = g.comboTag.text;
+        if (p.atk && p.atk.def !== last) { if (last) per.push(Math.round(h - e.hp)); h = e.hp; last = p.atk.def; defs.push(last); k++; }
+      }
+      per.push(Math.round(h - e.hp));
+      return { per, defs, total: Math.round(9999 - e.hp), tag };
+    };
+    for (const st of [6, 7]) {
+      TT.debug.start(st); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true); TT.debug.step(95);
+        const p = g.player;
+        const reset = () => { g.enemies.length = 0; g.projectiles.length = 0; g.effects.length = 0; g.comboTag = null; p.atk = null; p.setState('idle'); p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0; p.invul = 0; p.facing = 1; p.y = 590; p.x = g.camX + 300; };
+        reset(); const chain = mash(p, ['light', 'light', 'light', 'light', 'light'], 200);
+        reset(); const fin = mash(p, ['light', 'light', 'heavy'], 200);
+        out[st + ':' + p.key] = { chain: chain.per, chainTotal: chain.total, n: p.def.light.length, finTotal: fin.total, ender: !!p.def.ender && fin.defs.includes(p.def.ender), tag: fin.tag };
+      }
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k of ['robin', 'beastboy', 'cyborg', 'raven', 'starfire']) {
+    const a = combos['6:' + k], b = combos['7:' + k];
+    ok('combos novos (fase 8): combo de 5 golpes entra inteiro e dá mais dano: ' + k,
+      a.n === 3 && b.n === 5 && b.chain.length >= 5 && b.chain.slice(0, 5).every((d) => d > 0) && b.chainTotal > a.chainTotal, { fase7: a, fase8: b });
+    ok('combos novos (fase 8): ATAQUE, ATAQUE, FORTE solta o COMBO FINAL: ' + k,
+      !a.ender && b.ender && b.finTotal > 30 && !!b.tag, { fase7: a, fase8: b });
+  }
+
   // 3a2) Disco congelante do Robin: o inimigo fica preso no gelo (parado) por bem mais tempo que um golpe comum
   const ice = await ev(() => {
     const g = TT.game;
@@ -268,7 +308,7 @@ async page => {
         if (c) maxLive = Math.max(maxLive, c.live.length);
       }
       out.runs[st] = { target: c && c.target === b, by, first: c && c.queue[0].key, shown: c ? [...c.shown].sort().join(',') : '', hits: c ? c.hits : 0,
-        frames, frozen, dmg: Math.round(hp0 - b.hp), plus: c && c.queue.every((q) => !!q.a.def.plus === (st === 6)) };
+        frames, frozen, dmg: Math.round(hp0 - b.hp), plus: c && c.queue.every((q) => !!q.a.def.plus === (st >= 6)) };
     }
     // pular: ATAQUE depois da entrada vai direto para a explosão final (e o dano sai)
     TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
@@ -529,6 +569,62 @@ async page => {
   });
   for (const k in s7) ok('fase 7: golpe ' + k + ' acerta após o aviso', s7[k].zone && s7[k].inside && s7[k].hitT >= s7[k].s, s7[k]);
 
+  // 4b4f2) Inimigos da fase 8: raio congelante (congela o Titã), chute esticado e giro da Madame Rouge acertam só depois do aviso
+  const s8 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['freezer', 0, 200], ['rouge', 0, 200], ['rouge', 1, 90]]) {
+      TT.debug.start(7); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1, frozen = 0;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; if (p.frozen > 0) frozen++; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s, frozen };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s8) ok('fase 8: golpe ' + k + ' acerta após o aviso', s8[k].zone && s8[k].inside && s8[k].hitT >= s8[k].s, s8[k]);
+  ok('fase 8: o raio congelante prende o Titã no gelo', s8['freezer:0'].frozen >= 30, s8['freezer:0']);
+
+  // 4b4f3) Mallah e o Cérebro (fase 8): depois do laser a cúpula abre (parado, dano dobrado); na fase 2 chama
+  //        congeladores; o raio congelante do Cérebro congela o Titã dentro do círculo
+  const mallah = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(7); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.beam);
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.freezers = g.enemies.filter((e) => e.kind === 'freezer' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.freeze);
+    let frozen = 0;
+    for (let t = 0; t < 120; t++) { p.vx = p.vy = 0; g.step(); if (p.frozen > 0) frozen++; }
+    out.frozenFrames = frozen;
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('Mallah: cúpula do Cérebro abre depois do laser (parado, dano dobrado) e depois fecha', mallah.st === 'open' && mallah.openDmg === mallah.normal * 2 && mallah.moved < 1 && mallah.after !== 'open', mallah);
+  ok('Mallah: chama soldados congeladores na fase 2', mallah.freezers === 2, mallah);
+  ok('Mallah: o raio congelante do Cérebro congela o Titã', mallah.frozenFrames >= 40, mallah);
+
   // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
   //       na fase 2 chama comandos
   const slade = await ev(() => {
@@ -573,7 +669,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 7 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 8 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -676,6 +772,15 @@ async page => {
       for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
       return { x: bb.x, y: bb.y };
     } }));
+    // Mallah e o Cérebro (fase 8)
+    C(7, 'smash', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 270, y: b.y }));
+    C(7, 'charge', (b) => ({ x: b.x - 420, y: b.y + 20 }), (b) => ({ x: b.x - 420, y: b.y + 84 }));
+    C(7, 'beam', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(7, 'freeze', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -696,7 +801,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 200000) {
+      while (g.state !== 'victory' && steps < 240000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -715,11 +820,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (7 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:6') && full.seen.includes('clear:6'), full);
+    ok('jogo completo (8 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:7') && full.seen.includes('clear:7'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4, 5, 6]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6, 7]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

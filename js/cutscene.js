@@ -52,7 +52,7 @@
       if (first > 0) order.unshift(order.splice(first, 1)[0]);
       this.queue = order.map((k) => {
         const a = new TT.Titan(game, k);
-        a.setPower(!!game.powered);
+        a.setPower(game.power || 0);
         a.x = -200; a.y = GY; a.facing = 1;
         const moves = SCRIPT[k](a.def).map(([def, o]) => Object.assign({ def }, o));
         return { a, key: k, moves, mi: 0, phase: 'wait', pt: 0, alpha: 1 };

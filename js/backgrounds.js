@@ -1564,7 +1564,176 @@
     });
   }
 
+  // =============================================================== FASE 8 — A Base da Irmandade
+  // Montanhas nevadas sob a aurora, o hangar onde a Irmandade guarda os heróis congelados em blocos de
+  // gelo (como no fim da série) e o laboratório do Cérebro com tanques e telões.
+  const S8_HANGAR = 2700, S8_LAB = 5850;
+  const SNOW = '#eef5ff', SNOW_D = '#c4d4ea', ICE_C = '#9fd8ff', B_RED = '#c4162a';
+
+  // Emblema da Irmandade do Mal: círculo vermelho com um "B" (de Brotherhood) e um raio.
+  function brotherhoodLogo(g, x, y, r) {
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = B_RED; g.fill(); g.strokeStyle = OUT; g.lineWidth = Math.max(2, r * 0.1); g.stroke();
+    g.beginPath(); g.arc(x, y, r * 0.78, 0, Math.PI * 2); g.strokeStyle = '#1c1a22'; g.lineWidth = r * 0.08; g.stroke();
+    TT.drawText(g, 'B', x, y + r * 0.06, r * 1.15, '#ffffff', OUT, 'center', Math.max(2, r * 0.12));
+  }
+  // Herói congelado num bloco de gelo (silhueta colorida dentro do gelo, como na base da Irmandade).
+  function frozenHero(g, x, base, col, s) {
+    g.save(); g.translate(x, base); g.scale(s, s);
+    g.fillStyle = col; g.strokeStyle = 'rgba(20,20,40,0.5)'; g.lineWidth = 2;
+    g.beginPath(); g.ellipse(0, -128, 13, 14, 0, 0, Math.PI * 2); g.fill(); // cabeça
+    g.fillRect(-14, -114, 28, 46); g.fillRect(-12, -68, 10, 58); g.fillRect(2, -68, 10, 58); // corpo e pernas
+    g.save(); g.translate(-14, -108); g.rotate(0.9); g.fillRect(-4, 0, 9, 40); g.restore(); // braços protegendo o rosto
+    g.save(); g.translate(14, -108); g.rotate(-1.9); g.fillRect(-4, 0, 9, 40); g.restore();
+    // bloco de gelo
+    g.fillStyle = 'rgba(170,225,255,0.55)';
+    g.beginPath(); g.moveTo(-46, 0); g.lineTo(-52, -150); g.lineTo(-20, -172); g.lineTo(34, -166); g.lineTo(52, -140); g.lineTo(46, 0); g.closePath(); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 3; g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(-36, -130); g.lineTo(-30, -60); g.moveTo(26, -150); g.lineTo(34, -110); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(-40, -160, 12, 150);
+    g.restore();
+  }
+  function pine(g, x, base, h) {
+    g.fillStyle = '#5a4030'; g.fillRect(x - 5, base - 20, 10, 20);
+    for (let i = 0; i < 4; i++) {
+      const w = h * (0.42 - i * 0.08), y = base - 18 - i * h * 0.2;
+      g.beginPath(); g.moveTo(x - w, y); g.lineTo(x, y - h * 0.34); g.lineTo(x + w, y); g.closePath();
+      g.fillStyle = '#24543e'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2.5; g.stroke();
+      g.fillStyle = SNOW; g.beginPath(); g.moveTo(x - w * 0.5, y - h * 0.17); g.lineTo(x, y - h * 0.34); g.lineTo(x + w * 0.5, y - h * 0.17); g.quadraticCurveTo(x, y - h * 0.24, x - w * 0.5, y - h * 0.17); g.fill();
+    }
+  }
+
+  function s8Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#050a24'); sky.addColorStop(0.5, '#14285a'); sky.addColorStop(1, '#3a5a8e');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    // estrelas
+    cells(x0, x1, 80, 801, (cx, r) => { g.fillStyle = 'rgba(255,255,255,' + (0.4 + r() * 0.6) + ')'; g.fillRect(cx + r() * 80, r() * 260, 2, 2); });
+    // aurora boreal: faixas verdes e rosadas ondulando
+    cells(x0, x1, 1100, 803, (cx) => {
+      for (const [col, y0, amp] of [['rgba(93,255,170,0.22)', 90, 30], ['rgba(120,255,200,0.16)', 130, 40], ['rgba(255,120,220,0.12)', 70, 24]]) {
+        g.beginPath(); g.moveTo(cx, y0);
+        for (let x = 0; x <= 1100; x += 50) g.lineTo(cx + x, y0 + Math.sin(x * 0.012 + y0) * amp);
+        for (let x = 1100; x >= 0; x -= 50) g.lineTo(cx + x, y0 + 70 + Math.sin(x * 0.012 + y0 + 1) * amp);
+        g.closePath(); g.fillStyle = col; g.fill();
+      }
+    });
+    // montanhas nevadas
+    cells(x0, x1, 520, 805, (cx, r) => {
+      const h = 220 + r() * 120, w = 520, base = 440, px = cx + w * (0.35 + r() * 0.3);
+      g.beginPath(); g.moveTo(cx - 60, base); g.lineTo(px, base - h); g.lineTo(cx + w + 60, base); g.closePath(); g.fillStyle = '#4a5a80'; g.fill();
+      g.beginPath(); g.moveTo(px - h * 0.32, base - h * 0.62); g.lineTo(px, base - h); g.lineTo(px + h * 0.36, base - h * 0.6); g.lineTo(px + h * 0.12, base - h * 0.66); g.lineTo(px - h * 0.08, base - h * 0.58); g.closePath(); g.fillStyle = SNOW; g.fill();
+    });
+    g.fillStyle = '#8aa2c8'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s8Mid(g, x0, x1) {
+    cells(x0, x1, 700, 811, (cx, r) => { // a base: domos e torres de metal na neve
+      const x = cx + r() * 200, base = 470;
+      g.fillStyle = '#5c6a86'; g.strokeStyle = OUT; g.lineWidth = 3;
+      g.beginPath(); g.arc(x + 110, base, 110, Math.PI, 0); g.closePath(); g.fill(); g.stroke(); // domo
+      g.fillStyle = SNOW; g.beginPath(); g.arc(x + 110, base, 110, Math.PI * 1.15, Math.PI * 1.85); g.arc(x + 110, base - 20, 92, Math.PI * 1.85, Math.PI * 1.15, true); g.closePath(); g.fill();
+      g.fillStyle = '#ffe9a0'; for (let i = 0; i < 4; i++) g.fillRect(x + 50 + i * 34, base - 46, 14, 10);
+      g.fillStyle = '#4a566e'; g.fillRect(x + 250, base - 210, 46, 210); g.strokeRect(x + 250, base - 210, 46, 210); // torre
+      brotherhoodLogo(g, x + 273, base - 170, 18);
+      g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(x + 273, base - 216, 5, 0, Math.PI * 2); g.fill();
+    });
+    cells(x0, x1, 300, 813, (cx, r) => pine(g, cx + r() * 200, 478, 110 + r() * 50));
+  }
+
+  function s8Near(g, x0, x1) {
+    // --- lado de fora: neve funda, pinheiros, a cerca da base e placas
+    if (x0 < S8_HANGAR) clipX(g, x0, Math.min(x1, S8_HANGAR), () => {
+      cells(x0, x1, 820, 821, (cx, r) => {
+        const fx = cx + 60;
+        pine(g, fx + 40, FT + 6, 230);
+        // muro de aço da base com o emblema e luzes vermelhas
+        g.fillStyle = '#4a566e'; g.fillRect(fx + 160, 210, 460, FT - 210); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(fx + 160, 210, 460, FT - 210);
+        g.fillStyle = '#3a4458'; for (let x = fx + 160; x < fx + 620; x += 46) g.fillRect(x, 210, 6, FT - 210);
+        g.fillStyle = SNOW; g.beginPath(); g.moveTo(fx + 150, 214); g.quadraticCurveTo(fx + 390, 180, fx + 630, 214); g.lineTo(fx + 630, 222); g.lineTo(fx + 150, 222); g.closePath(); g.fill();
+        brotherhoodLogo(g, fx + 390, 320, 56);
+        TT.drawText(g, 'IRMANDADE DO MAL', fx + 390, 410, 26, '#ffe14a', OUT, 'center', 5);
+        for (const lx of [fx + 200, fx + 580]) { const gl = g.createRadialGradient(lx, 240, 2, lx, 240, 60); gl.addColorStop(0, 'rgba(255,60,50,0.9)'); gl.addColorStop(1, 'rgba(255,60,50,0)'); g.fillStyle = gl; g.fillRect(lx - 60, 180, 120, 120); }
+        pine(g, fx + 720, FT + 6, 200);
+        if (r() > 0.4) { g.fillStyle = '#2a3550'; g.fillRect(fx + 680, FT - 120, 8, 120); g.fillStyle = '#ffe14a'; g.fillRect(fx + 650, FT - 140, 70, 34); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(fx + 650, FT - 140, 70, 34); TT.drawText(g, 'PERIGO', fx + 685, FT - 123, 16, '#c4162a', OUT, 'center', 3); }
+      });
+      // chão de neve com montinhos e rastros
+      g.fillStyle = SNOW; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.fillStyle = SNOW_D; for (let y = FT + 40; y < H; y += 46) g.fillRect(x0, y, x1 - x0, 3);
+      cells(x0, x1, 220, 823, (cx, r) => { g.fillStyle = '#dce8f8'; g.beginPath(); g.ellipse(cx + r() * 150, FT + 30 + r() * 170, 60, 12, 0, 0, Math.PI * 2); g.fill(); });
+    });
+    // --- hangar: heróis congelados em blocos de gelo, guindastes e piso de metal com gelo
+    if (x1 > S8_HANGAR && x0 < S8_LAB) clipX(g, Math.max(x0, S8_HANGAR), Math.min(x1, S8_LAB), () => {
+      g.fillStyle = '#2a3244'; g.fillRect(x0, 0, x1 - x0, FT);
+      for (let x = Math.floor(x0 / 200) * 200; x < x1; x += 200) { // vigas
+        g.fillStyle = '#3a4458'; g.fillRect(x, 0, 18, FT); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x, -4, 18, FT + 8);
+        g.strokeStyle = '#4a566e'; g.lineWidth = 6; g.beginPath(); g.moveTo(x + 18, 40); g.lineTo(x + 200, 160); g.stroke();
+      }
+      const cols = ['#d7263e', '#79c64c', '#ffe14a', '#5f8fe0', '#f3a35a', '#7b55c9'];
+      cells(x0, x1, 340, 831, (cx, r) => frozenHero(g, cx + 170, FT - 4, TT.choice(cols.slice(Math.floor(r() * 3))), 1.15));
+      // luzes azuis frias penduradas
+      cells(x0, x1, 340, 833, (cx) => {
+        const lx = cx + 60;
+        g.strokeStyle = '#1c1a22'; g.lineWidth = 3; g.beginPath(); g.moveTo(lx, 0); g.lineTo(lx, 90); g.stroke();
+        const gl = g.createRadialGradient(lx, 100, 4, lx, 100, 130); gl.addColorStop(0, 'rgba(160,230,255,0.6)'); gl.addColorStop(1, 'rgba(160,230,255,0)');
+        g.fillStyle = gl; g.fillRect(lx - 130, 0, 260, 260);
+        g.fillStyle = '#e6fbff'; g.beginPath(); g.arc(lx, 98, 9, 0, Math.PI * 2); g.fill();
+      });
+      // piso de metal com placas de gelo
+      g.fillStyle = '#4a566e'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.strokeStyle = 'rgba(10,10,20,0.4)'; g.lineWidth = 2; for (let x = Math.floor(x0 / 90) * 90; x < x1; x += 90) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x - 40, H); g.stroke(); }
+      cells(x0, x1, 260, 835, (cx, r) => { g.fillStyle = 'rgba(190,235,255,0.55)'; g.beginPath(); g.ellipse(cx + r() * 160, FT + 50 + r() * 150, 70, 16, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 2; g.stroke(); });
+    });
+    // --- laboratório do Cérebro: tanques verdes, telões com o cérebro e o emblema gigante
+    if (x1 > S8_LAB) clipX(g, Math.max(x0, S8_LAB), x1, () => {
+      g.fillStyle = '#1c2030'; g.fillRect(x0, 0, x1 - x0, FT);
+      cells(x0, x1, 260, 841, (cx, r) => { // tanques com líquido verde e bolhas
+        const tx = cx + 60 + r() * 80, top = 150 + r() * 60;
+        g.fillStyle = 'rgba(120,230,170,0.45)'; g.fillRect(tx, top, 70, FT - top - 30);
+        g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(tx, top, 70, FT - top - 30);
+        g.fillStyle = '#5c6169'; g.fillRect(tx - 8, top - 16, 86, 18); g.fillRect(tx - 8, FT - 34, 86, 34);
+        g.fillStyle = 'rgba(255,255,255,0.6)'; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(tx + 15 + r() * 40, top + 20 + r() * (FT - top - 70), 3 + r() * 3, 0, Math.PI * 2); g.fill(); }
+      });
+      cells(x0, x1, 1300, 843, (cx) => {
+        const mx = cx + 650;
+        g.fillStyle = '#0c0d10'; g.fillRect(mx - 170, 70, 340, 200); g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(mx - 170, 70, 340, 200);
+        g.fillStyle = 'rgba(93,255,170,0.15)'; g.fillRect(mx - 160, 80, 320, 180);
+        TT.drawBrainJar(g, mx, 210, 2.2, 0, false, false);
+        g.fillStyle = 'rgba(0,0,0,0.25)'; for (let y = 80; y < 260; y += 6) g.fillRect(mx - 160, y, 320, 2);
+        brotherhoodLogo(g, mx - 300, 170, 60); brotherhoodLogo(g, mx + 300, 170, 60);
+      });
+      g.fillStyle = '#2a3040'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      for (let y = FT, row = 0; y < H; y += 44, row++) for (let x = Math.floor(x0 / 110) * 110 + (row % 2) * 55; x < x1; x += 110) { g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2; g.strokeRect(x, y, 110, 44); }
+      cells(x0, x1, 300, 845, (cx, r) => { const gl = g.createRadialGradient(cx + 100, FT + 90 + r() * 80, 4, cx + 100, FT + 90, 90); gl.addColorStop(0, 'rgba(93,255,170,0.25)'); gl.addColorStop(1, 'rgba(93,255,170,0)'); g.fillStyle = gl; g.fillRect(cx, FT, 200, H - FT); });
+    });
+    // passagens: portão do hangar e porta blindada do laboratório
+    for (const [px, col] of [[S8_HANGAR, '#3a4458'], [S8_LAB, '#2a3040']]) {
+      if (x0 > px + 180 || x1 < px - 180) continue;
+      g.fillStyle = col; g.fillRect(px - 150, 60, 300, FT - 60); g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(px - 150, 60, 300, FT - 60);
+      g.fillStyle = '#0c0d14'; g.fillRect(px - 110, 140, 220, FT - 140);
+      g.fillStyle = '#ffe14a'; for (let i = 0; i < 8; i++) g.fillRect(px - 110 + i * 28, 120, 14, 14); // faixa de perigo
+      g.fillStyle = '#1c1a22'; for (let i = 0; i < 8; i++) g.fillRect(px - 96 + i * 28, 120, 14, 14);
+      brotherhoodLogo(g, px, 92, 22);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  // Primeiro plano: pingentes de gelo pendurados e canos com gelo.
+  function s8Fg(g, x0, x1) {
+    cells(x0, x1, 1400, 851, (cx) => {
+      const x = cx + 700;
+      if (x > S8_LAB - 300) return; // nada na frente da arena do chefe
+      g.fillStyle = '#5c6a86'; g.fillRect(x, 0, 40, H); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 40, H + 8);
+      g.fillStyle = 'rgba(200,240,255,0.85)';
+      for (let i = 0; i < 6; i++) { const ix = x - 50 + i * 26, L = 40 + (i * 37) % 60; g.beginPath(); g.moveTo(ix, 0); g.lineTo(ix + 14, 0); g.lineTo(ix + 7, L); g.closePath(); g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.stroke(); }
+      g.fillStyle = SNOW; g.beginPath(); g.ellipse(x + 20, H - 6, 60, 22, 0, 0, Math.PI * 2); g.fill();
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 8) {
+      return { layers: [new Layer(0.1, s8Far, 28), new Layer(0.38, s8Mid, 29), new Layer(1, s8Near, 30)], fg: new Layer(1.18, s8Fg, 31), id };
+    }
     if (id === 7) {
       return { layers: [new Layer(0.1, s7Far, 24), new Layer(0.38, s7Mid, 25), new Layer(1, s7Near, 26)], fg: new Layer(1.18, s7Fg, 27), id };
     }

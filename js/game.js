@@ -84,7 +84,7 @@
       this.energy = 30; this.flashEnergy = 0;
       this.combo = 0; this.comboT = 0;
       this.tokens = this.baseTokens(2);
-      this.banner = null; this.powerBanner = 0;
+      this.banner = null; this.powerBanner = 0; this.comboTag = null; this.tint = null;
       this.boss = null; this.bossShown = 0;
       this.drill = null;
       this.superT = 0;
@@ -102,9 +102,11 @@
       this.bg = TT.makeBackground(this.stage.id);
       this.applyScale();
       this.stageStartScore = this.score;
-      // a partir da primeira fase "powerUp" (fase 7) os Titãs usam os golpes novos
-      this.powered = TT.STAGES.slice(0, i + 1).some((s) => s.powerUp);
-      for (const t of this.team) { t.setPower(this.powered); t.reset(); }
+      // nível de poder dos Titãs: golpes novos a partir da fase 7 ("powerUp"), combos a partir da fase 8 ("combos")
+      const upTo = TT.STAGES.slice(0, i + 1);
+      this.power = upTo.some((s) => s.combos) ? 2 : upTo.some((s) => s.powerUp) ? 1 : 0;
+      this.powered = this.power > 0;
+      for (const t of this.team) { t.setPower(this.power); t.reset(); }
       this.slots[0].ai = 0;
       const p = this.player;
       p.x = 220; p.y = 590; p.facing = 1;
@@ -114,7 +116,7 @@
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
       this.banner = { text: this.stage.name, sub: this.stage.subtitle, t: 0, dur: 200 };
-      if (this.stage.powerUp) this.powerBanner = 1; // depois do título da fase: "GOLPES NOVOS!"
+      if (this.stage.powerUp || this.stage.combos) this.powerBanner = 1; // depois do título da fase: "GOLPES NOVOS!" / "COMBOS NOVOS!"
       for (const l of this.bg.layers) l.warm(0);
       A().playSong(this.stage.song);
     }
@@ -125,7 +127,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -237,6 +239,9 @@
         b = new TT.BrotherBlood(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'psy';
+      } else if (sec.boss === 'mallah') {
+        b = new TT.Mallah(this, this.camX + 880, 590);
+        b.facing = -1;
       } else if (sec.boss === 'slade') {
         // sai das sombras: primeiro só o olho brilhando, depois o corpo inteiro
         b = new TT.Slade(this, this.camX + 880, 590);
@@ -398,6 +403,12 @@
         for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
       }
+      if (d.freezeHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
+        // raio congelante da Irmandade: o Titã fica preso num bloco de gelo
+        t.frozen = d.freezeHero; t.hitstun = Math.max(t.hitstun, d.freezeHero); t.vx = 0;
+        for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) });
+      }
       if (d.fire && t.team === 'hero') {
         // fogo de Trigon (demônios e Slade): faíscas laranja e "QUEIMOU!"
         for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-4, 4), vy: TT.rand(-7, -2), color: TT.choice(['#ff7a1a', '#ffd23a', '#ffffff']), size: 4, life: 16, grav: 0.1 });
@@ -504,6 +515,13 @@
     }
 
     // ------------------------------------------------------------------ Efeitos visuais
+    // Imagem residual do Titã (combos da fase 8). Em forma de animal fica só um brilho.
+    afterimage(f, col, flip) {
+      if (f.atk && (f.atk.def.form || f.atk.def.formAt)) { this.particles.spawn('glow', f.x, f.y - f.z - 70, { color: col, size: 90, life: 10 }); return; }
+      this.addEffect(new TT.Afterimage(this, f, col, flip));
+    }
+    // Tela inteira tingida por um instante (Supernova, rugido...).
+    tintScreen(col, dur) { this.tint = { col, t: dur, dur }; }
     hitSpark(x, y, big, color) {
       const n = big ? 12 : 7;
       const cols = color ? [color, '#ffffff', color, '#fff6b0'] : ['#fff6b0', '#ffd23a', '#ffffff'];
@@ -718,12 +736,16 @@
       else if (this.powerBanner) {
         // fase 7: anuncia os golpes novos logo depois do título da fase
         this.powerBanner = 0;
-        this.banner = { text: 'GOLPES NOVOS!', sub: 'Os Titãs liberaram os poderes máximos: mais dano!', t: 0, dur: 170, power: true };
+        this.banner = this.stage.combos
+          ? { text: 'COMBOS NOVOS!', sub: 'Ataque 5 vezes para o combo completo — ou ATAQUE, ATAQUE, FORTE para o COMBO FINAL!', t: 0, dur: 200, power: true }
+          : { text: 'GOLPES NOVOS!', sub: 'Os Titãs liberaram os poderes máximos: mais dano!', t: 0, dur: 170, power: true };
         for (const p of this.players()) { this.particles.spawn('ring', p.x, p.y - 60, { color: p.def.color, size: 120, life: 22 }); this.popText(p.x, p.y - 170, 'PODER MÁXIMO!', '#ffe14a', true); }
         A().play('super');
       }
       if (this.whiteFlash > 0) this.whiteFlash--;
       if (this.flashEnergy > 0) this.flashEnergy--;
+      if (this.tint && --this.tint.t <= 0) this.tint = null;
+      if (this.comboTag && ++this.comboTag.t > 90) this.comboTag = null;
       this.shake *= 0.86; if (this.shake < 0.3) this.shake = 0;
 
       const slots = this.activeSlots();
@@ -893,6 +915,7 @@
         case 'play': case 'pause': case 'gameover':
           this.drawWorld(ctx);
           this.drawHUD(ctx);
+          if (this.comboTag) this.drawComboTag(ctx);
           if (this.cut) this.cut.draw(ctx);
           if (this.state === 'pause') this.drawPause(ctx);
           if (this.state === 'gameover') this.drawGameOver(ctx);
@@ -937,6 +960,7 @@
       ctx.restore();
 
       ctx.drawImage(TT.vignette(), 0, 0, W, H);
+      if (this.tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * this.tint.t / this.tint.dur; ctx.fillStyle = this.tint.col; ctx.fillRect(0, 0, W, H); ctx.restore(); }
       if (this.whiteFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (this.whiteFlash / 14) + ')'; ctx.fillRect(0, 0, W, H); }
     }
 
@@ -982,6 +1006,15 @@
           ctx.fillRect(x, y, 3, 3);
         }
         ctx.globalCompositeOperation = 'source-over';
+      } else if (this.stage.id === 8) {
+        // neve caindo na base da Irmandade (mais fraca dentro da base)
+        const n = camX > 2600 ? 12 : 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        for (let i = 0; i < n; i++) {
+          const sp = 0.8 + (i % 5) * 0.35, x = ((i * 157 - camX * (0.3 + (i % 3) * 0.2) + Math.sin(f * 0.02 + i) * 30) % W + W) % W, y = (f * sp + i * 89) % (H + 20) - 10;
+          const r = 1.5 + (i % 3);
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
       } else if (this.stage.id === 7) {
         // brasas do fogo de Trigon subindo; no covil, faíscas das engrenagens caindo
         ctx.globalCompositeOperation = 'lighter';
@@ -1038,6 +1071,21 @@
         TT.drawText(ctx, b.text, 0, -1, 22, b.color === '#ffffff' ? '#222' : b.color, b.color === '#ffffff' ? null : OUT, 'center', 4);
         ctx.restore();
       }
+    }
+
+    // Nome do COMBO FINAL: faixa inclinada na cor do Titã que entra pela esquerda e sai pela direita.
+    drawComboTag(ctx) {
+      const c = this.comboTag, t = c.t;
+      const inK = TT.easeOut(Math.min(1, t / 10)), outK = t > 70 ? TT.easeInOut((t - 70) / 20) : 0;
+      const x = W / 2 + (1 - inK) * -W + outK * W, y = 168;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-0.05);
+      ctx.fillStyle = c.col; ctx.strokeStyle = OUT; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(-330, -34); ctx.lineTo(350, -34); ctx.lineTo(330, 34); ctx.lineTo(-350, 34); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-330, -30, 680, 14);
+      TT.drawText(ctx, 'COMBO FINAL', -300, -48, 22, '#ffe14a', OUT, 'left', 5);
+      TT.drawText(ctx, c.text + '!', 0, 2, 48, '#ffffff', OUT, 'center', 9);
+      ctx.restore();
+      if (t < 8) TT.drawGlow(ctx, c.fx, W / 2, y, 400 * (1 - t / 8), 0.6);
     }
 
     // ------------------------------------------------------------------ HUD
@@ -1256,7 +1304,7 @@
       const touch = this.touch && this.touch.visible;
       const rows = touch ? [
         ['Mover', 'analógico (lado esquerdo)'],
-        ['Ataque (combo)', 'ATAQUE'],
+        this.power >= 2 ? ['Combo (5) / COMBO FINAL', 'ATAQUE ×5  •  ATAQUE ×2 + FORTE'] : ['Ataque (combo)', 'ATAQUE'],
         ['Ataque forte', 'FORTE'],
         ['Especial (gasta energia)', 'ESPECIAL'],
         ['Pular / Esquiva (+ataque = investida)', 'PULO / ESQUIVA'],
@@ -1265,7 +1313,7 @@
         ['Pausa / Tela cheia', 'II / cantos'],
       ] : [
         ['Mover', this.coop ? 'WASD' : 'WASD / Setas'],
-        ['Ataque (combo)', 'J  ou  Z'],
+        this.power >= 2 ? ['Combo (5) / COMBO FINAL', 'J ×5  •  J, J, K'] : ['Ataque (combo)', 'J  ou  Z'],
         ['Ataque forte', 'K  ou  X'],
         ['Especial (gasta energia)', 'L  ou  C'],
         ['Pular / Esquiva (+ataque = investida)', 'Espaço / Shift'],
