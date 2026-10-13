@@ -5,6 +5,8 @@ Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): seis fases
 **O Show do Mumbo**), os 5 Titãs jogáveis com troca
 em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
+**Jogue online:** https://jovens-titas-jump-city.netlify.app
+
 ## Como jogar
 
 Dê **dois cliques em `JOGAR.bat`** (ou abra `index.html` no Chrome/Edge/Firefox).
@@ -186,6 +188,18 @@ página e chame a função serve.) A suíte tem 121 verificações e todas passa
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
+
+## Publicar na web (Netlify)
+
+O jogo fica em https://jovens-titas-jump-city.netlify.app. Para publicar uma versão nova, copie só
+`index.html`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
+
+```
+npx netlify-cli deploy --prod --no-build --dir site
+```
+
+A pasta `.netlify/` (fora do git) guarda o vínculo com o site; sem ela, use `--site jovens-titas-jump-city`.
+Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
 
 ## Próximos passos sugeridos
 
