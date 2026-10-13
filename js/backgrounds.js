@@ -888,7 +888,240 @@
     });
   }
 
+  // =============================================================== FASE 5 — Academia H.I.V.E.
+  // Pátio à noite em frente ao prédio da academia, corredor de armários e salas de aula,
+  // e o salão do Irmão Sangue (vermelho, com o emblema gigante).
+  const S5_HALL = 2700, S5_THRONE = 5850;
+  const HV_Y = '#f0c62e', HV_D = '#1e1b26', BLOOD = '#c4162a', BLOOD_D = '#6a0c1c';
+
+  function hexPath(g, x, y, r) {
+    g.beginPath();
+    for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+    g.closePath();
+  }
+  // Emblema da H.I.V.E.: hexágono com "H".
+  function hiveLogo(g, x, y, r, fill, letter, rim) {
+    hexPath(g, x, y, r); g.fillStyle = fill; g.fill();
+    g.strokeStyle = rim || OUT; g.lineWidth = Math.max(3, r * 0.1); g.stroke();
+    g.font = 'bold ' + Math.round(r * 1.05) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = letter; g.fillText('H', x, y + r * 0.06);
+  }
+
+  function s5Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#120a26'); sky.addColorStop(0.7, '#3a1a4e'); sky.addColorStop(1, '#6a2a5a');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 90, 201, (cx, r) => { // estrelas
+      g.fillStyle = 'rgba(255,240,220,' + (0.4 + r() * 0.5) + ')';
+      g.fillRect(cx + r() * 90, r() * 300, 2, 2);
+    });
+    cells(x0, x1, 1100, 203, (cx, r) => { // lua cheia
+      if (r() < 0.5) return;
+      const mx = cx + 300 + r() * 400, my = 90 + r() * 50;
+      const gl = g.createRadialGradient(mx, my, 20, mx, my, 140);
+      gl.addColorStop(0, 'rgba(255,240,210,0.35)'); gl.addColorStop(1, 'rgba(255,240,210,0)');
+      g.fillStyle = gl; g.fillRect(mx - 140, my - 140, 280, 280);
+      g.fillStyle = '#fff2d6'; g.beginPath(); g.arc(mx, my, 44, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(200,180,170,0.4)'; g.beginPath(); g.arc(mx - 12, my - 8, 9, 0, Math.PI * 2); g.arc(mx + 14, my + 12, 6, 0, Math.PI * 2); g.fill();
+    });
+    // morros com pinheiros (a academia fica isolada)
+    g.fillStyle = '#1d1230';
+    g.beginPath(); g.moveTo(x0, 440);
+    for (let x = Math.floor(x0 / 40) * 40; x <= x1 + 40; x += 40) g.lineTo(x, 380 + Math.sin(x * 0.004) * 30 + Math.sin(x * 0.013) * 12);
+    g.lineTo(x1, 440); g.closePath(); g.fill();
+    cells(x0, x1, 46, 205, (cx, r) => {
+      const x = cx + r() * 30, b = 395 + Math.sin(x * 0.004) * 30, h = 30 + r() * 30;
+      g.beginPath(); g.moveTo(x, b - h); g.lineTo(x + 12, b + 4); g.lineTo(x - 12, b + 4); g.closePath(); g.fill();
+    });
+    g.fillStyle = '#160d24'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s5Mid(g, x0, x1) {
+    // prédio da academia: blocos hexagonais com janelas amarelas e o letreiro H.I.V.E.
+    cells(x0, x1, 760, 211, (cx, r) => {
+      const bx = cx + 60, bw = 560, top = 150 + r() * 30, base = 470;
+      g.fillStyle = '#2c2440'; g.fillRect(bx, top, bw, base - top);
+      g.fillStyle = '#241d36'; g.fillRect(bx, top, 40, base - top); g.fillRect(bx + bw - 40, top, 40, base - top);
+      // telhado em favo de mel
+      for (let k = 0; k < 7; k++) { hexPath(g, bx + 40 + k * 80, top - 4, 30); g.fillStyle = '#3a2f55'; g.fill(); }
+      // janelas em hexágono, algumas acesas
+      for (let row = 0; row < 3; row++) for (let k = 0; k < 6; k++) {
+        const wx = bx + 80 + k * 82 + (row % 2) * 30, wy = top + 60 + row * 70;
+        if (wy > base - 30) continue;
+        hexPath(g, wx, wy, 18); g.fillStyle = r() > 0.35 ? '#ffd86a' : '#1a1428'; g.fill();
+        g.strokeStyle = '#18121f'; g.lineWidth = 3; g.stroke();
+      }
+      // torre central com o emblema
+      const tx = bx + bw / 2;
+      g.fillStyle = '#332a4a'; g.fillRect(tx - 70, top - 110, 140, 110);
+      hexPath(g, tx, top - 110, 74); g.fillStyle = '#3a2f55'; g.fill();
+      hiveLogo(g, tx, top - 70, 42, HV_Y, HV_D, '#18121f');
+      const gl = g.createRadialGradient(tx, top - 70, 10, tx, top - 70, 140);
+      gl.addColorStop(0, 'rgba(255,220,90,0.25)'); gl.addColorStop(1, 'rgba(255,220,90,0)');
+      g.fillStyle = gl; g.fillRect(tx - 140, top - 210, 280, 280);
+    });
+  }
+
+  function s5Near(g, x0, x1) {
+    // --- pátio: muro baixo com grade, postes de luz e bandeiras da H.I.V.E.
+    if (x0 < S5_HALL) clipX(g, x0, Math.min(x1, S5_HALL), () => {
+      g.fillStyle = '#4a4258'; g.fillRect(x0, 400, x1 - x0, 70);
+      g.fillStyle = '#5c536c'; g.fillRect(x0, 396, x1 - x0, 10);
+      g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.moveTo(x0, 400); g.lineTo(x1, 400); g.stroke();
+      g.strokeStyle = 'rgba(30,20,40,0.5)'; g.lineWidth = 2;
+      for (let y = 420; y < 470; y += 24) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+      g.strokeStyle = '#18121f'; g.lineWidth = 4; // grade de ferro
+      for (let x = Math.floor(x0 / 26) * 26; x < x1; x += 26) { g.beginPath(); g.moveTo(x, 396); g.lineTo(x, 320); g.stroke(); g.beginPath(); g.moveTo(x - 5, 326); g.lineTo(x, 314); g.lineTo(x + 5, 326); g.stroke(); }
+      g.beginPath(); g.moveTo(x0, 340); g.lineTo(x1, 340); g.stroke();
+      cells(x0, x1, 520, 221, (cx) => {
+        const px = cx + 120;
+        // poste de luz
+        g.fillStyle = '#2a2433'; g.fillRect(px - 5, 250, 10, 220); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(px - 5, 250, 10, 220);
+        g.fillStyle = '#ffe9a0'; hexPath(g, px, 240, 16); g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+        const gl = g.createRadialGradient(px, 240, 6, px, 240, 120);
+        gl.addColorStop(0, 'rgba(255,230,150,0.4)'); gl.addColorStop(1, 'rgba(255,230,150,0)');
+        g.fillStyle = gl; g.fillRect(px - 120, 120, 240, 240);
+        // bandeira
+        const fx = cx + 360;
+        g.fillStyle = '#2a2433'; g.fillRect(fx - 3, 160, 6, 310);
+        g.fillStyle = HV_D; g.fillRect(fx + 3, 170, 80, 120); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(fx + 3, 170, 80, 120);
+        g.fillStyle = HV_Y; g.fillRect(fx + 3, 170, 80, 10); g.fillRect(fx + 3, 280, 80, 10);
+        hiveLogo(g, fx + 43, 230, 26, HV_Y, HV_D);
+      });
+      // piso do pátio: lajotas hexagonais
+      g.fillStyle = '#6a6078'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.strokeStyle = 'rgba(40,30,50,0.45)'; g.lineWidth = 2;
+      for (let y = FT + 14, row = 0; y < H + 30; y += 30, row++) for (let x = Math.floor(x0 / 52) * 52 + (row % 2) * 26 - 52; x < x1 + 52; x += 52) {
+        g.beginPath(); g.ellipse(x, y, 24, 12, 0, 0, Math.PI * 2); g.stroke();
+      }
+      const sh = g.createLinearGradient(0, FT, 0, H);
+      sh.addColorStop(0, 'rgba(20,10,40,0.45)'); sh.addColorStop(1, 'rgba(20,10,40,0.05)');
+      g.fillStyle = sh; g.fillRect(x0, FT, x1 - x0, H - FT);
+    });
+    // --- corredor: armários, portas de sala de aula e cartazes
+    if (x1 > S5_HALL && x0 < S5_THRONE) clipX(g, Math.max(x0, S5_HALL), Math.min(x1, S5_THRONE), () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#2e2840'); wall.addColorStop(1, '#4a4060');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      g.fillStyle = HV_Y; g.fillRect(x0, 150, x1 - x0, 8); // faixa amarela
+      g.fillStyle = HV_D; for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) g.fillRect(x, 150, 20, 8);
+      cells(x0, x1, 240, 231, (cx) => { // luminárias no teto
+        g.fillStyle = '#d9dde6'; g.fillRect(cx + 60, 0, 120, 14);
+        const gl = g.createLinearGradient(0, 14, 0, 160);
+        gl.addColorStop(0, 'rgba(255,250,220,0.18)'); gl.addColorStop(1, 'rgba(255,250,220,0)');
+        g.fillStyle = gl; g.beginPath(); g.moveTo(cx + 60, 14); g.lineTo(cx + 180, 14); g.lineTo(cx + 230, 160); g.lineTo(cx + 10, 160); g.closePath(); g.fill();
+      });
+      const signs = ['VILANIA AVANÇADA', 'LABORATÓRIO DO MAL', 'ROBÓTICA SINISTRA', 'PLANOS MALIGNOS 101', 'DETENÇÃO'];
+      cells(x0, x1, 600, 233, (cx, r, i) => {
+        if (cx < S5_HALL - 100 || cx + 560 > S5_THRONE) return;
+        // fileira de armários
+        for (let k = 0; k < 7; k++) {
+          const lx = cx + 20 + k * 44;
+          g.fillStyle = k % 3 === 1 ? '#566788' : '#5b6b8a'; g.fillRect(lx, 250, 42, FT - 254);
+          g.strokeStyle = OUT; g.lineWidth = 2.5; g.strokeRect(lx, 250, 42, FT - 254);
+          g.fillStyle = '#4a5874'; for (let v = 0; v < 4; v++) g.fillRect(lx + 8, 264 + v * 7, 26, 3);
+          g.fillStyle = '#d9dde6'; g.fillRect(lx + 32, 340, 4, 16);
+          if (r() < 0.12) { g.fillStyle = '#2a2a38'; g.fillRect(lx + 2, 252, 38, FT - 258); g.fillStyle = '#7a5a9a'; g.fillRect(lx + 8, 300, 26, 30); } // armário aberto
+        }
+        // porta da sala com janela e placa
+        const dx = cx + 360;
+        g.fillStyle = '#6a4a36'; g.fillRect(dx, 230, 110, FT - 230); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(dx, 230, 110, FT - 230);
+        g.fillStyle = '#ffe9a0'; g.fillRect(dx + 25, 260, 60, 70); g.strokeRect(dx + 25, 260, 60, 70);
+        g.strokeStyle = '#6a4a36'; g.lineWidth = 3; g.beginPath(); g.moveTo(dx + 55, 260); g.lineTo(dx + 55, 330); g.stroke();
+        g.fillStyle = '#d9dde6'; g.beginPath(); g.arc(dx + 92, 360, 6, 0, Math.PI * 2); g.fill();
+        g.fillStyle = HV_D; g.fillRect(dx - 20, 186, 150, 34); g.strokeStyle = HV_Y; g.lineWidth = 3; g.strokeRect(dx - 20, 186, 150, 34);
+        TT.drawText(g, signs[((i % signs.length) + signs.length) % signs.length], dx + 55, 204, 15, HV_Y);
+        // cartaz da H.I.V.E. ou do Irmão Sangue
+        if (r() > 0.4) {
+          g.fillStyle = r() > 0.5 ? BLOOD : HV_Y; g.fillRect(cx + 500, 200, 70, 96); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 500, 200, 70, 96);
+          hiveLogo(g, cx + 535, 238, 22, HV_D, HV_Y);
+          TT.drawText(g, 'OBEDEÇA', cx + 535, 280, 13, '#ffffff');
+        }
+      });
+      // piso encerado xadrez roxo e cinza, com reflexo das luzes
+      for (let y = FT, row = 0; y < H; y += 32, row++) for (let x = Math.floor(x0 / 48) * 48; x < x1; x += 48) {
+        g.fillStyle = ((x / 48) + row) % 2 ? '#3e3654' : '#625a7c'; g.fillRect(x, y, 48, 32);
+      }
+      const sh = g.createLinearGradient(0, FT, 0, H);
+      sh.addColorStop(0, 'rgba(20,10,40,0.4)'); sh.addColorStop(1, 'rgba(20,10,40,0.05)');
+      g.fillStyle = sh; g.fillRect(x0, FT, x1 - x0, H - FT);
+      cells(x0, x1, 240, 237, (cx) => { g.fillStyle = 'rgba(255,250,220,0.1)'; g.fillRect(cx + 70, FT + 20, 100, 8); g.fillRect(cx + 90, FT + 60, 70, 5); });
+    });
+    // --- salão do Irmão Sangue: cortinas vermelhas, vitrais em hexágono e o emblema gigante
+    if (x1 > S5_THRONE) clipX(g, Math.max(x0, S5_THRONE), x1, () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#1a0a14'); wall.addColorStop(1, '#3a1222');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      cells(x0, x1, 640, 241, (cx) => {
+        if (cx < S5_THRONE - 300) return;
+        const ex = cx + 320;
+        // vitrais vermelhos
+        for (const vx of [cx + 90, cx + 550]) {
+          hexPath(g, vx, 170, 56); g.fillStyle = '#7a1424'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 6; g.stroke();
+          g.strokeStyle = '#2a0a12'; g.lineWidth = 3;
+          for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; g.beginPath(); g.moveTo(vx + Math.cos(a) * 54, 170 + Math.sin(a) * 54); g.lineTo(vx - Math.cos(a) * 54, 170 - Math.sin(a) * 54); g.stroke(); }
+          const gl = g.createRadialGradient(vx, 170, 10, vx, 170, 110);
+          gl.addColorStop(0, 'rgba(255,60,80,0.35)'); gl.addColorStop(1, 'rgba(255,60,80,0)');
+          g.fillStyle = gl; g.fillRect(vx - 110, 60, 220, 220);
+        }
+        // cortinas
+        for (const [cx0, dir] of [[cx + 170, 1], [cx + 470, -1]]) {
+          g.fillStyle = BLOOD; g.beginPath(); g.moveTo(cx0 - 50, 0); g.lineTo(cx0 + 50, 0);
+          g.quadraticCurveTo(cx0 + 20 * dir, 250, cx0 + 40 * dir, FT); g.lineTo(cx0 - 40 * dir, FT); g.quadraticCurveTo(cx0 - 30 * dir, 250, cx0 - 50, 0); g.closePath(); g.fill();
+          g.strokeStyle = BLOOD_D; g.lineWidth = 4;
+          for (const o of [-24, 0, 24]) { g.beginPath(); g.moveTo(cx0 + o, 0); g.quadraticCurveTo(cx0 + o * 0.6 + 10 * dir, 250, cx0 + o * 0.4 + 20 * dir, FT); g.stroke(); }
+          g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.moveTo(cx0 - 50, 0); g.quadraticCurveTo(cx0 - 30 * dir, 250, cx0 - 40 * dir, FT); g.stroke();
+        }
+        // emblema gigante do Irmão Sangue
+        const gl = g.createRadialGradient(ex, 200, 20, ex, 200, 200);
+        gl.addColorStop(0, 'rgba(255,40,70,0.4)'); gl.addColorStop(1, 'rgba(255,40,70,0)');
+        g.fillStyle = gl; g.fillRect(ex - 200, 0, 400, 400);
+        hiveLogo(g, ex, 200, 92, BLOOD, '#1a0a14', '#ff6a7a');
+        // trono no tablado
+        g.fillStyle = '#2a1018'; g.fillRect(ex - 140, FT - 40, 280, 40); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(ex - 140, FT - 40, 280, 40);
+        g.fillStyle = BLOOD_D; g.beginPath(); g.moveTo(ex - 50, FT - 40); g.lineTo(ex - 50, 330); g.lineTo(ex, 300); g.lineTo(ex + 50, 330); g.lineTo(ex + 50, FT - 40); g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = BLOOD; g.fillRect(ex - 38, 380, 76, 50);
+      });
+      // piso de pedra escura com tapete vermelho
+      g.fillStyle = '#2a2030'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2;
+      for (let y = FT + 40; y < H; y += 46) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+      for (let x = Math.floor(x0 / 90) * 90; x < x1; x += 90) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x - 30, H); g.stroke(); }
+      g.fillStyle = BLOOD_D; g.fillRect(x0, 560, x1 - x0, 70);
+      g.fillStyle = BLOOD; g.fillRect(x0, 566, x1 - x0, 58);
+      g.fillStyle = HV_Y; g.fillRect(x0, 570, x1 - x0, 3); g.fillRect(x0, 617, x1 - x0, 3);
+      const sh = g.createLinearGradient(0, FT, 0, H);
+      sh.addColorStop(0, 'rgba(30,0,10,0.5)'); sh.addColorStop(1, 'rgba(30,0,10,0.1)');
+      g.fillStyle = sh; g.fillRect(x0, FT, x1 - x0, H - FT);
+    });
+    // portas duplas entre as áreas
+    for (const bx of [S5_HALL, S5_THRONE]) if (x0 < bx + 90 && x1 > bx - 90) {
+      g.fillStyle = '#3a2a22'; g.fillRect(bx - 80, 120, 160, FT - 120);
+      g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(bx - 80, 120, 160, FT - 120);
+      g.fillStyle = '#6a4a36'; g.fillRect(bx - 70, 150, 66, FT - 150); g.fillRect(bx + 4, 150, 66, FT - 150);
+      g.lineWidth = 3; g.strokeRect(bx - 70, 150, 66, FT - 150); g.strokeRect(bx + 4, 150, 66, FT - 150);
+      hiveLogo(g, bx, 120, 34, bx === S5_THRONE ? BLOOD : HV_Y, HV_D);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  // Primeiro plano: colunas de pedra com flâmulas da H.I.V.E.
+  function s5Fg(g, x0, x1) {
+    cells(x0, x1, 1500, 251, (cx) => {
+      const x = cx + 750;
+      g.fillStyle = '#2a2236'; g.fillRect(x, 0, 60, H);
+      g.fillStyle = '#3a3048'; g.fillRect(x + 8, 0, 12, H);
+      g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 60, H + 8);
+      g.fillStyle = HV_D; g.fillRect(x + 6, 60, 48, 150); g.strokeRect(x + 6, 60, 48, 150);
+      g.fillStyle = HV_Y; g.beginPath(); g.moveTo(x + 6, 210); g.lineTo(x + 30, 236); g.lineTo(x + 54, 210); g.closePath(); g.fill(); g.stroke();
+      hiveLogo(g, x + 30, 130, 18, HV_Y, HV_D);
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 5) {
+      return { layers: [new Layer(0.1, s5Far, 16), new Layer(0.38, s5Mid, 17), new Layer(1, s5Near, 18)], fg: new Layer(1.18, s5Fg, 19), id };
+    }
     if (id === 1) {
       return { layers: [new Layer(0.1, s1Far, 1), new Layer(0.35, s1Mid, 2), new Layer(1, s1Near, 3)], fg: null, id };
     }

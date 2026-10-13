@@ -118,7 +118,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -225,6 +225,11 @@
         b = new TT.Plasmus(this, this.camX + 880, 590);
         b.facing = -1; b.rise = 0;
         this.introKind = 'rise';
+      } else if (sec.boss === 'blood') {
+        // surge num redemoinho de energia psíquica vermelha
+        b = new TT.BrotherBlood(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'psy';
       } else {
         b = new TT.GizmoMech(this, this.camX + W + 200, 590);
         b.facing = -1;
@@ -262,6 +267,13 @@
         b.rise = TT.clamp((k - 20) / 70, 0, 1);
         if (k > 10 && k < 90 && k % 8 === 0) { b.splash(this, b.x, b.y, 4); A().play('land'); }
         if (k === 92) { this.impact(b.x, b.y, 'GROOOAAAR!', '#ff5ab4', 1.4); this.shake = 16; A().play('roar'); }
+      }
+      if (this.introKind === 'psy') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 20) / 50, 0, 1);
+        if (k < 70 && k % 10 === 0) { this.particles.spawn('ring', b.x, b.y, { size: 60 + k * 2, color: '#ff3b4a', life: 18, flat: 0.4 }); A().play('dark'); }
+        if (k === 70) { this.impact(b.x, b.y, 'H.I.V.E.!', '#ff3b4a', 1.2); }
+        if (k === 95) this.say(b, 'Bem-vindos à H.I.V.E., Titãs.', '#ff8a9a');
       }
       if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
@@ -349,6 +361,17 @@
         // choque elétrico: faíscas ciano e "ZZT!"
         for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-6, 6), vy: TT.rand(-6, 6), color: TT.choice(['#6fe3ff', '#ffffff', '#ffe14a']), size: 3, life: 12 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'ZZT!', size: 34, color: '#bff6ff', color2: '#2a7bff', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.hex && t.team === 'hero') {
+        // raio de azar da Jinx: estrelinhas rosa e "AZAR!"
+        for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.hypno && t.team === 'hero') {
+        // hipnose do Irmão Sangue: Titã fica tonto por um tempo
+        t.hypno = true;
+        this.particles.spawn('ring', t.x, hy, { size: 70, color: '#ff7af0', life: 18 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'HIPNOTIZADO!', size: 30, color: '#ffc0f6', color2: '#a01a6a', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
       }
       if (heroAtk) {
         this.energy = Math.min(100, this.energy + d.dmg * 0.4);
@@ -864,6 +887,16 @@
         ctx.globalCompositeOperation = 'source-over';
         const fl = (f % 240) < 4 ? 0.06 : 0;
         if (fl) { ctx.fillStyle = 'rgba(120,230,255,' + fl + ')'; ctx.fillRect(0, 0, W, H); }
+      } else if (this.stage.id === 5) {
+        // partículas de energia psíquica vermelha subindo (mais densas no salão do Irmão Sangue)
+        ctx.globalCompositeOperation = 'lighter';
+        const n = camX > 5500 ? 22 : 12;
+        for (let i = 0; i < n; i++) {
+          const x = ((i * 233 - camX * 0.5) % W + W) % W, y = 700 - ((f * (0.6 + (i % 3) * 0.25) + i * 71) % 640);
+          ctx.fillStyle = 'rgba(255,70,90,' + (0.25 + 0.2 * Math.sin(f * 0.05 + i)) + ')';
+          ctx.fillRect(x + Math.sin(f * 0.03 + i) * 12, y, 3, 3);
+        }
+        ctx.globalCompositeOperation = 'source-over';
       } else {
         // poeira flutuando nos túneis
         ctx.fillStyle = 'rgba(255,220,170,0.35)';

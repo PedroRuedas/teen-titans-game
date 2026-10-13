@@ -735,6 +735,13 @@
         if (a.def.claw) this.drawClaw(ctx, sx, sy, a);
       }
       if (a && a.def.dmg && !a.def.beam && !a.def.form && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
+      // hipnotizado pelo Irmão Sangue: espirais girando sobre a cabeça enquanto está tonto
+      if (this.hypno && this.state === 'hurt') {
+        for (let i = 0; i < 3; i++) {
+          const ang = this.animT * 0.15 + i * 2.1;
+          TT.drawGlow(ctx, '#ff7af0', sx + Math.cos(ang) * 26, sy - 150 + Math.sin(ang) * 8, 14, 0.9);
+        }
+      } else this.hypno = false;
     }
 
     // Rastro verde da Estelar voando na esquiva.
@@ -903,6 +910,35 @@
       { pose: 'jab', s: 26, a: 4, r: 24, dmg: 10, reach: [-50, 80], depth: 40, kb: 6, knockdown: true, launch: 4, sound0: 'land' },
     ],
   };
+  // Aluno da Academia H.I.V.E. (fase 5): hipnotizado pelo Irmão Sangue; soco duplo ou chute.
+  ENEMIES.cadet = {
+    name: 'Aluno da H.I.V.E.', style: 'cadet', hp: 46, speed: 2.7, range: 60, score: 120, aggr: 1.15, picks: [0, 0, 2],
+    attacks: [
+      { pose: 'jab', s: 14, a: 4, r: 6, dmg: 6, reach: [0, 62], kb: 1, next: 1 },
+      { pose: 'cross', s: 6, a: 3, r: 18, dmg: 8, reach: [0, 68], kb: 3 },
+      { pose: 'kick', s: 18, a: 5, r: 18, dmg: 9, reach: [0, 82], kb: 4, knockdown: true, launch: 4 },
+    ],
+  };
+  // Jinx (fase 5): raio de azar rosa em linha (marcado no chão) e estrela (chute girando) de perto.
+  ENEMIES.jinx = {
+    name: 'Jinx', style: 'jinx', hp: 110, speed: 3.3, range: 150, score: 700, aggr: 1.25,
+    attacks: [
+      { pose: 'cast', s: 24, a: 10, r: 20, dmg: 10, zoneHit: true, knockdown: true, launch: 5, kb: 6, hex: true, sound0: 'dark', sound: 'zap',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 310, y: f.y, d: 28, arrows: true }]; } },
+      { pose: 'flyKick', s: 14, a: 6, r: 16, lunge: 6, dmg: 8, reach: [0, 78], kb: 4, sound0: 'whoosh' },
+    ],
+  };
+  // Mammoth (fase 5): gigante com super armadura; soco de varrer à frente e pisão em volta (ambos marcados).
+  ENEMIES.mammoth = {
+    name: 'Mammoth', style: 'mammoth', hp: 200, speed: 2.0, range: 96, score: 900, aggr: 1.1,
+    attacks: [
+      { pose: 'swing', s: 26, a: 6, r: 24, dmg: 14, zoneHit: true, knockdown: true, launch: 7, kb: 9, sound0: 'roar', sound: 'hitHeavy',
+        zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 150, ry: 50, f: f.facing }]; } },
+      { pose: 'slam', s: 30, a: 3, r: 28, dmg: 13, zoneHit: true, knockdown: true, launch: 6, kb: 7, sound: 'shockwave',
+        zone(f) { return [{ k: 'ell', x: f.x + f.facing * 20, y: f.y, rx: 175, ry: 64 }]; },
+        onFrame(f, t, g) { if (t === this.s) { g.impact(f.x + f.facing * 20, f.y, 'PISÃO!', '#e2702a', 0.8); g.dust(f.x, f.y, 10, '#b9a7c9'); } } },
+    ],
+  };
   TT.ENEMIES = ENEMIES;
 
   class Enemy extends Fighter {
@@ -955,7 +991,7 @@
       if (this.token && adx < this.def.range + 22 && Math.abs(dy) < 16 && this.cool <= 0) {
         this.vx = this.vy = 0;
         const atks = this.def.attacks;
-        const pick = this.kind === 'slade' ? (Math.random() < 0.6 ? 0 : 2) : TT.randi(0, atks.length - 1);
+        const pick = this.def.picks ? TT.choice(this.def.picks) : this.kind === 'slade' ? (Math.random() < 0.6 ? 0 : 2) : TT.randi(0, atks.length - 1);
         this.startAttack(atks[pick]);
       }
     }
@@ -1212,6 +1248,64 @@
     }
   }
   TT.GooBlob = GooBlob;
+
+  // Jinx (fase 5): bate e recua como o soldado elétrico; o raio de azar corre pelo chão em ondas rosa.
+  class JinxEnemy extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'jinx'); this.radius = 22; }
+    think() {
+      super.think();
+      if (!this.said && !this.entering && !this.dead) { this.said = true; this.game.say(this, 'Hora do azar, Titãs!', '#ff8ad6'); }
+    }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.def !== this.def.attacks[0]) return;
+      const d = a.def, x = this.x - camX, y = this.y - this.z;
+      if (a.t < d.s) { // mãos brilhando enquanto conjura
+        TT.drawGlow(ctx, '#ff5fb4', x + this.facing * 30, y - 70, 18 + 26 * (a.t / d.s), 0.9);
+        return;
+      }
+      if (a.t >= d.s + d.a) return;
+      // ondas de azar: arcos rosa que avançam pela faixa marcada
+      const k = (a.t - d.s) / d.a;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const u = TT.clamp(k * 1.3 - i * 0.12, 0, 1);
+        if (u <= 0) continue;
+        const wx = x + this.facing * (20 + u * 290), h = 34 + i * 6;
+        ctx.strokeStyle = 'rgba(255,95,180,' + (0.9 - i * 0.18) + ')'; ctx.lineWidth = 9 - i * 1.5;
+        ctx.beginPath(); ctx.ellipse(wx, this.y - 26, 14, h, 0, this.facing > 0 ? -Math.PI / 2 : Math.PI / 2, this.facing > 0 ? Math.PI / 2 : Math.PI * 1.5); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  TT.JinxEnemy = JinxEnemy;
+
+  // Mammoth (fase 5): não recua com golpes comuns (super armadura); só cambaleia depois de apanhar bastante.
+  class Mammoth extends Enemy {
+    constructor(game, x, y) {
+      super(game, 'mammoth', x, y);
+      this.radius = 42; this.height = 190; this.shadowW = 52;
+      this.superArmor = true; this.poise = 0; this.downTime = 60;
+    }
+    startAttack(def) {
+      super.startAttack(def);
+      this.atk.zones = def.zone ? def.zone.call(def, this, this.game, this.atk) : null;
+    }
+    onArmorHit(dmg) {
+      this.poise += dmg;
+      if (this.poise >= 45 && this.state !== 'attack') {
+        this.poise = 0; this.releaseToken();
+        this.setState('hurt'); this.setAnim('hurt'); this.hitstun = 22; this.vx = this.lastHitDir * 2;
+      }
+    }
+    think() {
+      super.think();
+      if (!this.said && !this.entering && !this.dead) { this.said = true; this.game.say(this, 'MAMMOTH ESMAGA!', '#ffb27a'); }
+    }
+    drawGround(ctx, camX) { Boss.prototype.drawGround.call(this, ctx, camX); }
+  }
+  TT.Mammoth = Mammoth;
 
   // Raio em zigue-zague entre dois pontos (para efeitos elétricos).
   function drawArc(ctx, x0, y0, x1, y1, col, w, segs) {
@@ -2281,6 +2375,244 @@
   }
   TT.Plasmus = Plasmus;
 
+  // Carteira escolar ou armário arremessado por telecinese (Irmão Sangue).
+  function drawDesk(ctx, x, y, s, rot, locker) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    if (locker) {
+      ctx.fillStyle = '#5b6b8a'; ctx.fillRect(-18, -36, 36, 72); ctx.strokeRect(-18, -36, 36, 72);
+      ctx.fillStyle = '#4a5874'; for (let k = 0; k < 4; k++) ctx.fillRect(-11, -28 + k * 6, 22, 3);
+      ctx.fillStyle = '#d9dde6'; ctx.fillRect(9, -2, 4, 12);
+      ctx.strokeStyle = '#3a4560'; ctx.lineWidth = 2; ctx.strokeRect(-14, -32, 28, 64);
+    } else {
+      ctx.fillStyle = '#8d96a6'; // pernas de metal
+      for (const lx of [-22, 18]) { ctx.fillRect(lx, -2, 5, 30); ctx.strokeRect(lx, -2, 5, 30); }
+      ctx.fillStyle = '#b27a45'; ctx.fillRect(-30, -10, 60, 12); ctx.strokeRect(-30, -10, 60, 12); // tampo
+      ctx.fillStyle = '#d29a62'; ctx.fillRect(-26, -8, 34, 3);
+      ctx.fillStyle = '#5c566c'; ctx.fillRect(-24, 10, 48, 8); ctx.strokeRect(-24, 10, 48, 8); // porta-livros
+    }
+    ctx.restore();
+  }
+  TT.drawDesk = drawDesk;
+
+  // ---- Irmão Sangue: diretor da Academia H.I.V.E. (fase 5)
+  // Fraqueza: a telecinese esgota a mente dele — depois de arremessar as carteiras fica tonto e leva dano dobrado.
+  class BrotherBlood extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'IRMÃO SANGUE';
+      this.style = TT.STYLES.blood;
+      this.hp = this.maxHp = 1200;
+      this.radius = 46; this.height = 230; this.shadowW = 62;
+      this.poiseMax = 150;
+      this.def = { score: 9000 };
+      this.tired = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0;
+      this.out = {};
+      this.taunts = ['Bem-vindos à minha escola, Titãs.', 'Hoje a aula é sobre DOR.', 'Ajoelhem-se diante do Irmão Sangue!', 'A H.I.V.E. obedece à minha mente!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      this.ATK = {
+        // empurrão psíquico: arco à frente
+        palm: { pose: 'cast', s: 28, a: 6, r: 24, dmg: 15, knockdown: true, launch: 8, kb: 11, zoneHit: true, color: '#ff3b4a', sound0: 'dark',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 210, ry: 62, f: f.facing }]; },
+          onFrame(f, t, g) {
+            if (t === this.s) {
+              g.impact(f.x + f.facing * 120, f.y, 'FWOOM!', '#ff3b4a', 0.9); A().play('hitHeavy');
+              for (const r of [90, 160]) g.particles.spawn('ring', f.x + f.facing * 70, f.y, { size: r, color: '#ff6a7a', life: 14, flat: 0.4 });
+            }
+          } },
+        // raio do braço cibernético: faixa até a borda da tela
+        beam: { pose: 'beam', s: 38, a: 14, r: 24, dmg: 13, knockdown: true, launch: 6, kb: 8, zoneHit: true, zr: 60, color: '#ff2a3a', sound: 'laser',
+          zone(f, g) {
+            const end = f.facing > 0 ? g.camX + TT.W + 40 : g.camX - 40;
+            return [{ k: 'rect', x0: f.x + f.facing * 50, x1: end, y: f.y, d: 30, arrows: true }];
+          },
+          onFrame(f, t, g) { if (t === this.s) g.impact(f.x + f.facing * 240, f.y, 'BZZZOW!', '#ff2a3a', 0.8); } },
+        // hipnose: círculo que segue o Titã até a metade do aviso; quem fica dentro fica tonto
+        mind: { pose: 'castUp', s: 44, a: 6, r: 20, dmg: 6, stun: 80, kb: 1, zoneHit: true, hypno: true, color: '#ff4af0',
+          aim(f, g, a) {
+            const p = g.targetFor(f);
+            if (p) { a.tx = clampX(g, p.x, 60); a.ty = TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM); }
+            else if (a.tx == null) { a.tx = f.x + f.facing * 300; a.ty = f.y; }
+            return { k: 'ell', x: a.tx, y: a.ty, rx: 100, ry: 40 };
+          },
+          zone(f, g, a) { return [this.aim(f, g, a)]; },
+          onFrame(f, t, g, a) {
+            if (t < this.s * 0.5) a.zones = [this.aim(f, g, a)];
+            if (t === 2) A().play('dark');
+            if (t === this.s) {
+              const z = a.zones[0];
+              for (const r of [70, 120, 170]) g.particles.spawn('ring', z.x, z.y, { size: r, color: '#ff7af0', life: 16, flat: 0.42 });
+              A().play('dark');
+            }
+          } },
+        // telecinese: carteiras e armários caem nos círculos marcados (depois ele fica esgotado)
+        hurl: { pose: 'castUp', s: 46, a: 1, r: 30, color: '#c08cff',
+          zone(f, g) {
+            const zs = [], hs = g.heroes(), n = f.phase2() ? 4 : 3, R = 85;
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: R, ry: R * 0.42 });
+            let guard = 0;
+            while (zs.length < n && guard++ < 30) {
+              const tp = groundTarget(g, TT.choice(hs) || f, 360, 110);
+              if (zs.every((z) => Math.abs(z.x - tp.x) > 2 * R || Math.abs(z.y - tp.y) > R)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: R, ry: R * 0.42 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === 4) A().play('dark');
+            if (t === this.s) {
+              a.zones.forEach((z, i) => {
+                const T = 34 + i * 7, z0 = 300, gr = 0.6, x0 = f.x + f.facing * 20 + (i - 1) * 50;
+                g.addProjectile(new Projectile(g, {
+                  kind: i % 2 ? 'locker' : 'desk', team: 'enemy', owner: f, x: x0, y: f.y, z: z0,
+                  vx: (z.x - x0) / T, vy: (z.y - f.y) / T, vz: (0.5 * gr * T * T - z0) / T, grav: gr,
+                  r: 30, dmg: 0, blastDmg: 12, life: 120, explodeOnGround: z.rx, zone: z, flight: T, impactWord: 'CRASH!',
+                }));
+              });
+              a.zones = null; // daqui em diante cada objeto desenha o seu alvo
+              A().play('whoosh');
+            }
+            if (t === this.s + this.a + this.r - 1) f.tire();
+          } },
+        // (fase 2) chama alunos hipnotizados
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#ff3b4a',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Alunos... ATAQUEM!', '#ff8a9a');
+            for (const side of [-1, 1]) {
+              const e = new Enemy(g, 'cadet', side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 50; g.addEnemy(e);
+              g.particles.spawn('glow', e.x, e.y - 60, { size: 130, color: '#ff3b4a', life: 16 });
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('dark');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    // Mente esgotada = dano dobrado.
+    get dmgTaken() { return this.tired > 0 ? 2 : 1; }
+    tire() {
+      this.atk = null;
+      this.setState('tired'); this.setAnim('hurt');
+      this.tired = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.game.say(this, 'Argh... minha cabeça!', '#ff8a9a');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'tired') return; // não interrompe a fraqueza
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'tired') {
+        this.vx = this.vy = 0;
+        if (--this.tired <= 0) { this.tired = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 30; }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'Chega de aula. Agora é PESSOAL!', '#ff3b4a');
+        g.impact(this.x, this.y, 'FÚRIA!', '#ff3b4a', 1);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 200), p.y, p2 ? 2.3 : 1.7);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem a telecinese (e a mente esgotada logo depois)
+        if (this.atkCount % 3 === 2) pick = 'hurl';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = ['mind'];
+          if (adx < 230 && Math.abs(dy) < 50) opts.push('palm', 'palm');
+          if (Math.abs(dy) < 40) opts.push('beam');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(40, 70) : this.nextCool(70, 105);
+        if (Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ff8a9a');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      if (this.state === 'tired') { this.pose.lean = -0.25; this.pose.tilt = -0.4; }
+      const x = this.x - camX + this.tellShake(), y = this.y - this.z;
+      ctx.save(); ctx.globalAlpha = al;
+      // aura psíquica vermelha (mais forte durante a preparação)
+      TT.drawGlow(ctx, '#ff1a3a', x, y - 120, 130 + Math.sin(t * 0.12) * 10 + (k > 0 ? 60 * k : 0), 0.35 + (k > 0 ? 0.35 * k : 0));
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      const o = this.out;
+      // telecinese: carteiras e armários flutuando acima dele enquanto prepara
+      if (d === this.ATK.hurl && a.t < d.s && a.zones) {
+        const u = TT.easeOut(Math.min(1, a.t / (d.s * 0.6)));
+        a.zones.forEach((z, i) => {
+          const fx = x + (i - (a.zones.length - 1) / 2) * 70, fy = y - 250 - 40 * u + Math.sin(t * 0.2 + i) * 6;
+          TT.drawGlow(ctx, '#ff4a6a', fx, fy, 40, 0.6);
+          drawDesk(ctx, fx, TT.lerp(y - 20, fy, u), 0.9, Math.sin(t * 0.1 + i) * 0.3, i % 2 === 1);
+        });
+      }
+      // hipnose: fio de energia dos olhos até o alvo marcado
+      if (d === this.ATK.mind && a.t < d.s + d.a && a.zones && o.hx != null) {
+        const z = a.zones[0], zx = z.x - camX, zy = z.y - 60;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(255,90,240,' + (0.3 + 0.5 * Math.max(0, k)) + ')'; ctx.lineWidth = 3 + 4 * Math.max(0, k);
+        ctx.setLineDash([14, 10]); ctx.lineDashOffset = -t * 2;
+        ctx.beginPath(); ctx.moveTo(o.hx, o.hy); ctx.quadraticCurveTo((o.hx + zx) / 2, Math.min(o.hy, zy) - 80, zx, zy); ctx.stroke();
+        ctx.setLineDash([]);
+        for (let i = 0; i < 3; i++) { // espiral sobre o alvo
+          const ang = t * 0.2 + i * 2.1;
+          TT.drawGlow(ctx, '#ff7af0', zx + Math.cos(ang) * 30, zy - 40 + Math.sin(ang) * 12, 16, 0.8);
+        }
+        ctx.restore();
+      }
+      // raio do braço cibernético
+      if (d === this.ATK.beam && a.t >= d.s && a.t < d.s + d.a && o.fx != null) {
+        const hx = o.fx, hy = o.fy, end = this.facing > 0 ? TT.W + 60 : -60;
+        const w = 22 * (1 - Math.abs((a.t - d.s) / d.a - 0.5));
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(255,40,60,0.55)'; ctx.lineWidth = w * 2.2; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(end, hy + 6); ctx.stroke();
+        ctx.strokeStyle = '#ffd0d6'; ctx.lineWidth = w * 0.6; ctx.stroke();
+        ctx.restore();
+        TT.drawGlow(ctx, '#ff2a3a', hx, hy, 50, 1);
+      } else if (d === this.ATK.beam && k > 0 && o.fx != null) {
+        TT.drawGlow(ctx, '#ff2a3a', o.fx, o.fy, 14 + 30 * k, 0.9); // carregando
+      }
+      // empurrão psíquico: onda vermelha à frente
+      if (d === this.ATK.palm && a.t >= d.s && a.t < d.s + d.a + 4) {
+        const u = (a.t - d.s) / (d.a + 4);
+        ctx.save(); ctx.globalAlpha = al * (1 - u);
+        ctx.strokeStyle = '#ff5a6a'; ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.ellipse(x + this.facing * 40, y - 110, 60 + 150 * u, 110 + 30 * u, 0, this.facing > 0 ? -1.2 : Math.PI - 1.2, this.facing > 0 ? 1.2 : Math.PI + 1.2); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 20);
+      if (this.state === 'tired') {
+        Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height + 10);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'MENTE ESGOTADA! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#ffb0b8', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.BrotherBlood = BrotherBlood;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -2453,6 +2785,10 @@
           break;
         case 'boulder':
           drawBoulder(ctx, x, y, 1, this.spin * 0.3);
+          break;
+        case 'desk': case 'locker':
+          TT.drawGlow(ctx, '#ff4a6a', x, y, 44, 0.55);
+          drawDesk(ctx, x, y, 1, this.spin * 0.25, this.kind === 'locker');
           break;
         case 'missile': {
           ctx.save(); ctx.translate(x, y);

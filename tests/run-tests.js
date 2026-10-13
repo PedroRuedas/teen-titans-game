@@ -52,10 +52,11 @@ async page => {
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
 
-  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 4) e ENTER começa nela
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 5) e ENTER começa nela
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
+    g.input.endStep(); // descarta o ENTER real ainda pendente (senão vira "confirmar" no 1º passo)
     const press = (k) => { g.input.pressed.add(k); g.step(); };
     press('down'); press('left');
     const sel = g.stageSel, label = g.menuLabel('stage').value;
@@ -64,7 +65,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 4 no título e começar nela', pick.sel === 3 && /GOSMA/.test(pick.label) && pick.st === 'play' && pick.stage === 3, pick);
+  ok('menu: escolher a fase 5 no título e começar nela', pick.sel === 4 && /ACADEMIA/.test(pick.label) && pick.st === 'play' && pick.stage === 4, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -290,6 +291,71 @@ async page => {
   });
   ok('Plasmus: braço grudado após o soco (parado, dano dobrado) e depois se solta', sticky.st === 'stuck' && sticky.stuckDmg === sticky.normal * 2 && sticky.moved < 1 && sticky.after !== 'stuck', sticky);
 
+  // 4b4b) Fraqueza do Irmão Sangue: depois da telecinese fica com a mente esgotada (parado, dano dobrado);
+  //       na fase 2 chama alunos hipnotizados; a hipnose deixa o Titã tonto
+  const blood = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(4); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.hurl);
+    for (let t = 0; t < 160 && b.state !== 'tired'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.tiredDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'tired'; t++) g.step();
+    out.after = b.state;
+    // fase 2: invocação de alunos
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.cadets = g.enemies.filter((e) => e.kind === 'cadet' && !e.dead).length;
+    // hipnose: Titã dentro do círculo fica tonto (hurt) por bem mais tempo que um golpe comum
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.mind);
+    let hurt = 0;
+    for (let t = 0; t < 200; t++) { p.vx = p.vy = 0; g.step(); if (p.state === 'hurt') hurt++; }
+    out.hypnoFrames = hurt;
+    TT.debug.god(false); g.enemies.length = 0;
+    return out;
+  });
+  ok('Irmão Sangue: mente esgotada após a telecinese (parado, dano dobrado) e depois se recupera', blood.st === 'tired' && blood.tiredDmg === blood.normal * 2 && blood.moved < 1 && blood.after !== 'tired', blood);
+  ok('Irmão Sangue: chama alunos hipnotizados na fase 2', blood.cadets === 2, blood);
+  ok('Irmão Sangue: hipnose deixa o Titã tonto', blood.hypnoFrames >= 70, blood);
+
+  // 4b4c) Inimigos da fase 5: raio de azar da Jinx e os dois golpes do Mammoth acertam só depois do aviso no chão
+  const s5 = await ev(() => {
+    const g = TT.game, out = {};
+    const cases = [['jinx', 0, 160], ['mammoth', 0, 110], ['mammoth', 1, 120]];
+    for (const [kind, i, dist] of cases) {
+      TT.debug.start(4); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    // super armadura do Mammoth: um golpe comum não o derruba
+    TT.debug.start(4); TT.debug.toSection(0); TT.debug.step(5);
+    g.enemies.length = 0;
+    const m = g.spawnEnemy('mammoth', 0, 1); m.entering = false; m.x = g.player.x + 90; m.cool = 9999;
+    m.takeHit(g.player, { dmg: 8, knockdown: true, launch: 6, kb: 4 });
+    out.armor = m.state;
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s5) if (k !== 'armor') ok('fase 5: golpe ' + k + ' acerta após o aviso', s5[k].zone && s5[k].inside && s5[k].hitT >= s5[k].s, s5[k]);
+  ok('fase 5: Mammoth não cai com golpe comum (super armadura)', s5.armor !== 'down' && s5.armor !== 'hurt', s5.armor);
+
   // 4b5) Vozes: só a Ravena fala ("Azarath Metrion Zinthos!"); os outros Titãs ficam só no balão
   const voices = await ev(() => {
     const g = TT.game, A = TT.audio, calls = [], orig = A.voice;
@@ -304,7 +370,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 4 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 5 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -377,6 +443,16 @@ async page => {
     C(3, 'wave', (b) => ({ x: b.x - 300, y: b.y + 40 }), (b) => ({ x: b.x - 610, y: 695 }));
     C(3, 'dive', (b) => ({ x: b.x - 400, y: b.y + 20 }),
       (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    // Irmão Sangue (fase 5)
+    C(4, 'palm', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(4, 'beam', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(4, 'mind', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(4, 'hurl', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -397,7 +473,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 100000) {
+      while (g.state !== 'victory' && steps < 140000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -416,11 +492,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (4 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:3') && full.seen.includes('clear:3'), full);
+    ok('jogo completo (5 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:4') && full.seen.includes('clear:4'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3]) {
+  for (const st of [0, 1, 2, 3, 4]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

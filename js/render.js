@@ -806,6 +806,173 @@
     },
   });
 
+  // Hexágono "H" da H.I.V.E. (emblema) centrado em (x, y).
+  function hiveHex(ctx, x, y, s, fill, letter) {
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; ctx.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s); }
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = letter; ctx.font = 'bold ' + Math.round(s * 1.25) + 'px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', x, y + 0.5);
+  }
+  TT.hiveHex = hiveHex;
+  // Olhos vermelhos brilhando (aluno hipnotizado pelo Irmão Sangue).
+  function redEyes(ctx, r, glow) {
+    if (FLASH) return;
+    ctx.fillStyle = '#ff2a3a';
+    ctx.beginPath(); ctx.ellipse(r * 0.18, -r * 0.08, r * 0.17, r * 0.11, 0.1, 0, TAU2); ctx.ellipse(r * 0.66, -r * 0.08, r * 0.13, r * 0.1, -0.1, 0, TAU2); ctx.fill();
+    ctx.fillStyle = '#ffd0d4'; ctx.fillRect(r * 0.12, -r * 0.12, r * 0.08, r * 0.05);
+    if (glow) TT.drawGlow(ctx, '#ff2a3a', r * 0.42, -r * 0.08, r * 0.9, 0.7);
+  }
+
+  // Aluno da Academia H.I.V.E. (fase 5): uniforme cinza-arroxeado, emblema amarelo e olhos vermelhos hipnotizados.
+  S.cadet = mkStyle({
+    skin: '#e8b98f', torso: '#5c566c', arm: '#5c566c', glove: '#1e1b26', hand: '#1e1b26', leg: '#48435a', boot: '#1e1b26',
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#f0c62e'; ctx.fillRect(-20, -9, 40, 5);
+      ctx.fillStyle = '#2b2735'; ctx.fillRect(-20, -th + 2, 40, 5); // gola
+      hiveHex(ctx, 6, -th + 17, 7, '#f0c62e', OUT);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e8b98f');
+      // cabelo curto escuro
+      ctx.beginPath(); ctx.arc(0, -r * 0.08, r * 1.04, Math.PI * 0.92, Math.PI * 1.9); ctx.quadraticCurveTo(r * 0.3, -r * 0.55, -r * 0.35, -r * 0.35); ctx.closePath();
+      ctx.fillStyle = C('#3a2a22'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      redEyes(ctx, r, false);
+      mouth(ctx, r, pose, r * 0.5, r * 0.55);
+    },
+  });
+
+  // Jinx (fase 5): vestido preto e roxo, meias listradas, cabelo rosa em dois chifres e olhos de gato rosa.
+  S.jinx = mkStyle({
+    headR: 19, torsoH: 31, shW: 24, waistW: 15, hipW: 19, legL: [26, 25], armL: [19, 18], legW: 7, armW: 6.5, handR: 5, footR: 7.5,
+    skin: '#e6dcef', torso: '#2b2233', arm: '#3c2c50', glove: '#e6dcef', hand: '#e6dcef', leg: '#6a3f8e', boot: '#1d1622',
+    legOpt: { sole: '#ff5fb4', band: [0.3, 0.62, 0.94, 1.26, 1.58].map((at) => ({ at, col: '#1d1622', len: 0.08 })) }, // meias listradas
+    drawMid(ctx, P) { // saia do vestido, rodada
+      const pts = [P.rot(-12, -8), P.rot(13, -8), P.rot(27, 20), P.rot(-24, 21)];
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+      ctx.lineTo(pts[1][0], pts[1][1]); ctx.lineTo(pts[2][0], pts[2][1]);
+      for (let k = 1; k <= 4; k++) { const q = k / 4, x = TT.lerp(pts[2][0], pts[3][0], q), y = TT.lerp(pts[2][1], pts[3][1], q); ctx.lineTo(x, y + (k % 2 ? 4 : 0)); }
+      ctx.closePath();
+      ctx.fillStyle = C('#2b2233'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (!FLASH) { ctx.strokeStyle = '#7b4aa6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pts[3][0] + 3, pts[3][1] - 3); ctx.lineTo(pts[2][0] - 3, pts[2][1] - 3); ctx.stroke(); }
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#7b4aa6'; ctx.fillRect(-16, -th + 2, 32, 5); // gola alta roxa
+      ctx.fillStyle = '#4a3366'; ctx.beginPath(); ctx.moveTo(-6, -th + 7); ctx.lineTo(6, -th + 7); ctx.lineTo(0, -th + 16); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff5fb4'; ctx.fillRect(-16, -8, 32, 3); // cinto rosa
+    },
+    drawHead(ctx, r, pose) {
+      // chifres de cabelo rosa (atrás e na frente)
+      const horn = (bx, by, tx, ty, w) => {
+        ctx.beginPath(); ctx.moveTo(bx - w, by); ctx.quadraticCurveTo(bx - w * 0.6, ty + (by - ty) * 0.35, tx, ty);
+        ctx.quadraticCurveTo(bx + w * 0.9, ty + (by - ty) * 0.55, bx + w, by); ctx.closePath();
+        ctx.fillStyle = C('#ff5fb4'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+        if (!FLASH) { ctx.strokeStyle = '#ffa6d6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx - w * 0.3, by - 4); ctx.quadraticCurveTo(bx - w * 0.2, ty + (by - ty) * 0.4, tx - 2, ty + 6); ctx.stroke(); }
+      };
+      horn(-r * 0.55, -r * 0.55, -r * 1.25, -r * 2.05, r * 0.42);
+      headCircle(ctx, r, '#e6dcef');
+      ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 1.05, Math.PI * 0.85, Math.PI * 1.98); ctx.quadraticCurveTo(r * 0.4, -r * 0.45, -r * 0.2, -r * 0.42); ctx.closePath();
+      ctx.fillStyle = C('#ff5fb4'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      horn(r * 0.3, -r * 0.8, r * 0.75, -r * 2.15, r * 0.38);
+      eyes(ctx, r, pose, { iris: '#ff3fa8', lid: '#7b4aa6', wide: 1.1 });
+      if (!FLASH && pose.eyes !== 'shut' && pose.eyes !== 'x') { // pupila de gato
+        ctx.fillStyle = OUT; ctx.fillRect(r * 0.18, -r * 0.2, r * 0.05, r * 0.2); ctx.fillRect(r * 0.68, -r * 0.18, r * 0.04, r * 0.17);
+      }
+      mouth(ctx, r, pose, r * 0.48, r * 0.55);
+      if (!FLASH && pose.mouth !== 'open' && pose.mouth !== 'shout') { ctx.strokeStyle = '#4a2a66'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(r * 0.36, r * 0.55); ctx.quadraticCurveTo(r * 0.5, r * 0.5, r * 0.62, r * 0.53); ctx.stroke(); }
+    },
+  });
+
+  // Mammoth (fase 5): gigante de juba laranja, regata cinza da H.I.V.E., braços enormes.
+  S.mammoth = mkStyle({
+    scale: 1.55, headR: 18, torsoH: 44, shW: 50, waistW: 32, hipW: 32, chest: 4, legL: [23, 21], armL: [22, 21], legW: 13, armW: 13, handR: 10, footR: 9.5, headOff: 7, neck: 2,
+    skin: '#e7b28a', torso: '#636878', arm: '#e7b28a', glove: '#e7b28a', hand: '#e7b28a', leg: '#2c2f38', boot: '#1b1c22',
+    armOpt: { band: [{ at: 1.75, col: '#2b2735', len: 0.12 }] }, // munhequeiras
+    drawBack(ctx, P) { // juba laranja caindo nos ombros
+      const [x, y] = P.hd, r = P.st.headR;
+      ctx.beginPath();
+      ctx.moveTo(x + r * 0.3, y - r * 1.05);
+      ctx.bezierCurveTo(x - r * 1.4, y - r * 1.4, x - r * 2.1, y + r * 0.6, x - r * 1.6, y + r * 2.1);
+      ctx.lineTo(x - r * 1.0, y + r * 1.6); ctx.lineTo(x - r * 0.7, y + r * 2.2); ctx.lineTo(x - r * 0.2, y + r * 1.2);
+      ctx.closePath();
+      ctx.fillStyle = C('#e2702a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#4a4e5c'; ctx.fillRect(-26, -th + 3, 52, 4);
+      ctx.fillStyle = '#f0c62e'; ctx.fillRect(-30, -10, 60, 7); // cinto
+      hiveHex(ctx, 0, -6, 7, '#2b2735', '#f0c62e');
+      ctx.strokeStyle = 'rgba(30,20,40,0.35)'; ctx.lineWidth = 2; // peitoral
+      ctx.beginPath(); ctx.moveTo(-12, -th + 14); ctx.quadraticCurveTo(2, -th + 22, 18, -th + 14); ctx.stroke();
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e7b28a');
+      // queixo enorme
+      ctx.beginPath(); ctx.ellipse(r * 0.38, r * 0.5, r * 0.75, r * 0.5, 0.15, 0, TAU2);
+      ctx.fillStyle = C('#e7b28a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      // cabelo bagunçado no topo
+      ctx.beginPath(); ctx.moveTo(-r * 1.0, r * 0.1);
+      for (const [px, py] of [[-1.1, -0.6], [-0.7, -1.25], [-0.3, -1.0], [0.05, -1.4], [0.35, -1.0], [0.75, -1.25], [0.95, -0.5], [0.6, -0.62], [0.1, -0.55], [-0.4, -0.45]]) ctx.lineTo(px * r, py * r);
+      ctx.closePath(); ctx.fillStyle = C('#e2702a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#c45a1c'; ctx.fillRect(r * 0.05, -r * 0.42, r * 0.85, r * 0.16); // sobrancelha grossa
+        ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.12, r * 0.09, 0, TAU2); ctx.arc(r * 0.72, -r * 0.12, r * 0.08, 0, TAU2); ctx.fill();
+      }
+      mouth(ctx, r, pose, r * 0.6, r * 0.62);
+    },
+  });
+
+  // Irmão Sangue (chefe da fase 5): farda roxa de gola alta com casaca, emblema vermelho, cabelo grisalho,
+  // olhos vermelhos e mão cibernética.
+  S.blood = mkStyle({
+    scale: 1.75, headR: 16, torsoH: 40, shW: 34, waistW: 21, hipW: 24, legL: [29, 28], armL: [22, 21], legW: 9.5, armW: 8.5, handR: 6.5, footR: 7.5, neck: 3,
+    skin: '#e8c4a6', torso: '#3b2c4d', arm: '#3b2c4d', glove: '#b9c2cf', hand: '#b9c2cf', leg: '#2a2236', boot: '#141118',
+    armOpt: { split: 1.6 },
+    drawBack(ctx, P) {
+      // casaca: abas longas atrás das pernas
+      const a = P.rot(-14, -6), b = P.rot(12, -4), sw = Math.sin((P.t || 0) * 0.07) * 3;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+      ctx.lineTo(P.Hx + 6, P.Hy + 52); ctx.lineTo(P.Hx - 12 + sw, P.Hy + 48); ctx.lineTo(P.Hx - 30 + sw, P.Hy + 54);
+      ctx.closePath();
+      ctx.fillStyle = C('#2c2039'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (!FLASH) { ctx.strokeStyle = '#c4162a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(P.Hx + 4, P.Hy + 48); ctx.lineTo(P.Hx - 28 + sw, P.Hy + 50); ctx.stroke(); }
+      // gola alta atrás da cabeça
+      const [hx, hy] = P.hd, r = P.st.headR;
+      ctx.beginPath(); ctx.moveTo(hx - r * 0.2, hy + r * 1.1); ctx.lineTo(hx - r * 1.35, hy - r * 0.6); ctx.lineTo(hx - r * 0.8, hy + r * 1.4); ctx.closePath();
+      ctx.fillStyle = C('#c4162a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#c4162a'; // lapelas vermelhas em V
+      ctx.beginPath(); ctx.moveTo(-14, -th); ctx.lineTo(0, -th + 16); ctx.lineTo(14, -th); ctx.lineTo(9, -th); ctx.lineTo(0, -th + 9); ctx.lineTo(-9, -th); ctx.closePath(); ctx.fill();
+      hiveHex(ctx, 4, -th + 24, 7.5, '#c4162a', '#1a0f18');
+      ctx.fillStyle = '#1a0f18'; ctx.fillRect(-22, -9, 44, 5);
+      ctx.fillStyle = '#c4162a'; ctx.fillRect(-3, -10, 7, 7);
+    },
+    drawFront(ctx, P, hF) { // luzes vermelhas da mão cibernética
+      if (FLASH) return;
+      ctx.fillStyle = '#ff2a3a';
+      ctx.beginPath(); ctx.arc(hF.ex, hF.ey, 2.6, 0, TAU2); ctx.fill();
+      TT.drawGlow(ctx, '#ff2a3a', hF.ex, hF.ey, 12, 0.8);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#e8c4a6');
+      // cabelo grisalho penteado para trás, com entradas
+      ctx.beginPath(); ctx.arc(0, -r * 0.05, r * 1.05, Math.PI * 0.82, Math.PI * 1.75); ctx.quadraticCurveTo(r * 0.1, -r * 0.62, -r * 0.4, -r * 0.2); ctx.quadraticCurveTo(-r * 0.6, r * 0.2, -r * 0.6, r * 0.5); ctx.closePath();
+      ctx.fillStyle = C('#d9dce4'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!FLASH) {
+        ctx.strokeStyle = '#a3a8b6'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-r * 0.7, -r * 0.6); ctx.quadraticCurveTo(-r * 0.2, -r * 0.95, r * 0.4, -r * 0.82); ctx.stroke();
+        ctx.strokeStyle = OUT; ctx.lineWidth = 2.6; // sobrancelhas arqueadas
+        ctx.beginPath(); ctx.moveTo(r * 0.0, -r * 0.4); ctx.lineTo(r * 0.38, -r * 0.3); ctx.moveTo(r * 0.55, -r * 0.3); ctx.lineTo(r * 0.85, -r * 0.42); ctx.stroke();
+      }
+      redEyes(ctx, r, true);
+      if (!FLASH) { ctx.strokeStyle = 'rgba(120,70,60,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(r * 0.75, r * 0.05); ctx.lineTo(r * 0.82, r * 0.3); ctx.stroke(); }
+      mouth(ctx, r, pose, r * 0.48, r * 0.56);
+    },
+  });
+
   S.slade = mkStyle({
     skin: '#1f2126', torso: '#1f2126', arm: '#2a2d33', glove: '#80868f', hand: '#80868f', leg: '#2a2d33', boot: '#80868f',
     shW: 32, hipW: 24, armW: 9, legW: 10,

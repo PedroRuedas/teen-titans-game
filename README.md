@@ -1,7 +1,7 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): quatro fases
-(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia** e **Fábrica de Gosma**), os 5 Titãs jogáveis com troca
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): cinco fases
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma** e **Academia H.I.V.E.**), os 5 Titãs jogáveis com troca
 em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
 ## Como jogar
@@ -99,6 +99,14 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    lodo: soco esticado em linha, cusparada de lodo (fuja dos círculos), onda de lodo (pule!) e,
    abaixo de 50% de vida, mergulho no chão para emergir embaixo de você. **Fraqueza:** depois do
    soco esticado o braço fica **grudado no chão** — ele trava no lugar e leva dano dobrado!
+5. **Academia H.I.V.E.**: pátio da escola do crime à noite, corredor de armários e salas de aula
+   ("Vilania Avançada", "Laboratório do Mal") e o salão vermelho do diretor. Inimigos: **Alunos da
+   H.I.V.E.** (hipnotizados, de olhos vermelhos), **Jinx** (raio de azar rosa que corre pelo chão e
+   estrela girando de perto) e **Mammoth** (super armadura: não cai com golpe comum; soco de varrer
+   e pisão, ambos marcados no chão). O chefe é o **Irmão Sangue**: empurrão psíquico, raio do braço
+   cibernético, **hipnose** (o círculo segue você; quem fica dentro fica tonto) e telecinese que
+   arremessa carteiras e armários nos círculos marcados; abaixo de 50% chama alunos para ajudar.
+   **Fraqueza:** depois da telecinese a **mente fica esgotada** — ele para e leva dano dobrado!
 
 ## Música e vozes
 
@@ -153,24 +161,25 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 92 verificações e todas passam:
+página e chame a função serve.) A suíte tem 108 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
-  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload e do Plasmus.
+  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus e do Irmão Sangue;
+  golpes da Jinx e do Mammoth (fase 5) com aviso no chão.
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante! e regressões.
-- 3 partidas completas (4 fases) do início ao fim com um bot.
-- Os quatro chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (5 fases) do início ao fim com um bot.
+- Os cinco chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Academia H.I.V.E., Mumbo, Control Freak, Slade…).
+- Mais fases (Mumbo, Control Freak, Slade…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

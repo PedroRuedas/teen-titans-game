@@ -65,5 +65,21 @@
         { type: 'boss', camX: 6000, boss: 'plasmus', intro: 'O monstro de lodo' },
       ],
     },
+    {
+      id: 5,
+      name: 'FASE 5 — ACADEMIA H.I.V.E.',
+      subtitle: 'O Irmão Sangue hipnotizou os alunos da academia do crime!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'blood',
+      crates: [[1150, 600, 'pizza'], [2350, 650, 'energy'], [3650, 560, 'pizza'], [4950, 620, 'energy'], [5500, 580, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['cadet', 'cadet', 'cadet'], ['cadet', 'cadet', 'cadet', 'cadet']] },
+        { type: 'arena', camX: 1500, waves: [['cadet', 'cadet', 'cadet'], ['jinx', 'cadet', 'cadet']] },
+        { type: 'arena', camX: 2950, waves: [['cadet', 'cadet', 'cadet', 'cadet'], ['mammoth', 'cadet', 'cadet']] },
+        { type: 'arena', camX: 4300, waves: [['jinx', 'cadet', 'cadet', 'cadet'], ['mammoth', 'jinx', 'cadet']] },
+        { type: 'boss', camX: 6000, boss: 'blood', intro: 'O diretor da Academia H.I.V.E.' },
+      ],
+    },
   ];
 })();
