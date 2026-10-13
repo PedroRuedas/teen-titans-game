@@ -120,8 +120,10 @@
       this.twoPlayers = false;
       this.held = new Map(); // código da tecla -> [jogador, ação]
       this.touch = null;     // controles de toque (js/touch.js), sempre do P1
+      this.remote = null;    // botões do amigo no jogo online (js/online.js), sempre do P2
       this.anyKey = false;
       window.addEventListener('keydown', (e) => {
+        if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // digitando (código da sala)
         this.anyKey = true;
         const m = this.mapKey(e.code);
         if (!m) return;
@@ -139,7 +141,8 @@
     // Tecla -> [jogador, ação], conforme o modo (1 ou 2 jogadores).
     mapKey(code) {
       if (KEYS_P1[code]) return [0, KEYS_P1[code]];
-      if (this.twoPlayers) return KEYS_P2[code] ? [1, KEYS_P2[code]] : null;
+      // online: o P2 é o amigo, então as setas continuam sendo do P1
+      if (this.twoPlayers && !this.remote) return KEYS_P2[code] ? [1, KEYS_P2[code]] : null;
       return KEYS_SOLO[code] ? [0, KEYS_SOLO[code]] : null;
     }
 
@@ -159,7 +162,7 @@
         if (ay > 0.35) P.padNow.add('down');
         if (p.buttons[9] && p.buttons[9].pressed) P.padNow.add('start');
         if (p.buttons[0] && p.buttons[0].pressed) P.padNow.add('confirm');
-        if (++n >= (this.twoPlayers ? 2 : 1)) break;
+        if (++n >= (this.twoPlayers && !this.remote ? 2 : 1)) break;
       }
       for (const P of this.pl) {
         for (const a of P.padNow) if (!P.padPrev.has(a)) {
@@ -177,6 +180,12 @@
       for (const P of this.pl) P.down.clear();
       for (const [, m] of this.held) this.pl[m[0]].down.add(m[1]);
       if (this.touch) for (const a of this.touch.down()) this.pl[0].down.add(a);
+      if (this.remote) { // amigo online = P2
+        const P = this.pl[1];
+        for (const a of this.remote.down) P.down.add(a);
+        for (const a of this.remote.pressed) { P.pressed.add(a); if (MENU_ACTS[a]) P.pressed.add('menu'); }
+        this.remote.pressed.clear();
+      }
       for (const P of this.pl) {
         for (const a of P.padNow) P.down.add(a);
         if (P.bot) {

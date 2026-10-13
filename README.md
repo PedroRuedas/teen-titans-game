@@ -46,6 +46,27 @@ Titã do parceiro), a câmera segue o meio dos dois e ninguém sai da tela. Pont
 compartilhados. Se um jogador ficar sem Titã livre, ele volta na próxima área; o jogo só acaba quando
 **todos** os Titãs caírem.
 
+### Jogar online com um amigo
+
+No título, escolha **JOGAR ONLINE** (logo abaixo de JOGAR):
+
+1. Um de vocês toca em **CRIAR SALA**. Aparece um código de 5 letras (ex.: `K7QX2`) e os botões
+   **COPIAR LINK** / **COMPARTILHAR LINK**. Mande o código ou o link para o amigo.
+2. O amigo abre o link (ou escolhe JOGAR ONLINE e digita o código) e toca em **ENTRAR**.
+3. Quando aparecer **AMIGO CONECTADO!**, quem criou a sala escolhe **JOGAR**. É o co-op normal:
+   quem criou é o P1 e o amigo é o P2.
+
+Como funciona: a partida roda no aparelho de quem criou a sala, e o amigo recebe a imagem e o som do
+jogo ao vivo e manda os botões dele (teclado, controle ou botões na tela), direto entre os dois
+aparelhos (WebRTC). Os dois veem sempre a mesma partida. O servidor gratuito do PeerJS só faz a
+apresentação entre os dois navegadores.
+
+- Quem cria a sala deve deixar o jogo aberto e na frente: se trocar de aba ou bloquear a tela, o jogo
+  para para os dois. É bom que seja quem tem o aparelho mais rápido e a melhor internet.
+- Quem cria joga com WASD **ou** setas (as setas não viram controles do P2).
+- Se o amigo sair ou a conexão cair, a partida continua para quem criou a sala, sozinho.
+- Algumas redes bem fechadas (de empresa ou escola) podem bloquear a conexão.
+
 ### Instalar como app (celular e computador)
 
 O jogo é um **app instalável** (PWA), com o ícone do "T" amarelo da aba do navegador:
@@ -242,6 +263,7 @@ js/stages.js      roteiro das fases (ondas, perseguição, chefes)
 js/cutscene.js    cutscene do "Titãs, avante!" (os cinco Titãs em combo)
 js/game.js        laço do jogo, câmera, HUD e telas
 js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
+js/online.js      jogar online com um amigo (sala com código, WebRTC via PeerJS)
 js/main.js        inicialização, bot de teste e API de depuração
 tests/            testes automatizados (Playwright)
 ```
@@ -296,6 +318,13 @@ npx netlify-cli deploy --prod --no-build --dir site
 
 A pasta `.netlify/` (fora do git) guarda o vínculo com o site; sem ela, use `--site jovens-titas-jump-city`.
 Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
+
+### Teste do jogo online
+
+`tests/online-test.js` abre duas janelas (quem cria a sala e o amigo) e conecta as duas de verdade pelo
+servidor do PeerJS, por isso fica fora da suíte principal e precisa de internet. Ele confere: criar a
+sala, entrar pelo link, imagem e som chegando, o amigo andando, atacando e pausando como P2, as setas
+continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexistente (13 verificações).
 
 ## Próximos passos sugeridos
 

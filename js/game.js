@@ -45,6 +45,8 @@
     get switchCool() { return this.slots[0].switchCool; }
     set switchCool(v) { this.slots[0].switchCool = v; }
     get coop() { return this.numPlayers > 1; }
+    // Jogando online como anfitrião: o P2 é o amigo, então o número de jogadores fica travado em 2.
+    get onlineLock() { return !!(this.online && this.online.hosting); }
     // Slots em jogo (1 ou 2).
     activeSlots() { return this.numPlayers > 1 ? this.slots : [this.slots[0]]; }
     slotTitan(s) { return this.team[this.slots[s].ai]; }
@@ -645,11 +647,13 @@
         default: break;
       }
       inp.endStep();
+      if (this.online) this.online.hostTick();
     }
 
     // Itens do menu do título.
     titleItems() {
-      const it = this.touch ? ['play', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'stage', 'players', 'diff', 'controls'];
+      const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'controls'];
+      if (!this.online) it.splice(1, 1);
       if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
       return it;
     }
@@ -676,6 +680,7 @@
 
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
+      if (this.online && this.online.panelOpen) return; // janela do JOGAR ONLINE aberta
       if (!this.titleSong) { A().playSong('theme'); this.titleSong = true; }
       const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
       if (this.showControls) {
@@ -690,13 +695,14 @@
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
       if (lr && it === 'stage') this.cycleStage(lr);
-      if (lr && it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
+      if (lr && it === 'players' && !this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
       if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
         if (it === 'stage') { this.cycleStage(1); return; }
-        if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
+        if (it === 'players') { if (!this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); } return; }
+        if (it === 'online') { A().play('select'); this.online.openPanel(); return; }
         if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
         if (it === 'install') { this.installApp(); return; }
@@ -1228,22 +1234,23 @@
       ctx.fillStyle = 'rgba(255,220,120,0.08)';
       for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(900, -80); ctx.lineTo(900, 80); ctx.fill(); }
       ctx.restore();
-      this.drawLogo(ctx, W / 2, 150 + Math.sin(f * 0.04) * 6, 1);
-      TT.drawText(ctx, 'A BATALHA DE JUMP CITY', W / 2, 250, 36, '#ffffff', OUT, 'center', 7);
+      const items = this.titleItems(), compact = items.length > 6, ty = compact ? -46 : 0;
+      this.drawLogo(ctx, W / 2, 150 + ty * 0.6 + Math.sin(f * 0.04) * 6, compact ? 0.9 : 1);
+      TT.drawText(ctx, 'A BATALHA DE JUMP CITY', W / 2, 250 + ty * 0.8, 36, '#ffffff', OUT, 'center', 7);
       // os cinco Titãs
       const xs = [250, 445, 640, 835, 1030];
       for (let i = 0; i < 5; i++) {
         const t = this.titleTitans[i];
         t.anim = (Math.floor(f / 90) % 5 === i) ? 'victory' : 'idle';
         t.vx = 0;
-        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], 515, 44, 11, 0, 0, Math.PI * 2); ctx.fill();
+        const by = 515 + ty;
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], by, 44, 11, 0, 0, Math.PI * 2); ctx.fill();
         TT.computePose(t, t.pose);
-        TT.drawRig(ctx, t.style, t.pose, xs[i], 515, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.25 });
-        TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
+        TT.drawRig(ctx, t.style, t.pose, xs[i], by, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.25 });
+        TT.drawText(ctx, t.name.toUpperCase(), xs[i], by + 31, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      const items = this.titleItems();
-      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, items.length > 6 ? 566 : 572, items.length > 6 ? 21 : items.length > 5 ? 24 : 27);
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, compact ? 526 : 572, compact ? (items.length > 7 ? 23 : 26) : items.length > 5 ? 24 : 27);
       const tip = this.touch && this.touch.visible ? 'analógico escolhe e muda  •  ATAQUE confirma' : '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som';
       TT.drawText(ctx, tip, W / 2, 708, 16, '#bfc4e8', OUT, 'center', 4);
     }
@@ -1254,11 +1261,12 @@
       switch (it) {
         case 'play': return { text: 'JOGAR' };
         case 'resume': return { text: 'CONTINUAR' };
-        case 'players': return { text: 'JOGADORES:', value: this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
+        case 'players': return { text: 'JOGADORES:', value: this.onlineLock ? '2 (ONLINE)' : this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
         case 'touch': return this.touch.label();
+        case 'online': return this.online.label();
         case 'install': return { text: 'INSTALAR APP', color: '#6fe3ff' };
         case 'quit': return this.quitArm ? { text: 'SAIR DA FASE?', value: 'CONFIRMAR', color: '#ff5a4a' } : { text: 'MENU INICIAL' };
         default: return { text: String(it) };

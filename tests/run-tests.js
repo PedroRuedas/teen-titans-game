@@ -23,9 +23,10 @@ async page => {
   await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowRight'); await sleep(60);
   const dTitle = await ev(() => ({ d: TT.game.difficulty, idx: TT.game.menuIdx, saved: localStorage.getItem('jovensTitas.dificuldade') }));
-  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 3 && dTitle.saved === 'hard', dTitle);
+  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 4 && dTitle.saved === 'hard', dTitle);
   await page.reload(); await page.waitForFunction(() => window.TT && TT.debug); await sleep(300);
   const dReload = await ev(() => TT.game.difficulty);
   ok('dificuldade: escolha persiste ao recarregar', dReload === 'hard', dReload);
@@ -40,8 +41,9 @@ async page => {
     return { err, d, fallback: (() => { Storage.prototype.getItem = () => { throw 1; }; const v = TT.store.get('x', 'def'); Storage.prototype.getItem = origGet; return v; })() };
   });
   ok('dificuldade: jogo funciona com storage bloqueado', !dFail.err && dFail.d === 'easy' && dFail.fallback === 'def', dFail);
-  await ev(() => { TT.game.menuIdx = 3; });
+  await ev(() => { TT.game.menuIdx = 4; });
   await page.keyboard.press('ArrowRight'); await sleep(60); // fácil -> normal
+  await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
@@ -58,9 +60,9 @@ async page => {
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
     g.input.endStep(); // descarta o ENTER real ainda pendente (senão vira "confirmar" no 1º passo)
     const press = (k) => { g.input.pressed.add(k); g.step(); };
-    press('down'); press('left');
+    press('down'); press('down'); press('left');
     const sel = g.stageSel, label = g.menuLabel('stage').value;
-    press('up'); press('menu');
+    press('up'); press('up'); press('menu');
     const res = { sel, label, st: g.state, stage: g.stageIdx };
     g.stageSel = 0; TT.debug.start(0);
     return res;
@@ -971,8 +973,10 @@ async page => {
   await page.waitForFunction(() => TT.game.frame > 30, null, { timeout: 8000 }).catch(() => {});
   await tap('ArrowDown');
   await tap('ArrowDown');
+  await tap('ArrowDown');
   await tap('ArrowRight');
   const coopSel = await ev(() => TT.game.numPlayers);
+  await tap('ArrowUp');
   await tap('ArrowUp');
   await tap('ArrowUp');
   await tap('Enter'); await sleep(100);

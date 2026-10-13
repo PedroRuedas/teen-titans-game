@@ -115,6 +115,7 @@
     const game = new TT.Game(canvas);
     TT.game = game;
     game.touch = game.input.touch = new TT.TouchControls(game);
+    game.online = new TT.Online(game);
     game.resize();
     let rt;
     window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => game.resize(), 120); });
@@ -124,6 +125,8 @@
     TT.paused = false;
     function frame(now) {
       requestAnimationFrame(frame);
+      // convidado do jogo online: não roda o jogo, só manda os botões (a imagem vem do anfitrião)
+      if (game.online.guest) { last = now; game.online.guestTick(); game.touch.update(); return; }
       if (TT.paused) { last = now; return; }
       acc += Math.min(250, now - last);
       last = now;
