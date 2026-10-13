@@ -1,6 +1,7 @@
 # Gera os ícones do app a partir do "T" do favicon (mesma geometria: viewBox 32, dois retângulos com contorno).
 from PIL import Image, ImageDraw
-OUT = 'C:/Users/pedro/Documents/TeenTitans/icons'
+import os
+OUT = os.path.dirname(os.path.abspath(__file__))
 YEL, DARK, BG = (255, 225, 74, 255), (23, 18, 31, 255), (7, 4, 15, 255)
 
 def draw_t(d, ox, oy, k):
