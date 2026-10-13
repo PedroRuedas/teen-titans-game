@@ -625,7 +625,9 @@
     }
 
     // Itens do menu do título.
-    titleItems() { return ['play', 'stage', 'players', 'diff', 'controls']; }
+    titleItems() { return this.touch ? ['play', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'stage', 'players', 'diff', 'controls']; }
+    // Itens do menu de pausa.
+    pauseItems() { return this.touch ? ['resume', 'diff', 'touch'] : ['resume', 'diff']; }
     // Fase inicial escolhida no título (para testar qualquer fase direto).
     cycleStage(d) { const n = TT.STAGES.length; this.stageSel = ((this.stageSel || 0) + d + n) % n; A().play('select'); }
 
@@ -646,11 +648,13 @@
       if (lr && it === 'diff') this.cycleDifficulty(lr);
       if (lr && it === 'stage') this.cycleStage(lr);
       if (lr && it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
+      if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
         if (it === 'stage') { this.cycleStage(1); return; }
         if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
+        if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
         A().play('select');
         this.score = 0;
@@ -663,19 +667,19 @@
       this.particles.update();
     }
 
-    // Menu de pausa: continuar / dificuldade.
+    // Menu de pausa: continuar / dificuldade / botões na tela.
     updatePause(inp) {
       if (inp.wasPressed('pause')) { this.state = 'play'; return; }
-      const n = 2;
+      const items = this.pauseItems(), n = items.length, it = items[this.pauseIdx] || 'resume';
       if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; A().play('select'); }
       if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; A().play('select'); }
-      if (this.pauseIdx === 1) {
-        if (inp.wasPressed('left')) this.cycleDifficulty(-1);
-        if (inp.wasPressed('right')) this.cycleDifficulty(1);
-      }
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      if (lr && it === 'diff') this.cycleDifficulty(lr);
+      if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (inp.wasPressed('menu') || inp.wasPressed('light')) {
-        if (this.pauseIdx === 0) this.state = 'play';
-        else this.cycleDifficulty(1);
+        if (it === 'resume') this.state = 'play';
+        else if (it === 'diff') this.cycleDifficulty(1);
+        else { this.touch.cycle(1); A().play('select'); }
       }
     }
 
@@ -1186,8 +1190,10 @@
         TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 572, 27);
-      TT.drawText(ctx, '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som', W / 2, 706, 16, '#bfc4e8', OUT, 'center', 4);
+      const items = this.titleItems();
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 572, items.length > 5 ? 24 : 27);
+      const tip = this.touch && this.touch.visible ? 'analógico escolhe e muda  •  ATAQUE confirma' : '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som';
+      TT.drawText(ctx, tip, W / 2, 708, 16, '#bfc4e8', OUT, 'center', 4);
     }
 
     // Texto e cor de cada item de menu.
@@ -1200,6 +1206,7 @@
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
+        case 'touch': return this.touch.label();
         default: return { text: String(it) };
       }
     }
@@ -1240,7 +1247,17 @@
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(cx - 360, cy - 150, 720, 350, 20); else ctx.rect(cx - 360, cy - 150, 720, 350); ctx.fill();
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.stroke();
       TT.drawText(ctx, 'CONTROLES', cx, cy - 118, 34, '#ffe14a', OUT);
-      const rows = [
+      const touch = this.touch && this.touch.visible;
+      const rows = touch ? [
+        ['Mover', 'analógico (lado esquerdo)'],
+        ['Ataque (combo)', 'ATAQUE'],
+        ['Ataque forte', 'FORTE'],
+        ['Especial (gasta energia)', 'ESPECIAL'],
+        ['Pular / Esquiva (+ataque = investida)', 'PULO / ESQUIVA'],
+        ['Trocar Titã', 'TROCAR'],
+        ['Titãs, avante! (energia cheia)', 'AVANTE!'],
+        ['Pausa / Tela cheia', 'II / cantos'],
+      ] : [
         ['Mover', this.coop ? 'WASD' : 'WASD / Setas'],
         ['Ataque (combo)', 'J  ou  Z'],
         ['Ataque forte', 'K  ou  X'],
@@ -1254,6 +1271,11 @@
         TT.drawText(ctx, r[0], cx - 330, cy - 76 + i * 30, 21, '#ffffff', OUT, 'left', 4);
         TT.drawText(ctx, r[1], cx + 330, cy - 76 + i * 30, 21, '#9effa8', OUT, 'right', 4);
       });
+      if (touch) {
+        TT.drawText(ctx, 'Opacidade dos botões: item BOTÕES NA TELA (título ou pausa), com ← →', cx, cy + 160, 17, '#bfc4e8', OUT, 'center', 4);
+        TT.drawText(ctx, 'Teclado e controle (gamepad) continuam funcionando', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
+        return;
+      }
       TT.drawText(ctx, 'Controle (gamepad) também funciona!' + (this.coop ? '  •  2º controle = P2' : ''), cx, cy + 160, 17, '#bfc4e8', OUT, 'center', 4);
       if (this.coop) TT.drawText(ctx, 'P2: setas • Num1/2/3 golpes • Num0 pula • Num, esquiva • Num4/6 troca • Num5 avante', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
       else TT.drawText(ctx, 'Co-op: escolha 2 JOGADORES no título (P2 usa setas + teclado numérico)', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
@@ -1262,9 +1284,12 @@
     drawPause(ctx) {
       ctx.fillStyle = 'rgba(5,0,20,0.6)'; ctx.fillRect(0, 0, W, H);
       TT.drawText(ctx, 'PAUSA', W / 2, 92, 72, '#ffe14a', OUT, 'center', 12);
-      this.drawMenu(ctx, ['resume', 'diff'].map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, 168, 38);
+      const items = this.pauseItems();
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, items.length > 2 ? 158 : 168, items.length > 2 ? 32 : 38);
       this.drawControls(ctx, W / 2, 400);
-      TT.drawText(ctx, 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar a dificuldade', W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
+      const tip = this.touch && this.touch.visible ? 'II para continuar  •  analógico escolhe  •  ←→ muda dificuldade e opacidade dos botões'
+        : 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar dificuldade e botões na tela';
+      TT.drawText(ctx, tip, W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
     }
 
     drawGameOver(ctx) {

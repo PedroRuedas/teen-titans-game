@@ -2,11 +2,14 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#07040f">
   <title>Jovens Titãs — A Batalha de Jump City</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='8' fill='%23ffe14a' stroke='%2317121f' stroke-width='2'/%3E%3Crect x='12' y='10' width='8' height='19' fill='%23ffe14a' stroke='%2317121f' stroke-width='2'/%3E%3C/svg%3E">
   <style>
-    html, body { margin: 0; height: 100%; background: #07040f; overflow: hidden; }
+    html, body { margin: 0; height: 100%; background: #07040f; overflow: hidden; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
     body { display: flex; align-items: center; justify-content: center; }
     canvas { display: block; background: #000; box-shadow: 0 0 60px rgba(120, 60, 255, 0.25); }
   </style>
@@ -23,6 +26,7 @@
   <script src="js/entities.js"></script>
   <script src="js/stages.js"></script>
   <script src="js/game.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/touch.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

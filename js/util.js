@@ -119,6 +119,7 @@
       this.pl = [new PlayerInput(), new PlayerInput()];
       this.twoPlayers = false;
       this.held = new Map(); // código da tecla -> [jogador, ação]
+      this.touch = null;     // controles de toque (js/touch.js), sempre do P1
       this.anyKey = false;
       window.addEventListener('keydown', (e) => {
         this.anyKey = true;
@@ -175,6 +176,7 @@
       this.pollPad();
       for (const P of this.pl) P.down.clear();
       for (const [, m] of this.held) this.pl[m[0]].down.add(m[1]);
+      if (this.touch) for (const a of this.touch.down()) this.pl[0].down.add(a);
       for (const P of this.pl) {
         for (const a of P.padNow) P.down.add(a);
         if (P.bot) {

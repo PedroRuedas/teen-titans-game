@@ -688,6 +688,65 @@ async page => {
     ok('bot vence o chefe da fase ' + (st + 1) + ' sem trapaça (NORMAL)', r.result === 'clear', r);
   }
 
+  // 6a) BOTÕES NA TELA (celular): liga pelo menu, analógico navega no menu e anda, botões golpeiam,
+  //     pausa e opacidade (salva no navegador). Usa o mouse, que gera os mesmos eventos de ponteiro do toque.
+  await page.goto('http://localhost:8765/?touch=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.debug);
+  const frames = (n) => ev((n) => new Promise((r) => { const f0 = TT.game.frame; (function w() { if (TT.game.frame >= f0 + n) r(); else requestAnimationFrame(w); })(); }), n);
+  await frames(30);
+  const tc = {};
+  tc.menu = await ev(() => {
+    const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.endStep();
+    const press = (k) => { g.input.pressed.add(k); g.step(); };
+    const hidden = getComputedStyle(document.getElementById('tt-touch')).display === 'none';
+    const was = g.touch.level;
+    g.menuIdx = g.titleItems().indexOf('touch');
+    g.touch.level = 'off'; press('right');
+    const on = { lvl: g.touch.level, label: g.menuLabel('touch').value };
+    press('right'); press('left'); press('left');
+    const off = g.touch.level;
+    press('right'); press('right');
+    g.menuIdx = 0;
+    return { was, hidden, on, off, lvl: g.touch.level, display: getComputedStyle(document.getElementById('tt-touch')).display, css: document.getElementById('tt-touch').style.opacity, saved: TT.store.get('botoes') };
+  });
+  const box = async (sel) => { const b = await page.locator(sel).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+  const z = await box('#tt-stick-zone');
+  const flick = async (dx, dy) => { await page.mouse.move(z.x, z.y); await page.mouse.down(); await page.mouse.move(z.x + dx, z.y + dy, { steps: 4 }); await frames(3); await page.mouse.up(); await frames(3); };
+  await flick(0, 80); await flick(0, 80);
+  tc.menuMoved = await ev(() => TT.game.menuIdx);
+  await flick(0, -80); await flick(0, -80);
+  const tapBtn = async (act) => { const b = await box('[data-act=' + act + ']'); await page.mouse.click(b.x, b.y); await frames(2); };
+  await tapBtn('light'); await frames(8);
+  tc.started = await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0);
+  await ev(() => { TT.game.banner = null; for (const t of TT.game.team) t.invul = 0; });
+  const tx0 = await ev(() => TT.game.player.x);
+  await page.mouse.move(z.x, z.y); await page.mouse.down(); await page.mouse.move(z.x + 90, z.y, { steps: 4 });
+  await frames(40);
+  tc.walked = Math.round((await ev(() => TT.game.player.x)) - tx0);
+  await page.mouse.up(); await frames(5);
+  tc.moves = {};
+  for (const a of ['light', 'heavy', 'special', 'jump']) { await frames(50); await ev(() => { TT.game.energy = 100; }); await tapBtn(a); tc.moves[a] = await ev(() => TT.game.player.state); }
+  await frames(60);
+  const k0 = await ev(() => TT.game.player.key);
+  await tapBtn('next'); await frames(3);
+  tc.switched = k0 !== (await ev(() => TT.game.player.key));
+  await tapBtn('pause');
+  tc.paused = await ev(() => TT.game.state);
+  await flick(0, 80); await flick(0, 80);
+  tc.pauseItem = await ev(() => TT.game.pauseItems()[TT.game.pauseIdx]);
+  await flick(-90, 0);
+  tc.opacity = await ev(() => ({ lvl: TT.game.touch.level, css: document.getElementById('tt-touch').style.opacity, saved: TT.store.get('botoes') }));
+  await tapBtn('pause');
+  tc.resumed = await ev(() => TT.game.state);
+  // volta a deixar os botões como estavam (sem nada salvo)
+  await ev(() => { localStorage.removeItem('jovensTitas.botoes'); TT.game.touch.level = 'off'; TT.game.touch.apply(); });
+  ok('botões na tela: item do menu liga, muda a opacidade, desliga e salva',
+    tc.menu.hidden && tc.menu.on.lvl === 0.25 && tc.menu.on.label === '25%' && tc.menu.off === 'off' && tc.menu.lvl === 0.4 && tc.menu.display === 'block' && tc.menu.css === '0.4' && tc.menu.saved === '0.4', tc.menu);
+  ok('botões na tela: analógico navega no menu e ATAQUE começa o jogo', tc.menuMoved === 2 && tc.started, tc);
+  ok('botões na tela: analógico anda e ATAQUE/FORTE/ESPECIAL/PULO funcionam',
+    tc.walked > 100 && tc.moves.light === 'attack' && tc.moves.heavy === 'attack' && tc.moves.special === 'attack' && tc.moves.jump === 'air', tc);
+  ok('botões na tela: TROCAR, pausa (II) e opacidade pela pausa', tc.switched && tc.paused === 'pause' && tc.pauseItem === 'touch' && tc.opacity.lvl === 0.25 && tc.opacity.css === '0.25' && tc.opacity.saved === '0.25' && tc.resumed === 'play', tc);
+
   // 6b) CO-OP LOCAL (2 jogadores) — recarrega a página para não herdar estado dos testes anteriores
   await page.goto('http://localhost:8765/?coop=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);

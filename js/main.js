@@ -114,6 +114,7 @@
     const canvas = document.getElementById('game');
     const game = new TT.Game(canvas);
     TT.game = game;
+    game.touch = game.input.touch = new TT.TouchControls(game);
     game.resize();
     let rt;
     window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => game.resize(), 120); });
@@ -133,6 +134,7 @@
       }
       if (n === 5) acc = 0;
       try { game.render(); } catch (e) { reportError(e); resetCanvas(); }
+      game.touch.update();
     }
     // Após um erro de desenho a pilha save/restore fica desbalanceada: zera o contexto do canvas.
     function resetCanvas() {

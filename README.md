@@ -45,6 +45,19 @@ Titã do parceiro), a câmera segue o meio dos dois e ninguém sai da tela. Pont
 compartilhados. Se um jogador ficar sem Titã livre, ele volta na próxima área; o jogo só acaba quando
 **todos** os Titãs caírem.
 
+### Celular e tablet (botões na tela)
+
+Abra o link do jogo no navegador do celular, **na horizontal**. Os botões aparecem sozinhos em aparelhos
+de toque:
+
+- **Analógico** no lado esquerdo: encoste em qualquer ponto da metade esquerda e arraste (também
+  navega nos menus).
+- À direita: **ATAQUE**, **FORTE**, **ESPECIAL**, **PULO** e **ESQUIVA**. Nos menus, ATAQUE confirma.
+- No alto: **AVANTE!** (pisca quando a energia está cheia), **TROCAR** Titã, **II** (pausa) e tela cheia.
+- O item **BOTÕES NA TELA** (no título e na pausa) liga e desliga os botões e muda a **opacidade**
+  (25% a 100%) com ← →. A escolha fica salva no navegador. No computador eles começam desligados.
+- Os botões controlam o P1; teclado e controle (gamepad) continuam funcionando juntos.
+
 ## Dificuldade
 
 | | Fácil | Normal | Difícil |
@@ -182,6 +195,7 @@ js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
 js/stages.js      roteiro das fases (ondas, perseguição, chefes)
 js/game.js        laço do jogo, câmera, HUD e telas
+js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
 js/main.js        inicialização, bot de teste e API de depuração
 tests/            testes automatizados (Playwright)
 ```
@@ -195,12 +209,14 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 142 verificações e todas passam:
+página e chame a função serve.) A suíte tem 146 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
+- Botões na tela: o item do menu liga/desliga e muda a opacidade (e salva); o analógico navega nos
+  menus e anda; ATAQUE, FORTE, ESPECIAL, PULO, TROCAR e pausa funcionam.
 - Golpes novos: só a partir da fase 7, e cada golpe novo dá mais dano que o original; disco
   congelante prende o inimigo no gelo.
 - Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
