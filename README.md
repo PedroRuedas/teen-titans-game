@@ -15,7 +15,8 @@ Não precisa instalar nada nem de internet.
 
 No título escolha **JOGAR**, **JOGADORES (1 ou 2)**, **DIFICULDADE** e **CONTROLES**
 (↑↓ escolhe, ←→ muda, ENTER confirma). A dificuldade também pode ser trocada no menu de pausa
-e fica salva no navegador.
+e fica salva no navegador. Para **voltar ao menu inicial**, use **MENU INICIAL** na pausa (pede
+confirmação, porque a fase em andamento é perdida) ou **Esc / II** na tela de game over.
 
 | Ação | Teclado (P1) | Controle |
 |---|---|---|
@@ -209,12 +210,13 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 146 verificações e todas passam:
+página e chame a função serve.) A suíte tem 148 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
+- Voltar ao menu inicial pela pausa (com confirmação) e pelo game over.
 - Botões na tela: o item do menu liga/desliga e muda a opacidade (e salva); o analógico navega nos
   menus e anda; ATAQUE, FORTE, ESPECIAL, PULO, TROCAR e pausa funcionam.
 - Golpes novos: só a partir da fase 7, e cada golpe novo dá mais dano que o original; disco

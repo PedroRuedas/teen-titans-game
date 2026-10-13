@@ -209,7 +209,7 @@ async page => {
     g.stage = Object.assign({}, g.stage, { sections: [] });
     const p = g.player; p.facing = 1; p.y = 590; p.invul = 0;
     g.enemies.length = 0;
-    const e = new TT.Enemy(g, 'hive', p.x + 200, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; g.addEnemy(e);
+    const e = new TT.Enemy(g, 'hive', p.x + 200, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 }); g.addEnemy(e);
     g.input.pressed.add('heavy');
     let frozen = 0, maxFrozen = 0;
     for (let t = 0; t < 140; t++) { g.step(); if (e.frozen > 0) { frozen++; maxFrozen = Math.max(maxFrozen, e.frozen); } }
@@ -746,6 +746,35 @@ async page => {
   ok('botões na tela: analógico anda e ATAQUE/FORTE/ESPECIAL/PULO funcionam',
     tc.walked > 100 && tc.moves.light === 'attack' && tc.moves.heavy === 'attack' && tc.moves.special === 'attack' && tc.moves.jump === 'air', tc);
   ok('botões na tela: TROCAR, pausa (II) e opacidade pela pausa', tc.switched && tc.paused === 'pause' && tc.pauseItem === 'touch' && tc.opacity.lvl === 0.25 && tc.opacity.css === '0.25' && tc.opacity.saved === '0.25' && tc.resumed === 'play', tc);
+
+  // 6a2) MENU INICIAL: pela pausa (pede confirmação) e pela tela de game over (Esc)
+  const quit = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {};
+    const press = (...ks) => { for (const k of ks) g.input.pressed.add(k); g.step(); };
+    TT.debug.start(3); TT.debug.step(30);
+    press('pause', 'menu'); // Esc manda 'pause' e 'menu'
+    const items = g.pauseItems();
+    out.paused = g.state;
+    for (let i = 0; i < items.indexOf('quit'); i++) press('down');
+    out.item = items[g.pauseIdx];
+    press('light'); out.armed = [g.state, g.menuLabel('quit').value];
+    press('up'); press('down'); out.disarmed = !g.quitArm;
+    press('light'); press('menu');
+    out.title = [g.state, g.menuIdx, g.score];
+    // game over: Esc volta ao título; ENTER tenta de novo
+    TT.debug.start(2); TT.debug.step(5);
+    g.state = 'gameover'; g.stateT = 100;
+    press('pause', 'menu');
+    out.fromGameOver = g.state;
+    TT.debug.start(2); TT.debug.step(5);
+    g.state = 'gameover'; g.stateT = 100;
+    press('start', 'menu');
+    out.retry = [g.state, g.stageIdx];
+    return out;
+  });
+  ok('menu inicial pela pausa (com confirmação)', quit.paused === 'pause' && quit.item === 'quit' && quit.armed[0] === 'pause' && quit.armed[1] === 'CONFIRMAR' && quit.disarmed && quit.title[0] === 'title' && quit.title[1] === 0 && quit.title[2] === 0, quit);
+  ok('menu inicial pelo game over (Esc); ENTER ainda tenta de novo', quit.fromGameOver === 'title' && quit.retry[0] === 'play' && quit.retry[1] === 2, quit);
 
   // 6b) CO-OP LOCAL (2 jogadores) — recarrega a página para não herdar estado dos testes anteriores
   await page.goto('http://localhost:8765/?coop=' + Date.now());

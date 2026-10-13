@@ -606,7 +606,8 @@
         case 'pause': this.updatePause(inp); break;
         case 'gameover':
           this.particles.update();
-          if (this.stateT > 60 && inp.wasPressed('menu')) { this.score = this.stageStartScore; this.startStage(this.stageIdx); }
+          if (this.stateT > 60 && inp.wasPressed('pause')) this.goTitle(); // Esc / II: menu inicial (antes do 'menu', que o Esc também manda)
+          else if (this.stateT > 60 && inp.wasPressed('menu')) { this.score = this.stageStartScore; this.startStage(this.stageIdx); }
           break;
         case 'clear':
           this.updateCelebration();
@@ -617,7 +618,7 @@
           break;
         case 'victory':
           this.updateCelebration();
-          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; A().playSong('theme'); }
+          if (this.stateT > 120 && inp.wasPressed('menu')) this.goTitle();
           break;
         default: break;
       }
@@ -627,7 +628,14 @@
     // Itens do menu do título.
     titleItems() { return this.touch ? ['play', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'stage', 'players', 'diff', 'controls']; }
     // Itens do menu de pausa.
-    pauseItems() { return this.touch ? ['resume', 'diff', 'touch'] : ['resume', 'diff']; }
+    pauseItems() { return this.touch ? ['resume', 'diff', 'touch', 'quit'] : ['resume', 'diff', 'quit']; }
+
+    // Volta para a tela de título (a fase em andamento é abandonada).
+    goTitle() {
+      this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; this.showControls = false; this.quitArm = false;
+      this.particles.clear();
+      A().playSong('theme');
+    }
     // Fase inicial escolhida no título (para testar qualquer fase direto).
     cycleStage(d) { const n = TT.STAGES.length; this.stageSel = ((this.stageSel || 0) + d + n) % n; A().play('select'); }
 
@@ -669,17 +677,20 @@
 
     // Menu de pausa: continuar / dificuldade / botões na tela.
     updatePause(inp) {
-      if (inp.wasPressed('pause')) { this.state = 'play'; return; }
+      if (inp.wasPressed('pause')) { this.state = 'play'; this.quitArm = false; return; }
       const items = this.pauseItems(), n = items.length, it = items[this.pauseIdx] || 'resume';
-      if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; A().play('select'); }
-      if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; A().play('select'); }
+      if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; this.quitArm = false; A().play('select'); }
+      if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; this.quitArm = false; A().play('select'); }
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
       if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (inp.wasPressed('menu') || inp.wasPressed('light')) {
         if (it === 'resume') this.state = 'play';
         else if (it === 'diff') this.cycleDifficulty(1);
-        else { this.touch.cycle(1); A().play('select'); }
+        else if (it === 'quit') {
+          // pede confirmação: o progresso da fase é perdido
+          if (this.quitArm) this.goTitle(); else { this.quitArm = true; A().play('select'); }
+        } else { this.touch.cycle(1); A().play('select'); }
       }
     }
 
@@ -1207,6 +1218,7 @@
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
         case 'touch': return this.touch.label();
+        case 'quit': return this.quitArm ? { text: 'SAIR DA FASE?', value: 'CONFIRMAR', color: '#ff5a4a' } : { text: 'MENU INICIAL' };
         default: return { text: String(it) };
       }
     }
@@ -1285,7 +1297,7 @@
       ctx.fillStyle = 'rgba(5,0,20,0.6)'; ctx.fillRect(0, 0, W, H);
       TT.drawText(ctx, 'PAUSA', W / 2, 92, 72, '#ffe14a', OUT, 'center', 12);
       const items = this.pauseItems();
-      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, items.length > 2 ? 158 : 168, items.length > 2 ? 32 : 38);
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, items.length > 3 ? 148 : 158, items.length > 3 ? 27 : 32);
       this.drawControls(ctx, W / 2, 400);
       const tip = this.touch && this.touch.visible ? 'II para continuar  •  analógico escolhe  •  ←→ muda dificuldade e opacidade dos botões'
         : 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar dificuldade e botões na tela';
@@ -1298,7 +1310,9 @@
       ctx.save(); ctx.translate(W / 2, 280); ctx.scale(0.5 + k * 0.5, 0.5 + k * 0.5);
       TT.drawText(ctx, 'OS TITÃS CAÍRAM...', 0, 0, 84, '#ff3b30', OUT, 'center', 12);
       ctx.restore();
-      if (this.stateT > 60 && (this.frame >> 5) % 2 === 0) TT.drawText(ctx, 'ENTER para tentar de novo', W / 2, 420, 34, '#ffffff', OUT, 'center', 6);
+      const touch = this.touch && this.touch.visible;
+      if (this.stateT > 60 && (this.frame >> 5) % 2 === 0) TT.drawText(ctx, touch ? 'ATAQUE para tentar de novo' : 'ENTER para tentar de novo', W / 2, 420, 34, '#ffffff', OUT, 'center', 6);
+      if (this.stateT > 60) TT.drawText(ctx, touch ? 'II para voltar ao menu inicial' : 'ESC para voltar ao menu inicial', W / 2, 470, 24, '#bfc4e8', OUT, 'center', 5);
     }
 
     drawClear(ctx) {
