@@ -33,6 +33,10 @@
       this.stats = { frames: 0, renderMs: 0, maxRenderMs: 0 };
     }
 
+    // "Titãs, avante!" em andamento = cutscene ativa (js/cutscene.js). superT > 0 enquanto ela roda.
+    get superT() { return this.cut && !this.cut.done ? this.cut.left : 0; }
+    set superT(v) { if (!v) this.cut = null; }
+
     newSlot(id, ai) { return { id, ai, switchCool: 0, koTimer: 0, out: false }; }
     // Compatibilidade com o modo 1 jogador: "player" / "activeIdx" / "switchCool" são do P1.
     get player() { return this.team[this.slots[0].ai]; }
@@ -480,8 +484,8 @@
     triggerSuper(s) {
       if (this.energy < 100 || this.superT > 0) return;
       this.energy = 0;
-      this.superT = 110;
       this.superBy = this.slotTitan(s || 0);
+      this.cut = new TT.SuperCutscene(this, this.superBy);
       A().play('super');
       this.say(this.superBy, 'Titãs, AVANTE!', '#ffe14a');
     }
@@ -720,10 +724,10 @@
           if (pi.wasPressed('super') && !sl.out) this.triggerSuper(sl.id);
         }
       }
-      // Cena do "Titãs, avante!": mundo congelado
-      if (this.superT > 0) {
-        this.superT--;
-        if (this.superT === 20) this.resolveSuper();
+      // Cutscene do "Titãs, avante!": mundo congelado (o dano sai no fim da cena)
+      if (this.cut) {
+        this.cut.update(inp);
+        if (this.cut.done) this.cut = null;
         this.particles.update();
         return;
       }
@@ -875,7 +879,7 @@
         case 'play': case 'pause': case 'gameover':
           this.drawWorld(ctx);
           this.drawHUD(ctx);
-          if (this.superT > 0) this.drawSuper(ctx);
+          if (this.cut) this.cut.draw(ctx);
           if (this.state === 'pause') this.drawPause(ctx);
           if (this.state === 'gameover') this.drawGameOver(ctx);
           break;
@@ -1018,31 +1022,6 @@
         ctx.beginPath(); ctx.moveTo(tail - 8, 17); ctx.lineTo(tail, 30); ctx.lineTo(tail + 8, 17); ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#fff'; ctx.fillRect(tail - 7, 14, 14, 5);
         TT.drawText(ctx, b.text, 0, -1, 22, b.color === '#ffffff' ? '#222' : b.color, b.color === '#ffffff' ? null : OUT, 'center', 4);
-        ctx.restore();
-      }
-    }
-
-    drawSuper(ctx) {
-      const k = 1 - this.superT / 110;
-      ctx.fillStyle = 'rgba(10,0,30,' + Math.min(0.75, k * 3) + ')';
-      ctx.fillRect(0, 0, W, H);
-      // faixas diagonais com os cinco titãs
-      const n = 5, bw = W / n;
-      for (let i = 0; i < n; i++) {
-        const delay = i * 0.08, kk = TT.clamp((k - delay) * 4, 0, 1);
-        const x = i * bw, slide = (1 - TT.easeOut(kk)) * (i % 2 ? -H : H);
-        ctx.save();
-        ctx.beginPath(); ctx.moveTo(x + 40, slide + 90); ctx.lineTo(x + bw + 40, slide + 90); ctx.lineTo(x + bw - 40, slide + 600); ctx.lineTo(x - 40, slide + 600); ctx.closePath();
-        const key = TT.TITAN_ORDER[i];
-        ctx.fillStyle = TT.TITANS[key].color; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.stroke();
-        ctx.clip();
-        ctx.drawImage(TT.portrait(key, 260), x + bw / 2 - 130, slide + 200, 260, 260);
-        ctx.restore();
-      }
-      if (k > 0.4) {
-        const s = Math.min(1, (k - 0.4) * 5);
-        ctx.save(); ctx.translate(W / 2, 640); ctx.scale(s, s);
-        TT.drawText(ctx, 'TITÃS, AVANTE!', 0, 0, 84, '#ffe14a', OUT, 'center', 14);
         ctx.restore();
       }
     }

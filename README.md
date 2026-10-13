@@ -102,7 +102,13 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.
-- Acertar inimigos enche a energia. Com a barra cheia, **Titãs, avante!** acerta todos na tela.
+- Acertar inimigos enche a energia. Com a barra cheia, **Titãs, avante!** abre uma **cutscene**: o jogo
+  congela e, numa cena de cinema, os cinco Titãs entram um de cada vez e fazem um combo no chefe (ou no
+  inimigo mais perto). Quem apertou começa; depois vêm Robin (bastão + birdarangues), Mutano (T-Rex),
+  Ciborgue (canhão sônico), Ravena (corvo de alma — *"Azarath Metrion Zinthos!"*) e Estelar (starbolt +
+  raios oculares). Na fase 7 eles usam os golpes novos (A Fera, chuva de starbolts, tentáculos de
+  sombra...). No fim os cinco aparecem juntos, disparam ao mesmo tempo e a explosão acerta todos os
+  inimigos da tela. A cena dura uns 6 segundos; **ENTER** (ou **ATAQUE** no celular) pula para o final.
 - Caixas guardam **pizza** (vida) e **cristais** (energia).
 - Todo ataque de chefe tem aviso: pose exagerada, brilho na cor do golpe, um **"!"** sobre a cabeça e
   a **área exata** marcada em vermelho no chão, que vai se preenchendo até o impacto.
@@ -195,6 +201,7 @@ js/anim.js        animações: quadros-chave, locomoção e golpes de cada Titã
 js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
 js/stages.js      roteiro das fases (ondas, perseguição, chefes)
+js/cutscene.js    cutscene do "Titãs, avante!" (os cinco Titãs em combo)
 js/game.js        laço do jogo, câmera, HUD e telas
 js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
 js/main.js        inicialização, bot de teste e API de depuração
@@ -210,7 +217,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 148 verificações e todas passam:
+página e chame a função serve.) A suíte tem 157 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -226,7 +233,8 @@ página e chame a função serve.) A suíte tem 148 verificações e todas passa
   e do Slade; golpes da Jinx, do Mammoth, do Soldado-Carta, do Coelho Mágico, do Comando do Slade e do
   Demônio de Fogo com aviso no chão; Titã virando coelho; Slade chamando comandos.
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
-- Titãs, avante! e regressões.
+- Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
+  golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
 - 3 partidas completas (7 fases) do início ao fim com um bot.
 - Os sete chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,

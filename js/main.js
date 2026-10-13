@@ -148,6 +148,8 @@
       if (!errShown) { errShown = true; console.error(e); }
     }
     requestAnimationFrame(frame);
+    // retratos grandes da cutscene do avante: desenhados antes, para a cena não engasgar ao começar
+    setTimeout(() => { for (const k of TT.TITAN_ORDER) TT.portrait(k, 260); }, 800);
 
     window.addEventListener('keydown', () => TT.audio.init());
     // Começa/retoma o áudio no primeiro clique também

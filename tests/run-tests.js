@@ -242,11 +242,54 @@ async page => {
     const g = TT.game;
     for (let i = 0; i < 3; i++) TT.debug.game.spawnEnemy('hive', i, 3);
     TT.debug.step(150);
-    g.energy = 100; g.input.pressed.add('super');
-    TT.debug.step(140);
-    return { energy: g.energy, alive: g.enemies.filter((e) => !e.dead).length };
+    g.energy = 100; g.input.pressed.add('super'); g.step();
+    let n = 0; while (g.cut && n++ < 900) g.step();
+    TT.debug.step(20);
+    return { energy: g.energy, alive: g.enemies.filter((e) => !e.dead).length, frames: n };
   });
   ok('Titãs, avante! derrota inimigos', sup.alive === 0 && sup.energy < 100, sup);
+
+  // 4a) Cutscene do "Titãs, avante!": os cinco Titãs aparecem e fazem o combo no alvo; o mundo fica
+  //     congelado; cada quadro é desenhado sem erro com cada chefe como alvo (e com golpes novos na fase 7);
+  //     ATAQUE pula para o final e o dano sai do mesmo jeito
+  const cut = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = { runs: {} }, before = (TT.errors || []).length;
+    for (let st = 0; st < TT.STAGES.length; st++) {
+      TT.debug.start(st); TT.debug.toSection(4); TT.debug.god(true);
+      let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+      const b = g.boss, hp0 = b.hp, x0 = b.x;
+      g.energy = 100; g.input.pressed.add('super'); g.step();
+      const c = g.cut, by = c && c.by.key;
+      let frames = 0, frozen = true, maxLive = 0;
+      while (g.cut && frames < 900) {
+        g.step(); g.render(); frames++;
+        if (Math.abs(b.x - x0) > 0.01) frozen = false;
+        if (c) maxLive = Math.max(maxLive, c.live.length);
+      }
+      out.runs[st] = { target: c && c.target === b, by, first: c && c.queue[0].key, shown: c ? [...c.shown].sort().join(',') : '', hits: c ? c.hits : 0,
+        frames, frozen, dmg: Math.round(hp0 - b.hp), plus: c && c.queue.every((q) => !!q.a.def.plus === (st === 6)) };
+    }
+    // pular: ATAQUE depois da entrada vai direto para a explosão final (e o dano sai)
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    for (let i = 0; i < 3; i++) { const e = g.spawnEnemy('hive', i, 3); e.entering = false; e.x = g.player.x + 200 + i * 70; }
+    g.energy = 100; g.input.pressed.add('super'); g.step();
+    for (let i = 0; i < 60; i++) g.step();
+    g.input.pressed.add('light');
+    let n = 0; while (g.cut && n++ < 400) g.step();
+    out.skip = { frames: n, alive: g.enemies.filter((e) => !e.dead).length };
+    TT.debug.god(false);
+    out.errors = (TT.errors || []).length - before;
+    out.comp = g.ctx.globalCompositeOperation; out.alpha = g.ctx.globalAlpha;
+    return out;
+  });
+  for (const st in cut.runs) {
+    const r = cut.runs[st];
+    ok('cutscene do avante (fase ' + (+st + 1) + '): os cinco Titãs fazem o combo no chefe', r.target && r.shown === 'beastboy,cyborg,raven,robin,starfire' && r.first === r.by && r.hits >= 15 && r.frozen && r.dmg > 0 && r.plus && r.frames < 420, r);
+  }
+  ok('cutscene do avante: ATAQUE pula para o final e o dano sai', cut.skip.frames < 60 && cut.skip.alive === 0, cut.skip);
+  ok('cutscene do avante: todos os quadros desenhados sem erro', cut.errors === 0 && cut.comp === 'source-over' && cut.alpha === 1, cut);
 
   // 4b) Regressões: Titã revivido volta a levantar; botão apertado durante o "hit-stop" não se perde
   const reg = await ev(() => {
@@ -271,7 +314,8 @@ async page => {
     TT.debug.start(0); TT.debug.step(10);
     g.hitstop = 5; g.energy = 100; g.input.pressed.add('super'); TT.debug.step(1);
     const superOk = g.superT > 0;
-    TT.debug.step(150);
+    let n = 0; while (g.cut && n++ < 900) g.step(); // espera a cutscene do avante acabar
+    TT.debug.step(20);
     g.hitstop = 5; g.switchCool = 0; g.input.pressed.add('t2'); TT.debug.step(1);
     return { superOk, switched: g.player.key === 'cyborg' };
   });
