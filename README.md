@@ -219,7 +219,9 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
   e conferir cada tela.
 - **Otimização:**
   - Passo fixo de 60 Hz.
-  - Cenários com parallax pré-renderizados em blocos cacheados (só um `drawImage` por bloco),
+  - Cada fase tem uma camada de detalhes (objetos de cenário, luminárias com cone de luz, poças com reflexo,
+    marcas no chão) e uma passada de luz e sombra, pintadas no mesmo bloco em cache do primeiro plano.
+- Cenários com parallax pré-renderizados em blocos cacheados (só um `drawImage` por bloco),
     com pré-geração à frente da câmera.
   - Pool de partículas, brilhos pré-renderizados (nada de `shadowBlur`) e retratos do HUD em cache.
   - Resolução interna adaptada à tela (nítido em 1080p e 4K).
