@@ -54,7 +54,7 @@ async page => {
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
 
-  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 8) e ENTER começa nela
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 9) e ENTER começa nela
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
@@ -67,7 +67,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 8 no título e começar nela', pick.sel === 7 && /IRMANDADE/.test(pick.label) && pick.st === 'play' && pick.stage === 7, pick);
+  ok('menu: escolher a fase 9 no título e começar nela', pick.sel === 8 && /CONTROL FREAK/.test(pick.label) && pick.st === 'play' && pick.stage === 8, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -627,6 +627,67 @@ async page => {
   ok('Mallah: chama soldados congeladores na fase 2', mallah.freezers === 2, mallah);
   ok('Mallah: o raio congelante do Cérebro congela o Titã', mallah.frozenFrames >= 40, mallah);
 
+  // 4b4f4) Inimigos da fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca acertam só depois do aviso
+  const s9 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist, dy] of [['tvbot', 0, 200, 0], ['popcorn', 0, 160, 0], ['popcorn', 0, 250, 14]]) {
+      TT.debug.start(8); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y - dy; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i + '@' + dist] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s9) ok('fase 9: golpe ' + k + ' acerta após o aviso', s9[k].zone && s9[k].inside && s9[k].hitT >= s9[k].s, s9[k]);
+
+  // 4b4f5) Control Freak (fase 9): depois do ZAP MÁXIMO a pilha acaba (parado, dano dobrado) e depois volta;
+  //        na fase 2 chama TV-Robôs; o botão de PAUSA pausa o Titã dentro do círculo; e "COMBOS NOVOS!"
+  //        só é anunciado na fase 8 (a fase 9 já começa com eles)
+  const freak = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(8); TT.debug.toSection(4); TT.debug.god(true);
+    out.banner9 = g.powerBanner;
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.zap);
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.tvbots = g.enemies.filter((e) => e.kind === 'tvbot' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.pause);
+    let paused = 0, kind = null;
+    for (let t = 0; t < 120; t++) { p.vx = p.vy = 0; g.step(); if (p.frozen > 0) { paused++; kind = p.frozenKind; } }
+    out.pausedFrames = paused; out.kind = kind;
+    g.enemies.length = 0;
+    TT.debug.start(7); out.banner8 = g.powerBanner;
+    TT.debug.start(6); out.banner7 = g.powerBanner;
+    return out;
+  });
+  ok('Control Freak: a pilha acaba depois do ZAP MÁXIMO (parado, dano dobrado) e depois volta', freak.name === 'CONTROL FREAK' && freak.st === 'open' && freak.openDmg === freak.normal * 2 && freak.moved < 1 && freak.after !== 'open', freak);
+  ok('Control Freak: chama TV-Robôs na fase 2', freak.tvbots === 2, freak);
+  ok('Control Freak: o botão de PAUSA pausa o Titã', freak.pausedFrames >= 40 && freak.kind === 'pause', freak);
+  ok('fase 9 já começa com os combos (sem repetir o aviso de COMBOS NOVOS das fases 7 e 8)', freak.banner9 === 0 && freak.banner8 === 1 && freak.banner7 === 1, freak);
+
   // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
   //       na fase 2 chama comandos
   const slade = await ev(() => {
@@ -671,7 +732,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 8 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 9 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -783,6 +844,14 @@ async page => {
       for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
       return { x: bb.x, y: bb.y };
     } }));
+    // Control Freak (fase 9)
+    C(8, 'swat', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(8, 'zap', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    for (const nm of ['tvs', 'pause']) C(8, nm, (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -803,7 +872,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 240000) {
+      while (g.state !== 'victory' && steps < 270000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -822,11 +891,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (8 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:7') && full.seen.includes('clear:7'), full);
+    ok('jogo completo (9 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:8') && full.seen.includes('clear:8'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4, 5, 6, 7]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);

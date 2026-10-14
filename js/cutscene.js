@@ -410,7 +410,7 @@
 
     // O inimigo de verdade é desenhado na cena (estado salvo e restaurado; o jogo continua congelado).
     drawTarget(ctx) {
-      const e = this.target, keys = ['x', 'y', 'z', 'facing', 'state', 'anim', 'animT', 'flash', 'atk', 'st', 'invul', 'frozen', 'dead', 'alpha', 'vx', 'vy', 'vz', 'hitstun'];
+      const e = this.target, keys = ['x', 'y', 'z', 'facing', 'state', 'anim', 'animT', 'flash', 'atk', 'st', 'invul', 'frozen', 'frozenKind', 'dead', 'alpha', 'vx', 'vy', 'vz', 'hitstun'];
       const save = {};
       for (const k of keys) save[k] = e[k];
       const sx = TX + this.tdx, sc = this.tScale;

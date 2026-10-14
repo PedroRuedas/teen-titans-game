@@ -118,7 +118,9 @@
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
       this.banner = { text: this.stage.name, sub: this.stage.subtitle, t: 0, dur: 200 };
-      if (this.stage.powerUp || this.stage.combos) this.powerBanner = 1; // depois do título da fase: "GOLPES NOVOS!" / "COMBOS NOVOS!"
+      // depois do título da fase: "GOLPES NOVOS!" / "COMBOS NOVOS!" — só na fase que estreia o poder
+      const before = TT.STAGES.slice(0, i);
+      if ((this.stage.combos && !before.some((s) => s.combos)) || (this.stage.powerUp && !before.some((s) => s.powerUp))) this.powerBanner = 1;
       for (const l of this.bg.layers) l.warm(0);
       A().playSong(this.stage.song);
     }
@@ -129,7 +131,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -241,6 +243,11 @@
         b = new TT.BrotherBlood(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'psy';
+      } else if (sec.boss === 'freak') {
+        // aparece "sintonizando" no meio do chuvisco, como um canal de TV
+        b = new TT.ControlFreak(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'tv';
       } else if (sec.boss === 'mallah') {
         b = new TT.Mallah(this, this.camX + 880, 590);
         b.facing = -1;
@@ -312,6 +319,13 @@
         if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
         if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
         if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
+      }
+      if (this.introKind === 'tv') {
+        const k = 170 - this.bossIntro;
+        b.alpha = k < 60 ? ((k >> 2) % 3 === 0 ? 0.5 : 0.08) : 1; // sinal falhando até sintonizar
+        if (k < 60 && k % 10 === 0) A().play('zap');
+        if (k === 60) { this.impact(b.x, b.y, 'CLICK!', '#7bffea', 1.3); this.whiteFlash = 6; }
+        if (k === 90) this.say(b, 'Interrompemos a programação para... a DERROTA dos Titãs!', '#bffff4');
       }
       if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
@@ -405,9 +419,19 @@
         for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
       }
+      if (d.pauseHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
+        // botão de pausa do Control Freak: o Titã fica parado como numa fita pausada
+        t.frozen = d.pauseHero; t.frozenKind = 'pause'; t.hitstun = Math.max(t.hitstun, d.pauseHero); t.vx = 0;
+        this.particles.spawn('text', t.x, hy - 60, { text: 'PAUSADO!', size: 30, color: '#ffe14a', color2: '#1c1a22', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.tvStatic && t.team === 'hero') {
+        // raio de chuvisco do TV-Robô: riscos brancos e "CHUVISCO!"
+        for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 30), { vx: TT.rand(-5, 5), vy: TT.rand(-4, 4), color: TT.choice(['#ffffff', '#c9d3e2', '#7bffea']), size: 3, life: 12 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'CHUVISCO!', size: 30, color: '#e6fffb', color2: '#3a4a6a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
       if (d.freezeHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
         // raio congelante da Irmandade: o Titã fica preso num bloco de gelo
-        t.frozen = d.freezeHero; t.hitstun = Math.max(t.hitstun, d.freezeHero); t.vx = 0;
+        t.frozen = d.freezeHero; t.frozenKind = null; t.hitstun = Math.max(t.hitstun, d.freezeHero); t.vx = 0;
         for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) });
       }
@@ -418,7 +442,7 @@
       }
       if (d.freeze && t.team === 'enemy' && !t.isBoss && !t.dead && t.state === 'hurt') {
         // disco congelante do Robin: o inimigo fica preso num bloco de gelo
-        t.frozen = d.stun || 80;
+        t.frozen = d.stun || 80; t.frozenKind = null;
         for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
         this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 44, rot: TT.rand(-0.1, 0.1) });
       }
@@ -1013,6 +1037,12 @@
           ctx.fillRect(x, y, 3, 3);
         }
         ctx.globalCompositeOperation = 'source-over';
+      } else if (this.stage.id === 9) {
+        // sinal de TV fraco: faixa de interferência descendo e pontinhos de chuvisco (mais forte no porão)
+        const lair = camX > 5600, by = (f * 2.2) % (H + 120) - 60;
+        ctx.fillStyle = 'rgba(200,220,255,' + (lair ? 0.07 : 0.04) + ')'; ctx.fillRect(0, by, W, 26);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        for (let i = 0; i < (lair ? 30 : 12); i++) ctx.fillRect(((i * 211 + f * 37) % W), ((i * 97 + f * 53) % H), 3, 2);
       } else if (this.stage.id === 8) {
         // neve caindo na base da Irmandade (mais fraca dentro da base)
         const n = camX > 2600 ? 12 : 40;

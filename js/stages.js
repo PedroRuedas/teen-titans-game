@@ -134,5 +134,23 @@
         { type: 'boss', camX: 6000, boss: 'mallah', intro: 'O gorila e o gênio da Irmandade do Mal' },
       ],
     },
+    {
+      id: 9,
+      name: 'FASE 9 — O CANAL DO CONTROL FREAK',
+      subtitle: 'Control Freak tomou o Canal 9 e está dando vida à TV com o controle remoto!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'freak',
+      powerUp: true,
+      combos: true,
+      crates: [[1150, 600, 'pizza'], [2350, 640, 'energy'], [3650, 560, 'pizza'], [4950, 620, 'energy'], [5500, 580, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['tvbot', 'tvbot', 'popcorn'], ['popcorn', 'tvbot', 'popcorn', 'tvbot']] },
+        { type: 'arena', camX: 1500, waves: [['popcorn', 'popcorn', 'tvbot'], ['tvbot', 'tvbot', 'popcorn', 'popcorn']] },
+        { type: 'arena', camX: 2950, waves: [['tvbot', 'tvbot', 'tvbot', 'popcorn'], ['popcorn', 'popcorn', 'tvbot', 'tvbot']] },
+        { type: 'arena', camX: 4300, waves: [['tvbot', 'popcorn', 'popcorn', 'tvbot'], ['tvbot', 'tvbot', 'popcorn', 'popcorn', 'tvbot']] },
+        { type: 'boss', camX: 6000, boss: 'freak', intro: 'O nerd do controle remoto' },
+      ],
+    },
   ];
 })();

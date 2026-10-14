@@ -2232,7 +2232,284 @@
     });
   }
 
+  // =============================================================== FASE 9 — O Canal do Control Freak
+  // A rua do Cine Jump e da loja de eletrônicos à noite, o estúdio do Canal 9 (que ele tomou com o controle
+  // remoto) e o porão dele: pôsteres, bonecos, pilhas de quadrinhos e o telão gigante.
+  const S9_STUDIO = 2700, S9_LAIR = 5850;
+  const BARS = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
+
+  // Barras coloridas de teste de TV (fora do ar).
+  function colorBars(g, x, y, w, h) {
+    const bw = w / BARS.length;
+    BARS.forEach((c, i) => { g.fillStyle = c; g.fillRect(x + i * bw, y, bw + 0.5, h * 0.72); });
+    ['#0000c0', '#131313', '#c000c0', '#131313', '#00c0c0', '#131313', '#c0c0c0'].forEach((c, i) => { g.fillStyle = c; g.fillRect(x + i * bw, y + h * 0.72, bw + 0.5, h * 0.08); });
+    g.fillStyle = '#1d1d4a'; g.fillRect(x, y + h * 0.8, w * 0.3, h * 0.2);
+    g.fillStyle = '#f0f0f0'; g.fillRect(x + w * 0.3, y + h * 0.8, w * 0.25, h * 0.2);
+    g.fillStyle = '#131313'; g.fillRect(x + w * 0.55, y + h * 0.8, w * 0.45, h * 0.2);
+  }
+  // Chuvisco de TV fora de sintonia.
+  function staticNoise(g, x, y, w, h, r) {
+    g.fillStyle = '#5a5a66'; g.fillRect(x, y, w, h);
+    for (let i = 0; i < w * h / 40; i++) { const v = Math.floor(120 + r() * 135); g.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; g.fillRect(x + r() * (w - 3), y + r() * (h - 2), 3, 2); }
+  }
+  // TV de tubo com antena; screen: 'bars' | 'static' | cor sólida. Brilho da tela no ar em volta.
+  function crtTV(g, x, base, w, h, screen, r, antenna) {
+    const y = base - h;
+    g.fillStyle = '#4a3a30'; g.strokeStyle = OUT; g.lineWidth = 3;
+    if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, 8); g.fill(); g.stroke(); } else { g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); }
+    const sx = x + 8, sy = y + 8, sw = w * 0.72, sh = h - 16;
+    if (screen === 'bars') colorBars(g, sx, sy, sw, sh);
+    else if (screen === 'static') staticNoise(g, sx, sy, sw, sh, r);
+    else { g.fillStyle = screen; g.fillRect(sx, sy, sw, sh); }
+    g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(sx, sy, sw, sh);
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(sx + 3, sy + 3, sw * 0.3, 4);
+    for (let i = 0; i < 2; i++) { g.fillStyle = '#c9b48a'; g.beginPath(); g.arc(x + w * 0.86, y + 18 + i * 18, 5, 0, Math.PI * 2); g.fill(); g.stroke(); } // botões
+    g.fillStyle = '#2a2d33'; for (let i = 0; i < 3; i++) g.fillRect(x + w * 0.8, y + h - 26 + i * 6, w * 0.13, 3);
+    if (antenna) { g.strokeStyle = '#8a909a'; g.lineWidth = 3; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 - 30, y - 40); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 + 26, y - 44); g.stroke(); }
+    glowPool(g, sx + sw / 2, sy + sh / 2, sw, sh * 0.9, screen === 'static' ? '#c8d0ff' : '#8ab0ff', 0.25);
+  }
+  // Logo do Control Freak: "CF" num controle remoto estilizado.
+  function freakLogo(g, x, y, s) {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.fillStyle = '#2a2d33'; g.strokeStyle = OUT; g.lineWidth = 4;
+    if (g.roundRect) { g.beginPath(); g.roundRect(-22, -50, 44, 100, 14); g.fill(); g.stroke(); } else { g.fillRect(-22, -50, 44, 100); g.strokeRect(-22, -50, 44, 100); }
+    g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(0, -32, 8, 0, Math.PI * 2); g.fill(); g.stroke();
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { g.fillStyle = ['#ffe14a', '#5fc8ff', '#7bff8a'][i]; g.fillRect(-14 + j * 16, -14 + i * 16, 12, 10); }
+    TT.drawText(g, 'CF', 0, 38, 20, '#ffe14a', OUT, 'center', 4);
+    g.restore();
+  }
+  // Pôster de filme (ficção científica dos anos 50 que o Control Freak adora).
+  function moviePoster(g, x, y, w, h, r, tilt) {
+    const k = Math.floor(r() * 3);
+    poster(g, x, y, w, h, ['#1a2a6a', '#5a1030', '#103a2a'][k], (pg, px, py, pw, ph) => {
+      if (k === 0) { // disco voador
+        pg.fillStyle = '#c9d3e2'; pg.beginPath(); pg.ellipse(px + pw / 2, py + ph * 0.42, pw * 0.36, ph * 0.08, 0, 0, Math.PI * 2); pg.fill(); pg.stroke();
+        pg.fillStyle = '#7bff8a'; pg.beginPath(); pg.ellipse(px + pw / 2, py + ph * 0.38, pw * 0.14, ph * 0.08, 0, Math.PI, 0); pg.fill();
+        pg.fillStyle = 'rgba(255,255,160,0.5)'; pg.beginPath(); pg.moveTo(px + pw * 0.42, py + ph * 0.48); pg.lineTo(px + pw * 0.2, py + ph * 0.82); pg.lineTo(px + pw * 0.8, py + ph * 0.82); pg.lineTo(px + pw * 0.58, py + ph * 0.48); pg.fill();
+      } else if (k === 1) { // monstro gigante
+        pg.fillStyle = '#3a8a4e'; pg.beginPath(); pg.ellipse(px + pw / 2, py + ph * 0.55, pw * 0.3, ph * 0.3, 0, 0, Math.PI * 2); pg.fill(); pg.stroke();
+        pg.fillStyle = '#ffe14a'; pg.beginPath(); pg.arc(px + pw * 0.42, py + ph * 0.45, 4, 0, Math.PI * 2); pg.arc(px + pw * 0.58, py + ph * 0.45, 4, 0, Math.PI * 2); pg.fill();
+      } else { // robô
+        pg.fillStyle = '#9aa3b2'; pg.fillRect(px + pw * 0.3, py + ph * 0.3, pw * 0.4, ph * 0.4); pg.strokeRect(px + pw * 0.3, py + ph * 0.3, pw * 0.4, ph * 0.4);
+        pg.fillStyle = '#ff3b30'; pg.fillRect(px + pw * 0.36, py + ph * 0.4, pw * 0.28, ph * 0.06);
+      }
+      TT.drawText(pg, ['INVASORES!', 'O MONSTRO', 'ROBÔ 3000'][k], px + pw / 2, py + ph * 0.12, Math.min(14, pw * 0.16), '#ffe14a', OUT, 'center', 3);
+    }, tilt);
+  }
+
+  function s9Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#0c0624'); sky.addColorStop(0.55, '#2a1458'); sky.addColorStop(1, '#6a2a7a');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 90, 901, (cx, r) => { g.fillStyle = 'rgba(255,255,255,' + (0.3 + r() * 0.5) + ')'; g.fillRect(cx + r() * 90, r() * 220, 2, 2); });
+    // lua cheia
+    cells(x0, x1, 2400, 903, (cx) => { glowPool(g, cx + 600, 110, 160, 160, '#fff3c0', 0.35); g.fillStyle = '#fff6dc'; g.beginPath(); g.arc(cx + 600, 110, 44, 0, Math.PI * 2); g.fill(); });
+    // prédios distantes com antenas de TV
+    cells(x0, x1, 150, 905, (cx, r) => {
+      const h = 140 + r() * 180, w = 90 + r() * 50, x = cx + r() * 40, top = 440 - h;
+      g.fillStyle = '#1c1240'; g.fillRect(x, top, w, h);
+      g.fillStyle = 'rgba(255,220,140,0.5)'; for (let yy = top + 12; yy < 430; yy += 22) for (let xx = x + 8; xx < x + w - 10; xx += 18) if (r() < 0.35) g.fillRect(xx, yy, 8, 10);
+      if (r() < 0.6) { g.strokeStyle = '#2c2058'; g.lineWidth = 3; g.beginPath(); g.moveTo(x + w / 2, top); g.lineTo(x + w / 2, top - 40); g.moveTo(x + w / 2 - 16, top - 30); g.lineTo(x + w / 2 + 16, top - 30); g.moveTo(x + w / 2 - 10, top - 18); g.lineTo(x + w / 2 + 10, top - 18); g.stroke(); }
+    });
+    g.fillStyle = '#140c30'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s9Mid(g, x0, x1) {
+    // torre de transmissão do Canal 9 com a luz vermelha no alto
+    cells(x0, x1, 1500, 911, (cx) => {
+      const x = cx + 700, base = 470;
+      g.strokeStyle = '#3a2c66'; g.lineWidth = 5;
+      g.beginPath(); g.moveTo(x - 60, base); g.lineTo(x, base - 400); g.lineTo(x + 60, base); g.stroke();
+      g.lineWidth = 3; for (let y = base - 40; y > base - 380; y -= 40) { const w = 60 * (base - y) / 400; g.beginPath(); g.moveTo(x - 60 + w, y); g.lineTo(x + 60 - w, y - 40); g.moveTo(x + 60 - w, y); g.lineTo(x - 60 + w, y - 40); g.stroke(); }
+      g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(x, base - 404, 7, 0, Math.PI * 2); g.fill();
+      glowPool(g, x, base - 404, 40, 40, '#ff3b30', 0.6);
+      sign(g, x, base - 200, 90, 34, 'CANAL 9', '#ffe14a');
+    });
+    cells(x0, x1, 420, 913, (cx, r) => { // prédios mais perto, com parabólicas
+      const x = cx + r() * 120, w = 200 + r() * 80, h = 160 + r() * 90, top = 470 - h;
+      g.fillStyle = '#2a1c52'; g.strokeStyle = OUT; g.lineWidth = 3; g.fillRect(x, top, w, h); g.strokeRect(x, top, w, h);
+      for (let yy = top + 16; yy < 450; yy += 30) for (let xx = x + 12; xx < x + w - 20; xx += 30) { g.fillStyle = r() < 0.4 ? '#7a8aff' : r() < 0.5 ? '#ffd98a' : '#1c1240'; g.fillRect(xx, yy, 16, 18); }
+      g.fillStyle = '#9aa3b2'; g.beginPath(); g.ellipse(x + w * 0.7, top - 14, 22, 12, -0.5, 0, Math.PI * 2); g.fill(); g.stroke();
+    });
+  }
+
+  function s9Near(g, x0, x1) {
+    // --- rua: fachada do Cine Jump e da loja de eletrônicos com a vitrine cheia de TVs
+    part(g, x0, x1, -1e5, S9_STUDIO, () => {
+      cells(x0, x1, 900, 921, (cx, r) => {
+        const fx = cx + 40;
+        // cinema: fachada vermelha, letreiro com lâmpadas e cartazes
+        g.fillStyle = '#7a1a2a'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(fx, 120, 400, FT - 120); g.strokeRect(fx, 120, 400, FT - 120);
+        g.fillStyle = '#f2e6c8'; g.fillRect(fx + 30, 150, 340, 70); g.strokeRect(fx + 30, 150, 340, 70);
+        TT.drawText(g, 'CINE JUMP', fx + 200, 104, 34, '#ffe14a', OUT, 'center', 6);
+        TT.drawText(g, 'HOJE: A VINGANÇA', fx + 200, 172, 20, '#1c1a22', null, 'center', 0);
+        TT.drawText(g, 'DO CONTROLE REMOTO', fx + 200, 200, 20, '#c4162a', null, 'center', 0);
+        for (let i = 0; i < 18; i++) { const lx = fx + 30 + i * 20; for (const ly of [144, 226]) { g.fillStyle = '#fff3a0'; g.beginPath(); g.arc(lx, ly, 4, 0, Math.PI * 2); g.fill(); } }
+        glowPool(g, fx + 200, 185, 230, 80, '#ffd98a', 0.3);
+        moviePoster(g, fx + 40, 250, 90, 130, r, 0); moviePoster(g, fx + 270, 250, 90, 130, r, 0);
+        g.fillStyle = '#2a0c14'; g.fillRect(fx + 150, 270, 100, FT - 270); g.strokeRect(fx + 150, 270, 100, FT - 270); // porta
+        g.fillStyle = '#ffd98a'; g.fillRect(fx + 196, 280, 8, FT - 290);
+        // loja de eletrônicos: vitrine com TVs empilhadas
+        const sx = fx + 440;
+        g.fillStyle = '#2a3a5a'; g.fillRect(sx, 150, 420, FT - 150); g.strokeRect(sx, 150, 420, FT - 150);
+        sign(g, sx + 210, 130, 300, 40, 'MEGA ELETRÔNICOS', '#5fc8ff');
+        g.fillStyle = '#0c0d18'; g.fillRect(sx + 20, 180, 380, FT - 200); g.strokeRect(sx + 20, 180, 380, FT - 200);
+        for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) {
+          const s = row === 2 ? 'static' : (row + col) % 2 ? 'bars' : TT.choice(['#ff3b30', '#5fc8ff', '#7bff8a', '#ffe14a']);
+          crtTV(g, sx + 30 + col * 92, 180 + 82 * (row + 1), 84, 74, s, r);
+        }
+        g.fillStyle = 'rgba(200,220,255,0.12)'; g.beginPath(); g.moveTo(sx + 40, 180); g.lineTo(sx + 120, 180); g.lineTo(sx + 60, FT - 20); g.lineTo(sx + 20, FT - 20); g.fill(); // reflexo no vidro
+      });
+      // calçada
+      g.fillStyle = '#5a5470'; g.fillRect(x0, FT, x1 - x0, 46);
+      g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2; for (let x = Math.floor(x0 / 120) * 120; x < x1; x += 120) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x - 10, FT + 46); g.stroke(); }
+      g.fillStyle = '#8a84a0'; g.fillRect(x0, FT + 46, x1 - x0, 8);
+      g.fillStyle = '#2c2838'; g.fillRect(x0, FT + 54, x1 - x0, H - FT - 54); // asfalto
+      g.fillStyle = '#ffe14a'; for (let x = Math.floor(x0 / 160) * 160; x < x1; x += 160) g.fillRect(x, FT + 150, 80, 8);
+    });
+    // --- estúdio do Canal 9: paredes escuras, treliças com refletores, cenário de ficção científica e "NO AR"
+    part(g, x0, x1, S9_STUDIO, S9_LAIR, () => {
+      g.fillStyle = '#1a1626'; g.fillRect(x0, 0, x1 - x0, FT);
+      g.fillStyle = '#231e34'; for (let x = Math.floor(x0 / 60) * 60; x < x1; x += 60) g.fillRect(x, 0, 30, FT); // espuma acústica
+      g.fillStyle = '#3a3d47'; g.fillRect(x0, 40, x1 - x0, 14); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x0 - 4, 40, x1 - x0 + 8, 14); // treliça
+      g.strokeStyle = '#5c6169'; g.lineWidth = 2; for (let x = Math.floor(x0 / 28) * 28; x < x1; x += 28) { g.beginPath(); g.moveTo(x, 40); g.lineTo(x + 14, 54); g.lineTo(x + 28, 40); g.stroke(); }
+      cells(x0, x1, 1000, 931, (cx, r) => {
+        const x = cx + 180;
+        // cenário: painel com planetas e o disco voador de papelão
+        g.fillStyle = '#10183a'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(x, 120, 520, FT - 150); g.strokeRect(x, 120, 520, FT - 150);
+        for (let i = 0; i < 40; i++) { g.fillStyle = '#fff'; g.fillRect(x + r() * 510, 125 + r() * (FT - 170), 2, 2); }
+        g.fillStyle = '#e2702a'; g.beginPath(); g.arc(x + 120, 210, 46, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.strokeStyle = '#ffd98a'; g.lineWidth = 5; g.beginPath(); g.ellipse(x + 120, 210, 74, 14, -0.3, 0, Math.PI * 2); g.stroke();
+        g.fillStyle = '#5fc8ff'; g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.arc(x + 420, 170, 24, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = '#c9d3e2'; g.beginPath(); g.ellipse(x + 290, 300, 90, 20, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = '#7bff8a'; g.beginPath(); g.ellipse(x + 290, 290, 36, 26, 0, Math.PI, 0); g.fill(); g.stroke();
+        g.strokeStyle = '#8a909a'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 290, 264); g.lineTo(x + 290, 54); g.stroke(); // fio segurando o disco
+        // placa "NO AR"
+        g.fillStyle = '#2a0c14'; g.strokeStyle = OUT; g.lineWidth = 3; g.fillRect(x + 600, 90, 150, 50); g.strokeRect(x + 600, 90, 150, 50);
+        TT.drawText(g, 'NO AR', x + 675, 116, 30, '#ff3b30', OUT, 'center', 4);
+        glowPool(g, x + 675, 115, 110, 50, '#ff3b30', 0.45);
+        // telão do estúdio com as barras coloridas e o logo
+        g.fillStyle = '#0c0d10'; g.fillRect(x + 590, 170, 200, 140); g.strokeRect(x + 590, 170, 200, 140);
+        colorBars(g, x + 598, 178, 184, 124);
+        freakLogo(g, x + 690, 236, 0.5);
+        // refletores na treliça, com cone de luz até o chão
+        for (const lx of [x + 60, x + 470, x + 860]) {
+          g.fillStyle = '#2a2d33'; g.strokeStyle = OUT; g.lineWidth = 3;
+          g.beginPath(); g.moveTo(lx - 14, 56); g.lineTo(lx + 14, 56); g.lineTo(lx + 20, 86); g.lineTo(lx - 20, 86); g.closePath(); g.fill(); g.stroke();
+          g.fillStyle = '#fff6d0'; g.beginPath(); g.ellipse(lx, 87, 16, 4, 0, 0, Math.PI * 2); g.fill();
+          lightCone(g, lx, 88, FT + 40, 16, 140, '#fff3c0', 0.12);
+          glowPool(g, lx, FT + 60, 150, 36, '#fff3c0', 0.2);
+        }
+      });
+      // piso preto brilhante com marcações de fita
+      g.fillStyle = '#16141e'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = FT + 20; y < H; y += 40) g.fillRect(x0, y, x1 - x0, 2);
+      cells(x0, x1, 300, 933, (cx, r) => { g.fillStyle = r() < 0.5 ? '#ffe14a' : '#ff3b30'; const x = cx + r() * 200, y = FT + 40 + r() * 160; g.fillRect(x, y, 30, 5); g.fillRect(x, y, 5, 22); });
+    });
+    // --- porão do Control Freak: pôsteres, estantes com bonecos, telão gigante e carpete
+    part(g, x0, x1, S9_LAIR, 1e5, () => {
+      g.fillStyle = '#3a2a4a'; g.fillRect(x0, 0, x1 - x0, FT);
+      g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 2; for (let x = Math.floor(x0 / 40) * 40; x < x1; x += 40) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FT); g.stroke(); } // lambri
+      cells(x0, x1, 1300, 941, (cx, r) => {
+        const mx = cx + 650;
+        // telão gigante com o rosto dele... e chuvisco nas bordas
+        g.fillStyle = '#16171b'; g.strokeStyle = OUT; g.lineWidth = 6; g.fillRect(mx - 230, 60, 460, 260); g.strokeRect(mx - 230, 60, 460, 260);
+        staticNoise(g, mx - 218, 72, 436, 236, r);
+        g.fillStyle = 'rgba(40,20,80,0.8)'; g.fillRect(mx - 160, 92, 320, 196);
+        freakLogo(g, mx, 190, 1.4);
+        glowPool(g, mx, 190, 300, 170, '#8ab0ff', 0.25);
+        for (const s of [-1, 1]) { g.fillStyle = '#2a2d33'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(mx + s * 290 - 30, 150, 60, 170); g.strokeRect(mx + s * 290 - 30, 150, 60, 170); g.fillStyle = '#16171b'; g.beginPath(); g.arc(mx + s * 290, 200, 22, 0, Math.PI * 2); g.arc(mx + s * 290, 278, 26, 0, Math.PI * 2); g.fill(); } // caixas de som
+        // estantes com bonecos e pôsteres
+        for (const sx of [mx - 620, mx + 380]) {
+          g.fillStyle = '#5a3a2a'; g.strokeStyle = OUT; g.lineWidth = 3;
+          for (let i = 0; i < 3; i++) { g.fillRect(sx, 170 + i * 80, 220, 10); g.strokeRect(sx, 170 + i * 80, 220, 10); }
+          for (let i = 0; i < 3; i++) for (let j = 0; j < 5; j++) {
+            const bx = sx + 18 + j * 42, by = 170 + i * 80;
+            g.fillStyle = TT.shade(['#d7263e', '#5f8fe0', '#79c64c', '#ffe14a', '#7b55c9'][Math.floor(r() * 5)], 0);
+            g.fillRect(bx - 7, by - 36, 14, 22); g.strokeRect(bx - 7, by - 36, 14, 22);
+            g.beginPath(); g.arc(bx, by - 44, 8, 0, Math.PI * 2); g.fill(); g.stroke();
+            g.fillRect(bx - 6, by - 14, 5, 14); g.fillRect(bx + 1, by - 14, 5, 14);
+          }
+          moviePoster(g, sx + 30, 30, 70, 100, r, -0.05); moviePoster(g, sx + 130, 34, 70, 100, r, 0.06);
+        }
+      });
+      // carpete roxo com estampa
+      g.fillStyle = '#4a2a5a'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.fillStyle = 'rgba(255,225,74,0.12)'; for (let y = FT + 24, row = 0; y < H; y += 48, row++) for (let x = Math.floor(x0 / 80) * 80 + (row % 2) * 40; x < x1; x += 80) { g.beginPath(); g.moveTo(x, y - 10); g.lineTo(x + 12, y); g.lineTo(x, y + 10); g.lineTo(x - 12, y); g.closePath(); g.fill(); }
+    });
+    // passagens: porta do estúdio (com a luz "NO AR") e a escada do porão
+    for (const [px, col, txt] of [[S9_STUDIO, '#2a2d3a', 'ESTÚDIO'], [S9_LAIR, '#3a2a3a', 'PORÃO']]) {
+      if (x0 > px + 180 || x1 < px - 180) continue;
+      g.fillStyle = col; g.fillRect(px - 150, 60, 300, FT - 60); g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(px - 150, 60, 300, FT - 60);
+      g.fillStyle = '#0c0d14'; g.fillRect(px - 100, 150, 200, FT - 150);
+      sign(g, px, 112, 160, 38, txt, '#ffe14a');
+      g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(px, 78, 8, 0, Math.PI * 2); g.fill(); glowPool(g, px, 78, 40, 40, '#ff3b30', 0.6);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  // Câmera de estúdio no tripé.
+  function studioCamera(g, x, base, f) {
+    g.strokeStyle = OUT; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(x, base - 90); g.lineTo(x - 40, base); g.moveTo(x, base - 90); g.lineTo(x + 40, base); g.moveTo(x, base - 90); g.lineTo(x, base); g.stroke();
+    g.strokeStyle = '#5c6169'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#2a2d33'; g.strokeStyle = OUT; g.lineWidth = 3;
+    g.fillRect(x - 46, base - 136, 80, 46); g.strokeRect(x - 46, base - 136, 80, 46);
+    g.fillRect(x + f * 34 - (f > 0 ? 0 : 30), base - 128, 30, 30); g.strokeRect(x + f * 34 - (f > 0 ? 0 : 30), base - 128, 30, 30);
+    g.fillStyle = '#5fc8ff'; g.beginPath(); g.arc(x + f * 64, base - 113, 9, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(x - 36, base - 128, 4, 0, Math.PI * 2); g.fill();
+    TT.drawText(g, '9', x - 8, base - 112, 18, '#ffe14a', OUT, 'center', 3);
+  }
+  function popcornSpill(g, x, y, r) {
+    g.fillStyle = '#d7263e'; g.strokeStyle = OUT; g.lineWidth = 2.5;
+    g.save(); g.translate(x, y); g.rotate(1.3);
+    g.beginPath(); g.moveTo(-14, -20); g.lineTo(14, -20); g.lineTo(10, 18); g.lineTo(-10, 18); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.fillRect(-4, -20, 6, 38);
+    g.restore();
+    for (let i = 0; i < 14; i++) { g.fillStyle = r() < 0.7 ? '#fff6dc' : '#ffe14a'; g.beginPath(); g.arc(x - 30 - r() * 60, y + (r() - 0.5) * 24, 4 + r() * 3, 0, Math.PI * 2); g.fill(); }
+  }
+  function d9(g, x0, x1) {
+    part(g, x0, x1, -1e5, S9_STUDIO, () => {
+      cells(x0, x1, 900, 951, (cx, r) => {
+        lampPost(g, cx + 20, FT + 4, 230, '#ffd98a');
+        const k = r();
+        if (k < 0.5) { g.fillStyle = '#c4162a'; g.strokeStyle = OUT; g.lineWidth = 3; g.fillRect(cx + 470, FT - 120, 80, 126); g.strokeRect(cx + 470, FT - 120, 80, 126); g.fillStyle = '#bfefff'; g.fillRect(cx + 480, FT - 108, 60, 40); g.strokeRect(cx + 480, FT - 108, 60, 40); TT.drawText(g, 'INGRESSOS', cx + 510, FT - 54, 12, '#ffe14a', OUT, 'center', 2); } // bilheteria
+        else crtTV(g, cx + 490, FT + 6, 90, 76, 'static', r, true); // TV jogada na calçada
+      });
+      cells(x0, x1, 420, 953, (cx, r) => { if (r() < 0.55) popcornSpill(g, cx + 150 + r() * 160, FT + 30 + r() * 20, r); });
+    });
+    part(g, x0, x1, S9_STUDIO, S9_LAIR, () => {
+      cells(x0, x1, 620, 955, (cx, r) => {
+        studioCamera(g, cx + 140 + r() * 80, FT + 8, r() < 0.5 ? 1 : -1);
+        if (r() < 0.5) crate(g, cx + 400, FT + 6, 90, 60, '#3a3d47', 'CANAL 9');
+      });
+      cells(x0, x1, 360, 957, (cx, r) => { const y = FT + 50 + r() * 140; cableSag(g, cx, cx + 360, y, 26, '#0c0d10', 5); });
+    });
+    part(g, x0, x1, S9_LAIR, 1e5, () => {
+      cells(x0, x1, 560, 959, (cx, r) => {
+        // pufe, pilha de caixas de pizza e latinhas
+        g.fillStyle = '#5f8fe0'; g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.ellipse(cx + 120, FT - 20, 56, 34, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+        for (let i = 0; i < 3 + Math.floor(r() * 3); i++) { g.fillStyle = '#e8d2a8'; g.fillRect(cx + 300 - i * 2, FT - 6 - i * 12, 76, 12); g.strokeRect(cx + 300 - i * 2, FT - 6 - i * 12, 76, 12); }
+        for (let i = 0; i < 4; i++) { g.fillStyle = ['#d7263e', '#79c64c', '#5fc8ff'][i % 3]; g.fillRect(cx + 420 + i * 18, FT - 18, 12, 22); g.strokeRect(cx + 420 + i * 18, FT - 18, 12, 22); }
+      });
+      cells(x0, x1, 300, 961, (cx, r) => { if (r() < 0.5) { g.fillStyle = TT.shade('#ffe14a', -0.1); g.save(); g.translate(cx + r() * 220, FT + 60 + r() * 140); g.rotate(r() - 0.5); g.fillRect(-20, -14, 40, 28); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(-20, -14, 40, 28); g.restore(); } }); // gibis no chão
+    });
+  }
+  // Primeiro plano: colunas de treliça com refletores (fora da arena do chefe).
+  function s9Fg(g, x0, x1) {
+    cells(x0, x1, 1400, 971, (cx) => {
+      const x = cx + 700;
+      if (x > S9_LAIR - 300 || x < S9_STUDIO - 200) return;
+      g.fillStyle = '#2a2d33'; g.fillRect(x, 0, 34, H); g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(x, -4, 34, H + 8);
+      g.strokeStyle = '#5c6169'; g.lineWidth = 3; for (let y = 0; y < H; y += 34) { g.beginPath(); g.moveTo(x + 2, y); g.lineTo(x + 32, y + 34); g.stroke(); }
+      g.fillStyle = '#16171b'; g.beginPath(); g.moveTo(x - 20, 200); g.lineTo(x + 54, 200); g.lineTo(x + 64, 250); g.lineTo(x - 30, 250); g.closePath(); g.fill(); g.strokeStyle = OUT; g.lineWidth = 4; g.stroke();
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 9) {
+      return { layers: [new Layer(0.1, s9Far, 32), new Layer(0.38, s9Mid, 33), new Layer(1, detailed(s9Near, d9, 'rgba(20,0,40,0.3)'), 34)], fg: new Layer(1.18, s9Fg, 35), id };
+    }
     if (id === 8) {
       return { layers: [new Layer(0.1, s8Far, 28), new Layer(0.38, s8Mid, 29), new Layer(1, detailed(s8Near, d8), 30)], fg: new Layer(1.18, s8Fg, 31), id };
     }

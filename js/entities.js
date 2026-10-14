@@ -222,6 +222,7 @@
       if (this.flash > 0) this.flash--;
       if (this.invul > 0) this.invul--;
       if (this.frozen > 0 && (--this.frozen === 0 || this.state !== 'hurt')) this.frozen = 0;
+      if (!this.frozen) this.frozenKind = null;
       this.x += this.vx;
       this.y += this.vy;
       if (this.z > 0 || this.vz !== 0) {
@@ -252,13 +253,14 @@
       TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: this.flash > 3 || blink, t: this.animT });
       if (tell >= 0) TT.drawGlow(ctx, '#ff6a2a', sx + this.facing * 26, sy - 78, 16 + 22 * tell, 0.35 + 0.5 * tell);
       ctx.globalAlpha = 1;
-      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen);
+      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen, this.frozenKind);
     }
   }
   TT.Fighter = Fighter;
 
   // Bloco de gelo do disco congelante do Robin (k = quadros restantes; racha e some no fim).
-  function drawIce(ctx, x, y, h, k) {
+  function drawIce(ctx, x, y, h, k, kind) {
+    if (kind === 'pause') { drawPaused(ctx, x, y, h, k); return; }
     const a = Math.min(1, k / 12), w = 34, top = y - Math.min(h, 140) - 10;
     ctx.save(); ctx.globalAlpha = 0.6 * a;
     ctx.beginPath(); ctx.moveTo(x - w, y + 4); ctx.lineTo(x - w - 6, top + 26); ctx.lineTo(x - w * 0.4, top); ctx.lineTo(x + w * 0.5, top + 8); ctx.lineTo(x + w + 6, top + 34); ctx.lineTo(x + w, y + 4); ctx.closePath();
@@ -267,6 +269,17 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x - w * 0.5, top + 20); ctx.lineTo(x - w * 0.2, top + 60); ctx.moveTo(x + w * 0.3, top + 30); ctx.lineTo(x + w * 0.6, top + 52); ctx.stroke();
     if (k < 20) { ctx.beginPath(); ctx.moveTo(x - 10, top + 10); ctx.lineTo(x + 4, top + 50); ctx.lineTo(x - 6, top + 80); ctx.stroke(); } // rachando
+    ctx.restore();
+  }
+
+  // Titã pausado pelo controle do Control Freak: listras de fita VHS, tom azulado e o símbolo de pausa.
+  function drawPaused(ctx, x, y, h, k) {
+    const a = Math.min(1, k / 12), top = y - Math.min(h, 140) - 10, t = TT.game ? TT.game.frame || 0 : 0;
+    ctx.save(); ctx.globalAlpha = 0.35 * a; ctx.fillStyle = '#5a7aff'; ctx.fillRect(x - 40, top, 80, y - top + 4);
+    ctx.globalAlpha = 0.7 * a; ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 3; i++) ctx.fillRect(x - 44, top + ((i * 47 + t * 3) % (y - top)), 88, 3);
+    ctx.globalAlpha = a; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    for (const bx of [x - 15, x + 4]) { ctx.fillRect(bx, top - 40, 11, 30); ctx.strokeRect(bx, top - 40, 11, 30); }
     ctx.restore();
   }
 
@@ -1102,7 +1115,7 @@
           TT.drawGlow(ctx, '#ff7af0', sx + Math.cos(ang) * 26, sy - 150 + Math.sin(ang) * 8, 14, 0.9);
         }
       } else this.hypno = false;
-      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen); // raio congelante da Irmandade
+      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen, this.frozenKind); // raio congelante da Irmandade / pausa do Control Freak
     }
 
     // Rastro verde da Estelar voando na esquiva.
@@ -1364,6 +1377,34 @@
       { pose: 'spin', s: 22, a: 10, r: 18, dmg: 10, zoneHit: true, knockdown: true, launch: 6, kb: 7, stretch: 'arms', sound0: 'whoosh',
         zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 150, ry: 54 }]; },
         onFrame(f, t) { if (t >= this.s && t < this.s + this.a && t % 3 === 0) f.facing *= -1; } },
+    ],
+  };
+  // TV-Robô (fase 9): televisão que o Control Freak trouxe à vida; raio de chuvisco em linha (marcado,
+  // deixa o Titã tonto) e cabeçada com a TV de perto.
+  ENEMIES.tvbot = {
+    name: 'TV-Robô', style: 'tvbot', hp: 70, speed: 2.9, range: 160, score: 230, aggr: 1.15,
+    attacks: [
+      { pose: 'beam', s: 26, a: 10, r: 20, dmg: 9, zoneHit: true, stun: 40, kb: 3, tvStatic: true, sound0: 'alarm', sound: 'zap',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 320, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'jab', s: 16, a: 6, r: 18, lunge: 7, dmg: 10, reach: [0, 80], depth: 28, kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  // Monstro de Pipoca (fase 9): balde de pipoca do cinema que ganhou vida; cospe pipocas que estouram nos
+  // três círculos marcados à frente e dá barrigada de perto.
+  ENEMIES.popcorn = {
+    name: 'Monstro de Pipoca', style: 'popcorn', hp: 62, speed: 2.5, range: 150, score: 210, aggr: 1.1,
+    attacks: [
+      { pose: 'throw', s: 28, a: 4, r: 22, dmg: 10, zoneHit: true, knockdown: true, launch: 5, kb: 5, sound0: 'jump',
+        zone(f) { return [70, 160, 250].map((d, i) => ({ k: 'ell', x: f.x + f.facing * d, y: f.y + (i - 1) * 14, rx: 50, ry: 22 })); },
+        onFrame(f, t, g, a) {
+          if (t !== this.s || !a.zones) return;
+          A().play('hit');
+          for (const z of a.zones) {
+            for (let i = 0; i < 6; i++) g.particles.spawn('star', z.x + TT.rand(-30, 30), z.y - TT.rand(10, 50), { vx: TT.rand(-3, 3), vy: TT.rand(-6, -2), color: TT.choice(['#fff6dc', '#ffe9a0', '#ffffff']), size: 9, life: 20, grav: 0.3, vr: 0.2 });
+            g.particles.spawn('text', z.x, z.y - 70, { text: 'POP!', size: 28, color: '#fff6dc', color2: '#d7263e', vy: -0.6, life: 26, rot: TT.rand(-0.3, 0.3) });
+          }
+        } },
+      { pose: 'jab', s: 18, a: 6, r: 18, lunge: 6, dmg: 9, reach: [0, 74], depth: 30, kb: 5, sound0: 'whoosh' },
     ],
   };
   TT.ENEMIES = ENEMIES;
@@ -1910,6 +1951,48 @@
     }
   }
   TT.MadameRouge = MadameRouge;
+
+  // TV-Robô (fase 9): bate e recua; o raio de chuvisco sai da tela em linha reta.
+  class TVBot extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'tvbot'); }
+    die(dir, d) {
+      super.die(dir, d);
+      this.game.particles.spawn('text', this.x, this.y - 150, { text: 'TELA AZUL!', size: 26, color: '#bfe0ff', color2: '#1a3a9a', vy: -0.6, life: 34, rot: TT.rand(-0.2, 0.2) });
+    }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      if (!a || this.state !== 'attack' || a.def !== this.def.attacks[0] || this.dead) return;
+      const d = a.def, x = this.x - camX + this.facing * 30, y = this.y - this.z - 112;
+      if (a.t < d.s) { TT.drawGlow(ctx, '#7bffea', x, y, 20 + 30 * (a.t / d.s), 0.9); return; }
+      if (a.t >= d.s + d.a + 4) return;
+      // feixe de chuvisco: faixa cinza com riscos brancos piscando
+      const k = Math.min(1, (a.t - d.s + 1) / 3), L = 290 * k, fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1, y1 = this.y - 40;
+      ctx.save(); ctx.globalAlpha = fade; ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(190,200,230,0.75)'; ctx.lineWidth = 22; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + this.facing * L, y1); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      for (let i = 0; i < 8; i++) { const u = Math.random(), v = Math.random() * 16 - 8; ctx.beginPath(); ctx.moveTo(x + this.facing * L * u, TT.lerp(y, y1, u) + v); ctx.lineTo(x + this.facing * (L * u + 14), TT.lerp(y, y1, u) + v); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  TT.TVBot = TVBot;
+
+  // Monstro de Pipoca (fase 9): ao ser derrotado estoura numa chuva de pipoca.
+  class PopcornMonster extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'popcorn'); this.radius = 26; }
+    die(dir, d) {
+      super.die(dir, d);
+      for (let i = 0; i < 14; i++) this.game.particles.spawn('star', this.x + TT.rand(-26, 26), this.y - TT.rand(40, 120), { vx: TT.rand(-5, 5), vy: TT.rand(-8, -2), color: TT.choice(['#fff6dc', '#ffe9a0', '#ffffff']), size: 10, life: 26, grav: 0.35, vr: 0.2 });
+    }
+    draw(ctx, camX) {
+      Fighter.prototype.draw.call(this, ctx, camX);
+      const a = this.atk;
+      // pipoca juntando na boca durante a preparação da cuspida
+      if (a && this.state === 'attack' && a.def === this.def.attacks[0] && a.t < a.def.s && !this.dead && (a.t >> 2) % 2 === 0)
+        TT.drawGlow(ctx, '#ffe9a0', this.x - camX + this.facing * 22, this.y - this.z - 112, 14 + 16 * (a.t / a.def.s), 0.9);
+    }
+  }
+  TT.PopcornMonster = PopcornMonster;
 
   // Comando do Slade (fase 7): mesma tática de bate e recua, sempre com o bastão na mão.
   class SladeCommando extends ShockTrooper {
@@ -3913,6 +3996,190 @@
   }
   TT.Mallah = Mallah;
 
+  // ---- Control Freak (fase 9): o nerd do controle remoto mágico, que dá vida a tudo o que passa na TV.
+  // Fraqueza: depois do ZAP MÁXIMO a PILHA do controle acaba — ele fica sacudindo o controle (dano dobrado).
+  class ControlFreak extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'CONTROL FREAK';
+      this.style = TT.STYLES.freak;
+      this.hp = this.maxHp = 2900;
+      this.radius = 48; this.height = 210; this.shadowW = 70;
+      this.poiseMax = 190;
+      this.def = { score: 15000 };
+      this.openT = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0; this.out = {};
+      this.taunts = ['Ninguém zapeia o Control Freak!', 'Hora do comercial!', 'Spoiler: vocês perdem!', 'Eu sou o mestre da TV!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      // círculos em cima de cada Titã (e mais alguns por perto) — usados pela chuva de TVs e pela pausa
+      const circles = (f, g, n, R, spread) => {
+        const zs = [], hs = g.heroes();
+        for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: R, ry: R * 0.42 });
+        let guard = 0;
+        while (zs.length < n && guard++ < 30) {
+          const tp = groundTarget(g, TT.choice(hs) || f, spread, 110);
+          if (zs.every((z) => Math.abs(z.x - tp.x) > 2 * R || Math.abs(z.y - tp.y) > R)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: R, ry: R * 0.42 });
+        }
+        return zs;
+      };
+      this.ATK = {
+        // pancada com o controle em arco à frente
+        swat: { pose: 'bigSwing', s: 24, a: 6, r: 22, dmg: 15, knockdown: true, launch: 7, kb: 9, zoneHit: true, color: '#ff8a3a', sound0: 'whoosh',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 190, ry: 58, f: f.facing }]; },
+          onFrame(f, t, g) { if (t === this.s) { A().play('hitHeavy'); g.impact(f.x + f.facing * 120, f.y, 'POW!', '#ff8a3a', 0.9); } } },
+        // chuva de TVs: aponta o controle para o alto e TVs caem nos círculos marcados
+        tvs: { pose: 'castUp', s: 34, a: 1, r: 24, color: '#7bffea',
+          zone(f, g) { return circles(f, g, f.phase2() ? 4 : 3, 78, 360); },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Chuva de TVs!', '#bffff4');
+            if (t !== this.s) return;
+            a.zones.forEach((z, i) => {
+              const T = 32 + i * 6, z0 = 620;
+              g.addProjectile(new Projectile(g, {
+                kind: 'tvDrop', team: 'enemy', owner: f, x: z.x, y: z.y, z: z0, vx: 0, vy: 0, vz: (0.5 * 0.6 * T * T - z0) / T, grav: 0.6,
+                r: 24, dmg: 0, blastDmg: 13, life: 120, explodeOnGround: z.rx, zone: z, flight: T, impactWord: 'CRASH!',
+              }));
+            });
+            a.zones = null; // daqui em diante cada TV desenha o seu alvo
+            A().play('zap');
+          } },
+        // ZAP MÁXIMO: raio do controle remoto em linha até o fim da tela; depois a pilha acaba (fraqueza)
+        zap: { pose: 'beam', s: 42, a: 14, r: 10, dmg: 16, knockdown: true, launch: 6, kb: 8, zoneHit: true, color: '#7bffea', sound0: 'alarm', sound: 'laser',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 780, y: f.y, d: 34, arrows: true }]; },
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'ZAP MÁXIMO!', '#bffff4');
+            if (t === this.s) { g.shake = Math.max(g.shake, 8); g.impact(f.x + f.facing * 420, f.y, 'ZZZAP!', '#7bffea', 0.8); }
+            if (t === this.s + this.a + this.r - 1) f.deadBattery();
+          } },
+        // (fase 2) PAUSA: círculos em cima de cada Titã; quem ficar dentro fica pausado
+        pause: { pose: 'beam', s: 38, a: 6, r: 22, dmg: 8, pauseHero: 70, stun: 70, kb: 0, zoneHit: true, zr: 60, color: '#ffe14a', sound0: 'alarm', sound: 'zap',
+          zone(f, g) { return circles(f, g, 3, 90, 380); },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Botão de PAUSA!', '#ffe9a0');
+            if (t === this.s) for (const z of a.zones) {
+              g.particles.spawn('ring', z.x, z.y - 10, { color: '#ffe14a', size: 160, life: 16, flat: 0.42 });
+              g.particles.spawn('text', z.x, z.y - 130, { text: 'PAUSA!', size: 30, color: '#ffe14a', color2: '#1c1a22', vy: -0.4, life: 24 });
+            }
+          } },
+        // (fase 2) troca de canal: dois TV-Robôs saem da tela
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#7bffea',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Mudando de canal... TV-Robôs!', '#bffff4');
+            for (const side of [-1, 1]) {
+              const e = new TVBot(g, side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 60; g.addEnemy(e);
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('zap');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    deadBattery() {
+      this.atk = null;
+      this.setState('open'); this.setAnim('idle');
+      this.openT = this.phase2() ? 110 : 140; this.vx = this.vy = 0;
+      this.game.say(this, 'Não, não, NÃO! Pilha fraca AGORA?!', '#bffff4');
+      A().play('ko');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return;
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (--this.openT <= 0) {
+          this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25;
+          g.say(this, 'Pilhas novas! Voltamos à programação!', '#bffff4');
+        }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) { this.p2Said = true; g.say(this, 'Chega! Modo MARATONA ativado!', '#ffe9a0'); g.impact(this.x, this.y, 'CLICK!', '#7bffea', 1.1); }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 180), p.y, p2 ? 2.5 : 2.0);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o ZAP MÁXIMO (e a pilha acaba logo depois)
+        if (this.atkCount % 3 === 2) pick = 'zap';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = ['tvs'];
+          if (adx < 230 && Math.abs(dy) < 50) opts.push('swat', 'swat');
+          if (p2) opts.push('pause', 'pause');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(38, 64) : this.nextCool(60, 95);
+        if (pick !== 'zap' && Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#bffff4');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      const open = this.state === 'open';
+      this.pose.deadRemote = open;
+      if (this.state === 'stagger') { this.pose.lean = -0.3; this.pose.tilt = -0.3; }
+      if (open) { // sacudindo o controle sem pilha, desesperado
+        this.pose.lean = 0.12; this.pose.tilt = 0.25; this.pose.mouth = 'open';
+        this.pose.armF = [-0.6 + Math.sin(t * 0.8) * 0.5, -1.6]; this.pose.armB = [0.4, 0.8];
+      }
+      const x = this.x - camX + this.tellShake() + (open ? Math.sin(t * 0.8) * 2 : 0), y = this.y - this.z;
+      ctx.save(); ctx.globalAlpha = al;
+      // chuvisco em volta dele na apresentação (aparece "sintonizando")
+      if (al < 1) for (let i = 0; i < 10; i++) { ctx.fillStyle = Math.random() < 0.5 ? '#ffffff' : '#9aa3b2'; ctx.fillRect(x - 70 + Math.random() * 140, y - 220 + Math.random() * 220, 10, 3); }
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      // controle carregando: brilho na ponta
+      const fx = this.out.fx != null ? this.out.fx : x + this.facing * 60, fy = this.out.fy != null ? this.out.fy : y - 120;
+      if (k >= 0 && d && d !== this.ATK.swat) TT.drawGlow(ctx, d.color || '#7bffea', fx + this.facing * 10, fy, 18 + 30 * k, 0.9);
+      // ZAP MÁXIMO
+      if (d === this.ATK.zap && a.t >= d.s && a.t < d.s + d.a + 3) {
+        const u = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 3 : 1, x1 = fx + this.facing * 780 * u, y1 = this.y - 50;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = al * fade;
+        ctx.strokeStyle = '#2ad6c0'; ctx.lineWidth = 38; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.strokeStyle = '#e6fffb'; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.restore();
+        for (let i = 0; i < 2; i++) { const v = Math.random() * u; drawArc(ctx, TT.lerp(fx, x1, v), TT.lerp(fy, y1, v), TT.lerp(fx, x1, v) + TT.rand(-30, 30), TT.lerp(fy, y1, v) + TT.rand(-40, 40), '#7bffea', 2, 4); }
+      }
+      // PAUSA: raio amarelo do controle até cada círculo
+      if (d === this.ATK.pause && a.zones && a.t >= d.s && a.t < d.s + d.a + 4) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 6; ctx.globalAlpha = al * 0.8;
+        for (const z of a.zones) { ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(z.x - camX, z.y - 60); ctx.stroke(); }
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 20);
+      if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height - 10);
+      if (open) {
+        // gotas de suor e o controle apagado
+        for (let i = 0; i < 2; i++) { const u = ((t + i * 14) % 28) / 28; ctx.fillStyle = 'rgba(160,220,255,' + (1 - u) + ')'; ctx.beginPath(); ctx.ellipse(x + (i ? 40 : -34), y - this.height + 10 + u * 30, 4, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'PILHA FRACA! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 24, '#bffff4', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.ControlFreak = ControlFreak;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -4024,6 +4291,8 @@
         if (this.t % 3 === 0) g.particles.spawn('star', this.x - this.vx, this.y - this.z + TT.rand(-6, 6), { color: '#e6fbff', size: 6, life: 14, rot: Math.random() });
       } else if (this.kind === 'tkRock') {
         if (this.t % 3 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 34, life: 12 });
+      } else if (this.kind === 'tvDrop') {
+        if (this.t % 3 === 0) g.particles.spawn('star', this.x + TT.rand(-20, 20), this.y - this.z + 30, { color: '#e6fffb', size: 5, life: 10, rot: Math.random() });
       } else if (this.kind === 'sladeBomb') {
         if (this.t % 3 === 0) g.particles.spawn('dust', this.x, this.y - this.z, { color: 'rgba(90,90,100,0.7)', size: 7, life: 14 });
       }
@@ -4165,6 +4434,17 @@
           ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.ellipse(x, y, 8, 18, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
           break;
+        case 'tvDrop': { // TV de tubo caindo do alto (chuva de TVs do Control Freak), girando de leve
+          ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(this.spin * 0.3) * 0.25);
+          ctx.fillStyle = '#6a4a38'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+          ctx.fillRect(-30, -24, 60, 48); ctx.strokeRect(-30, -24, 60, 48);
+          ctx.fillStyle = (this.t >> 2) % 2 ? '#c9d3e2' : '#7a8296'; ctx.fillRect(-24, -18, 40, 36); ctx.strokeRect(-24, -18, 40, 36);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (let i = 0; i < 5; i++) ctx.fillRect(-22 + ((i * 13 + this.t * 3) % 36), -16 + i * 7, 6, 2);
+          ctx.strokeStyle = '#8a909a'; ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(-14, -42); ctx.moveTo(0, -24); ctx.lineTo(14, -44); ctx.stroke();
+          ctx.restore();
+          TT.drawGlow(ctx, '#7bffea', x, y, 30, 0.5);
+          break;
+        }
         case 'sladeBomb': { // bomba de disco do Slade (luz laranja piscando)
           ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.6); ctx.scale(1, 0.6);
           ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fillStyle = '#2a2d33'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();

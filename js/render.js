@@ -1264,6 +1264,136 @@
     },
   });
 
+  // TV-Robô (fase 9): televisão de tubo que o Control Freak trouxe à vida — a cabeça é a TV (com a cara
+  // brava na tela), corpo de metal com fios e antena em V.
+  S.tvbot = mkStyle({
+    headR: 21, torsoH: 32, shW: 28, waistW: 20, hipW: 20, legL: [24, 23], armL: [18, 17], legW: 7, armW: 6.5, handR: 6, footR: 8, neck: 5,
+    skin: '#8a909a', torso: '#5c6169', arm: '#8a909a', glove: '#3a3d47', hand: '#3a3d47', leg: '#8a909a', boot: '#3a3d47',
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#3a3d47'; ctx.fillRect(-12, -th + 8, 24, 16);
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = ['#ff3b30', '#ffe14a', '#7bff8a'][i]; ctx.fillRect(-8 + i * 6, -th + 12, 4, 4); }
+      ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, -6); ctx.quadraticCurveTo(0, 2, 14, -10); ctx.stroke(); // fio
+    },
+    drawHead(ctx, r, pose, t) {
+      const w = r * 2.3, h = r * 1.8;
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; // antena em V
+      ctx.beginPath(); ctx.moveTo(-r * 0.1, -h * 0.5); ctx.lineTo(-r * 0.7, -h * 1.15); ctx.moveTo(-r * 0.1, -h * 0.5); ctx.lineTo(r * 0.6, -h * 1.2); ctx.stroke();
+      ctx.fillStyle = C('#d0d4dc'); ctx.beginPath(); ctx.arc(-r * 0.7, -h * 1.15, 3, 0, TAU2); ctx.arc(r * 0.6, -h * 1.2, 3, 0, TAU2); ctx.fill();
+      ctx.fillStyle = C('#6a4a38'); ctx.lineWidth = 3; // caixa de madeira da TV
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-w * 0.45, -h * 0.5, w, h, 6); else ctx.rect(-w * 0.45, -h * 0.5, w, h); ctx.fill(); ctx.stroke();
+      const sx = -w * 0.35, sy = -h * 0.38, sw = w * 0.68, sh = h * 0.76;
+      ctx.fillStyle = FLASH ? '#fff' : '#1a3a6a'; ctx.fillRect(sx, sy, sw, sh); ctx.strokeRect(sx, sy, sw, sh);
+      if (FLASH) return;
+      // chuvisco passando + linhas de varredura
+      ctx.fillStyle = 'rgba(160,200,255,0.25)'; const sc = ((t || 0) * 1.5) % sh; ctx.fillRect(sx, sy + sc, sw, 4);
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let y = sy + 2; y < sy + sh; y += 4) ctx.fillRect(sx, y, sw, 1);
+      // cara brava pixelada na tela
+      const hurt = pose.eyes === 'x' || pose.eyes === 'shut';
+      ctx.fillStyle = hurt ? '#ffffff' : '#7bffea';
+      if (hurt) { for (const ex of [sx + sw * 0.32, sx + sw * 0.7]) { ctx.save(); ctx.translate(ex, sy + sh * 0.38); ctx.rotate(0.785); ctx.fillRect(-6, -1.5, 12, 3); ctx.fillRect(-1.5, -6, 3, 12); ctx.restore(); } }
+      else for (const ex of [sx + sw * 0.32, sx + sw * 0.7]) { ctx.fillRect(ex - 4, sy + sh * 0.3, 8, 8); }
+      ctx.fillRect(sx + sw * 0.22, sy + sh * 0.2, sw * 0.2, 3); ctx.fillRect(sx + sw * 0.6, sy + sh * 0.2, sw * 0.2, 3);
+      if (pose.mouth === 'open' || pose.mouth === 'shout') ctx.fillRect(sx + sw * 0.35, sy + sh * 0.62, sw * 0.32, sh * 0.16);
+      else ctx.fillRect(sx + sw * 0.32, sy + sh * 0.68, sw * 0.38, 3);
+      TT.drawGlow(ctx, '#7bffea', sx + sw / 2, sy + sh / 2, sw * 0.7, 0.35);
+      ctx.fillStyle = '#c9b48a'; ctx.strokeStyle = OUT; ctx.lineWidth = 1.5; // botões
+      ctx.beginPath(); ctx.arc(w * 0.47, -h * 0.2, 3, 0, TAU2); ctx.arc(w * 0.47, h * 0.05, 3, 0, TAU2); ctx.fill(); ctx.stroke();
+    },
+  });
+
+  // Monstro de Pipoca (fase 9): balde listrado de cinema que ganhou vida, com a cabeça de pipoca estourando.
+  S.popcorn = mkStyle({
+    headR: 22, torsoH: 34, shW: 36, waistW: 30, hipW: 28, legL: [20, 19], armL: [17, 16], legW: 9, armW: 8, handR: 7, footR: 8, neck: 1,
+    skin: '#fff3d0', torso: '#f4f0ea', arm: '#fff3d0', glove: '#ffe08a', hand: '#ffe08a', leg: '#fff3d0', boot: '#ffd04a',
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      ctx.fillStyle = '#d7263e'; for (let x = -24; x < 24; x += 12) ctx.fillRect(x, -th - 4, 6, th + 10); // listras do balde
+      ctx.fillStyle = '#ffe14a'; ctx.beginPath(); ctx.arc(2, -th * 0.5, 9, 0, TAU2); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      TT.drawText(ctx, 'POP', 2, -th * 0.5 + 1, 8, '#d7263e', null, 'center', 0);
+    },
+    drawHead(ctx, r, pose) {
+      // monte de pipocas
+      const puffs = [[-0.6, 0.1, 0.5], [-0.25, -0.45, 0.55], [0.3, -0.5, 0.52], [0.7, -0.05, 0.48], [0.1, 0.05, 0.62], [-0.5, -0.75, 0.38], [0.55, -0.85, 0.36], [0, -0.95, 0.4]];
+      for (const [px, py, pr] of puffs) {
+        ctx.beginPath(); ctx.arc(px * r, py * r, pr * r, 0, TAU2);
+        ctx.fillStyle = C(py < -0.7 ? '#ffe9a0' : '#fff6dc'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      }
+      if (FLASH) return;
+      ctx.fillStyle = '#ffd04a'; for (const [px, py] of [[-0.3, -0.2], [0.45, -0.35], [-0.1, -0.7]]) { ctx.beginPath(); ctx.arc(px * r, py * r, r * 0.1, 0, TAU2); ctx.fill(); } // manteiga
+      if (pose.eyes === 'x' || pose.eyes === 'shut') eyes(ctx, r, pose, {});
+      else {
+        for (const ex of [r * 0.12, r * 0.55]) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(ex, -r * 0.05, r * 0.15, r * 0.19, 0, 0, TAU2); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(ex + r * 0.05, -r * 0.02, r * 0.07, 0, TAU2); ctx.fill(); }
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-r * 0.05, -r * 0.32); ctx.lineTo(r * 0.28, -r * 0.2); ctx.moveTo(r * 0.72, -r * 0.32); ctx.lineTo(r * 0.42, -r * 0.2); ctx.stroke(); // sobrancelhas bravas
+      }
+      ctx.fillStyle = '#5a1020'; ctx.beginPath(); ctx.ellipse(r * 0.35, r * 0.35, r * 0.25, pose.mouth === 'open' || pose.mouth === 'shout' ? r * 0.18 : r * 0.08, 0, 0, TAU2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(r * 0.18, r * 0.28, r * 0.34, r * 0.06);
+    },
+  });
+
+  // Control Freak (chefe da fase 9): nerd gordão de cabelo ruivo bagunçado, camiseta verde-água com o
+  // controle no peito, capa roxa de gola alta e o controle remoto mágico na mão.
+  S.freak = mkStyle({
+    scale: 1.55, headR: 18, torsoH: 40, shW: 40, waistW: 58, hipW: 42, chest: 8, legL: [20, 19], armL: [19, 18], legW: 12, armW: 10, handR: 7, footR: 9, neck: 1,
+    skin: '#f3c9a6', torso: '#3aa89a', arm: '#3aa89a', glove: '#f3c9a6', hand: '#f3c9a6', leg: '#3a3550', boot: '#5a3a2a',
+    armOpt: { split: 0.9 },
+    drawBack(ctx, P) { // capa roxa com gola alta
+      const a = P.rot(-14, -P.st.torsoH + 2), b = P.rot(12, -P.st.torsoH + 2), sw = Math.sin((P.t || 0) * 0.07) * 5;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+      ctx.lineTo(P.Hx - 6, P.Hy + 30); ctx.lineTo(P.Hx - 52 + sw, P.Hy + 26); ctx.quadraticCurveTo(P.Hx - 44, P.Hy - 20, a[0], a[1]); ctx.closePath();
+      ctx.fillStyle = C('#5a2a8a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      const [hx, hy] = P.hd, r = P.st.headR; // gola alta atrás da cabeça
+      ctx.beginPath(); ctx.moveTo(hx - r * 0.3, hy + r * 0.9); ctx.lineTo(hx - r * 1.3, hy - r * 0.6); ctx.lineTo(hx - r * 0.9, hy + r * 1.2); ctx.closePath();
+      ctx.fillStyle = C('#7a3aaa'); ctx.fill(); ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      // controle remoto estampado no peito
+      ctx.fillStyle = '#2a2d33'; ctx.fillRect(-2, -th + 8, 14, 22);
+      ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(5, -th + 12, 2.5, 0, TAU2); ctx.fill();
+      ctx.fillStyle = '#ffe14a'; ctx.fillRect(1, -th + 17, 4, 3); ctx.fillRect(7, -th + 17, 4, 3); ctx.fillRect(1, -th + 22, 4, 3); ctx.fillRect(7, -th + 22, 4, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(10, -th * 0.35, 18, 10, 0, 0, TAU2); ctx.fill(); // barrigão
+      ctx.fillStyle = '#2a2540'; ctx.fillRect(-32, -6, 64, 7); // cinto
+    },
+    drawFront(ctx, P, hF) { // controle remoto com a ponta brilhando
+      if (P.pose.noRemote) return;
+      const dx = Math.sin(hF.a), dy = Math.cos(hF.a);
+      ctx.save(); ctx.translate(hF.ex + dx * 6, hF.ey + dy * 6); ctx.rotate(-hF.a);
+      ctx.fillStyle = C('#2a2d33'); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-6, -6, 12, 30, 4); else ctx.rect(-6, -6, 12, 30); ctx.fill(); ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(0, 18, 2.6, 0, TAU2); ctx.fill();
+        ctx.fillStyle = '#ffe14a'; ctx.fillRect(-4, 6, 3, 3); ctx.fillRect(1, 6, 3, 3); ctx.fillRect(-4, 11, 3, 3); ctx.fillRect(1, 11, 3, 3);
+        if (!P.pose.deadRemote) TT.drawGlow(ctx, '#7bffea', 0, 26, 12, 0.8);
+      }
+      ctx.restore();
+    },
+    drawHead(ctx, r, pose) {
+      // cabelo ruivo bagunçado por trás
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.9);
+      for (const [px, py] of [[-0.8, -1.2], [-0.9, -0.85], [-1.35, -0.7], [-1.1, -0.35], [-1.4, 0.0], [-1.0, 0.25], [-1.15, 0.6], [-0.6, 0.45]]) ctx.lineTo(px * r, py * r);
+      ctx.closePath(); ctx.fillStyle = C('#d0582a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      headCircle(ctx, r, '#f3c9a6');
+      // bochechas e queixo duplo
+      ctx.beginPath(); ctx.ellipse(r * 0.25, r * 0.65, r * 0.75, r * 0.38, 0.05, 0, Math.PI); ctx.fillStyle = C('#f3c9a6'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      // franja espetada em cima
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 0.2);
+      for (const [px, py] of [[-1.0, -0.9], [-0.55, -1.35], [-0.2, -1.0], [0.15, -1.4], [0.45, -1.0], [0.85, -1.2], [0.9, -0.55], [0.45, -0.6], [0.05, -0.5], [-0.4, -0.55]]) ctx.lineTo(px * r, py * r);
+      ctx.closePath(); ctx.fillStyle = C('#d0582a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (FLASH) return;
+      ctx.fillStyle = '#a83a1a'; ctx.beginPath(); ctx.ellipse(-r * 0.45, r * 0.15, r * 0.18, r * 0.35, 0.2, 0, TAU2); ctx.fill(); // costeleta
+      if (pose.eyes === 'x' || pose.eyes === 'shut') eyes(ctx, r, pose, {});
+      else { // olhinhos pequenos e espertos com sobrancelhas grossas
+        ctx.fillStyle = OUT;
+        for (const ex of [r * 0.2, r * 0.66]) { ctx.beginPath(); ctx.ellipse(ex, -r * 0.08, r * 0.08, r * 0.12, 0, 0, TAU2); ctx.fill(); }
+        ctx.fillStyle = '#a83a1a'; ctx.fillRect(r * 0.05, -r * 0.36, r * 0.32, r * 0.1); ctx.fillRect(r * 0.52, -r * 0.38, r * 0.3, r * 0.1);
+      }
+      ctx.fillStyle = '#e8a888'; ctx.beginPath(); ctx.arc(r * 0.82, r * 0.12, r * 0.14, 0, TAU2); ctx.fill(); // nariz
+      if (pose.mouth === 'open' || pose.mouth === 'shout') mouth(ctx, r, pose, r * 0.5, r * 0.5);
+      else { ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(r * 0.48, r * 0.3, r * 0.22, 0.3, Math.PI - 0.6); ctx.stroke(); } // sorrisinho de quem tem um plano
+    },
+  });
+
   S.cinderblock = mkStyle({
     scale: 2.0, skin: '#9b958d', torso: '#8e8880', arm: '#968f86', glove: '#7d776f', hand: '#8a847c', leg: '#857f77', boot: '#6f6a63',
     shW: 62, hipW: 44, torsoH: 46, headR: 17, legL: [20, 20], armL: [22, 22], armW: 17, legW: 17, handR: 12, footR: 10, headOff: 8,

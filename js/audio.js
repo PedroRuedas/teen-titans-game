@@ -91,6 +91,17 @@
              80, 0, 76, 0, 80, 0, 83, 0, 88, 0, 0, 0, 87, 0, 83, 0],
       drums: 'metal',
     },
+    // Chefe Control Freak: tema de seriado de ficção científica dos anos 60 em Ré menor — arpejos de
+    // "teremin" subindo e a virada de "plantão urgente" no fim
+    freak: {
+      bpm: 170,
+      chords: [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]],
+      lead: [74, 77, 81, 0, 86, 0, 81, 0, 77, 0, 74, 0, 81, 0, 0, 0,
+             70, 74, 77, 0, 82, 0, 77, 0, 74, 0, 70, 0, 77, 0, 0, 0,
+             72, 76, 79, 0, 84, 0, 79, 0, 76, 79, 84, 0, 88, 0, 86, 0,
+             85, 0, 0, 85, 0, 0, 85, 0, 88, 0, 85, 0, 81, 0, 76, 0],
+      drums: 'rock',
+    },
     victory: {
       bpm: 120,
       chords: [[60, 64, 67], [65, 69, 72], [67, 71, 74], [60, 64, 67]],

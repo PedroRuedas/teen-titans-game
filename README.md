@@ -1,8 +1,8 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): oito fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): nove fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
-**O Show do Mumbo**, **O Covil do Slade** e **A Base da Irmandade**), os 5 Titãs jogáveis com troca
+**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade** e **O Canal do Control Freak**), os 5 Titãs jogáveis com troca
 em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), inimigos da série, **3 níveis de dificuldade** e
 **co-op local para 2 jogadores**.
 
@@ -221,6 +221,17 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    **Monsieur Mallah com o Cérebro** no ombro: tapa de gorila, investida até a parede (fica tonto se
    bater), laser do Cérebro e, abaixo de 50%, raio congelante em círculos e chama congeladores.
    **Fraqueza:** depois do laser a cúpula superaquece e **abre** — cérebro exposto, dano dobrado!
+9. **O Canal do Control Freak**: a rua do Cine Jump e da loja de eletrônicos à noite (vitrine cheia de TVs
+   com barras coloridas e chuvisco), o estúdio do Canal 9 com o cenário de ficção científica, refletores e a
+   placa "NO AR", e o porão do Control Freak, com pôsteres, estantes de bonecos e o telão gigante. A imagem
+   tem interferência de TV. Os Titãs já começam com os golpes e combos novos. Inimigos: **TV-Robôs**
+   (raio de chuvisco em linha, que deixa o Titã tonto, e cabeçada) e **Monstros de Pipoca** (cospem
+   pipocas que estouram em três círculos marcados à frente; barrigada de perto). O chefe é o **Control
+   Freak**, que aparece "sintonizando" no meio do chuvisco: pancada com o controle, **chuva de TVs** nos
+   círculos marcados e o **ZAP MÁXIMO** em linha; abaixo de 50% usa o **botão de PAUSA** (quem fica no
+   círculo fica pausado como numa fita) e troca de canal para chamar TV-Robôs.
+   **Fraqueza:** depois do ZAP MÁXIMO a **pilha do controle acaba** — ele fica sacudindo o controle,
+   parado, e leva dano dobrado!
 
 ## Música e vozes
 
@@ -281,7 +292,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 184 verificações e todas passam:
+página e chame a função serve.) A suíte tem 201 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -303,10 +314,13 @@ página e chame a função serve.) A suíte tem 184 verificações e todas passa
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
   golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
-- 3 partidas completas (8 fases) do início ao fim com um bot.
-- Os oito chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (9 fases) do início ao fim com um bot.
+- Os nove chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Fase 8: raio congelante, chute e giro da Madame Rouge com aviso no chão; cúpula do Mallah abre depois do
   laser (dano dobrado), ele chama congeladores e o raio do Cérebro congela o Titã.
+- Fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca com aviso no chão; pilha do Control
+  Freak acaba depois do ZAP MÁXIMO (dano dobrado), ele chama TV-Robôs, o botão de PAUSA pausa o Titã e o
+  aviso de COMBOS NOVOS não se repete na fase 9.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
@@ -332,6 +346,6 @@ continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexis
 
 ## Próximos passos sugeridos
 
-- Mais fases (Control Freak, Trigon…).
+- Mais fases (Trigon…).
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.
