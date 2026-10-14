@@ -39,6 +39,10 @@ async page => {
     .catch(() => null);
   ok('os dois se conectam e o anfitrião fica com 2 jogadores (P2 = amigo)', linked && (await host.evaluate(() => TT.game.numPlayers === 2 && !!TT.game.input.remote)), linked);
   ok('convidado recebe a imagem (e o som) do jogo', video && video.w > 0 && video.canvasHidden && video.audio >= 1, video);
+  // vídeo leve e sem folga no buffer (menos atraso): até 960x540, a 30 quadros, e buffer mínimo pedido
+  const lowLag = await guest.evaluate(() => ({ w: document.getElementById('tt-video').videoWidth, jb: TT.game.online.call.peerConnection.getReceivers().map((r) => r.jitterBufferTarget) }));
+  const send = await host.evaluate(() => { const s = TT.game.online.call.peerConnection.getSenders().find((x) => x.track && x.track.kind === 'video'); const p = s.getParameters(); return { fps: p.encodings[0].maxFramerate, scale: p.encodings[0].scaleResolutionDownBy, cap: TT.game.renderCap }; });
+  ok('vídeo do jogo online leve e com pouco atraso', lowLag.w <= 960 && lowLag.jb.every((v) => v === 0 || v === undefined) && send.fps === 30 && send.cap === 1, { lowLag, send });
 
   // anfitrião começa a fase 1; o convidado anda e ataca com o teclado dele (P2 no anfitrião)
   await host.click('#tt-online [data-a=close]').catch(() => {});

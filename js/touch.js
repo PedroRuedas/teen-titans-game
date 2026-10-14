@@ -125,7 +125,7 @@
         // nos menus (título, pausa, fim de fase) ATAQUE e PULO também confirmam
         if (b.ok && this.game.state !== 'play') this.press('menu');
       });
-      const up = (e) => { el.classList.remove('down'); this.held.delete(e.pointerId); };
+      const up = (e) => { el.classList.remove('down'); if (this.held.delete(e.pointerId)) this.changed(); };
       for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, up);
       el.addEventListener('contextmenu', (e) => e.preventDefault());
       this.root.appendChild(el);
@@ -134,7 +134,9 @@
     }
 
     // Aperto (vale um quadro) — o "segurado" vem de this.held na amostragem da entrada.
-    press(a) { this.input.pl[0].pressed.add(a); this.input.anyKey = true; }
+    press(a) { this.input.pl[0].pressed.add(a); this.input.anyKey = true; this.changed(); }
+    // Jogo online (amigo): manda o botão na hora, sem esperar o próximo quadro.
+    changed() { const o = this.game.online; if (o && o.guest) o.flush(); }
 
     // Ações seguradas agora (botões + direções do analógico), lidas por Input.sample().
     down() {
@@ -150,7 +152,7 @@
       e.preventDefault();
       try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ponteiro sintético */ }
       TT.audio.init();
-      this.stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+      this.stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), settled: false };
       Object.assign(this.base.style, { left: e.clientX + 'px', top: e.clientY + 'px' });
       this.stickMove(e);
     }
@@ -159,24 +161,36 @@
       const s = this.stick;
       if (!s || e.pointerId !== s.id) return;
       const R = Math.min(innerWidth, innerHeight) * 0.13; // curso do analógico
-      let dx = e.clientX - s.x0, dy = e.clientY - s.y0;
-      const d = Math.hypot(dx, dy);
-      if (d > R) { dx = dx / d * R; dy = dy / d * R; }
-      this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
-      // zona morta de 30% e direções em 8 setores (diagonais valem as duas)
-      const nd = new Set();
-      if (d > R * 0.3) {
-        const a = Math.atan2(dy, dx), c = Math.cos(a), sn = Math.sin(a);
-        if (c > 0.38) nd.add('right'); else if (c < -0.38) nd.add('left');
-        if (sn > 0.38) nd.add('down'); else if (sn < -0.38) nd.add('up');
+      let dx = e.clientX - s.x0, dy = e.clientY - s.y0, d = Math.hypot(dx, dy);
+      // logo que o dedo encosta, o ponto de contato "assenta" (o dedo achata e o centro desce alguns pixels):
+      // nesse começo a origem acompanha o dedo, senão o boneco já sairia andando para baixo
+      // (só um pequeno deslocamento a partir do toque; um movimento rápido de verdade passa direto)
+      if (!s.settled) {
+        if (performance.now() - s.t < 100 && Math.hypot(e.clientX - s.sx, e.clientY - s.sy) < R * 0.25) { s.x0 = e.clientX; s.y0 = e.clientY; dx = dy = d = 0; }
+        else s.settled = true;
       }
-      for (const k of nd) if (!this.dirs.has(k)) this.press(k); // aperto novo: navega nos menus
+      // analógico flutuante: se o dedo passa do curso, a base vem junto (a direção segue o movimento atual do
+      // dedo, e não um ponto de partida antigo)
+      if (d > R) {
+        s.x0 = e.clientX - dx / d * R; s.y0 = e.clientY - dy / d * R;
+        dx = dx / d * R; dy = dy / d * R; d = R;
+        Object.assign(this.base.style, { left: s.x0 + 'px', top: s.y0 + 'px' });
+      }
+      this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // direções com preferência pela horizontal: o polegar faz um arco ao empurrar para o lado, então até
+      // 40° de inclinação é só esquerda/direita; para cima/baixo precisa de mais inclinação e mais curso
+      const nd = new Set(), ax = Math.abs(dx), ay = Math.abs(dy), ang = Math.atan2(ay, ax) * 180 / Math.PI;
+      if (ax > R * 0.28 && ang < 62) nd.add(dx > 0 ? 'right' : 'left');
+      if (ay > R * 0.42 && ang > 40) nd.add(dy > 0 ? 'down' : 'up');
+      const prev = this.dirs;
       this.dirs = nd;
+      for (const k of nd) if (!prev.has(k)) this.press(k); // aperto novo: navega nos menus
+      if (nd.size !== prev.size || [...nd].some((k) => !prev.has(k))) this.changed();
     }
 
     stickUp(e) {
       if (!this.stick || e.pointerId !== this.stick.id) return;
-      this.stick = null; this.dirs = new Set();
+      this.stick = null; this.dirs = new Set(); this.changed();
       this.resetStick();
     }
 

@@ -58,7 +58,10 @@ No título, escolha **JOGAR ONLINE** (logo abaixo de JOGAR):
 
 Como funciona: a partida roda no aparelho de quem criou a sala, e o amigo recebe a imagem e o som do
 jogo ao vivo e manda os botões dele (teclado, controle ou botões na tela), direto entre os dois
-aparelhos (WebRTC). Os dois veem sempre a mesma partida. O servidor gratuito do PeerJS só faz a
+aparelhos (WebRTC). Os dois veem sempre a mesma partida. Para ter pouco atraso, enquanto o amigo está
+conectado o jogo de quem criou a sala desenha em 1280x720 e manda o vídeo em 960x540 a 30 quadros (H.264
+pelo hardware quando o aparelho tem), e o aparelho do amigo manda cada botão na hora e toca o vídeo sem folga
+no buffer. O servidor gratuito do PeerJS só faz a
 apresentação entre os dois navegadores.
 
 - Quem cria a sala deve deixar o jogo aberto e na frente: se trocar de aba ou bloquear a tela, o jogo
@@ -83,7 +86,8 @@ Abra o link do jogo no navegador do celular, **na horizontal**. Os botões apare
 de toque:
 
 - **Analógico** no lado esquerdo: encoste em qualquer ponto da metade esquerda e arraste (também
-  navega nos menus).
+  navega nos menus). Ele dá preferência à horizontal (o arco natural do polegar não puxa para baixo) e
+  acompanha o dedo quando ele passa do curso.
 - À direita: **ATAQUE**, **FORTE**, **ESPECIAL**, **PULO** e **ESQUIVA**. Nos menus, ATAQUE confirma.
 - No alto: **AVANTE!** (pisca quando a energia está cheia), **TROCAR** Titã, **II** (pausa) e tela cheia.
 - O item **BOTÕES NA TELA** (no título e na pausa) liga e desliga os botões e muda a **opacidade**
@@ -277,7 +281,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 183 verificações e todas passam:
+página e chame a função serve.) A suíte tem 184 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -324,7 +328,7 @@ Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
 `tests/online-test.js` abre duas janelas (quem cria a sala e o amigo) e conecta as duas de verdade pelo
 servidor do PeerJS, por isso fica fora da suíte principal e precisa de internet. Ele confere: criar a
 sala, entrar pelo link, imagem e som chegando, o amigo andando, atacando e pausando como P2, as setas
-continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexistente (13 verificações).
+continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexistente e o vídeo leve e com pouco atraso (14 verificações).
 
 ## Próximos passos sugeridos
 

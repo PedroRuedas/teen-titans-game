@@ -54,6 +54,18 @@
   }
   const newCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
   const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  // Põe o H.264 na frente da lista de vídeo: nos celulares ele é codificado pelo hardware (bem mais leve e
+  // rápido que o VP8 por software). Se o aparelho não tiver H.264, a lista fica como está.
+  function preferH264(sdp) {
+    const lines = sdp.split('\r\n'), mi = lines.findIndex((l) => l.startsWith('m=video'));
+    if (mi < 0) return sdp;
+    const h264 = [];
+    for (const l of lines) { const m = /^a=rtpmap:(\d+) H264\/90000/i.exec(l); if (m) h264.push(m[1]); }
+    if (!h264.length) return sdp;
+    const parts = lines[mi].split(' '), pts = parts.slice(3);
+    lines[mi] = parts.slice(0, 3).concat(pts.filter((p) => h264.includes(p)), pts.filter((p) => !h264.includes(p))).join(' ');
+    return lines.join('\r\n');
+  }
 
   class Online {
     constructor(game) {
@@ -65,6 +77,9 @@
       this.remote = null;    // botões do amigo (anfitrião)
       this.sentDown = ''; this.tick = 0;
       this.build();
+      // convidado: tecla apertada vai para o anfitrião na hora (o Input já registrou a tecla antes deste ouvinte)
+      window.addEventListener('keydown', () => { if (this.guest) this.flush(); });
+      window.addEventListener('keyup', () => { if (this.guest) this.flush(); });
       // link de convite: ?sala=CODIGO abre a janela já com o código
       const m = /[?&]sala=([A-Za-z0-9]+)/.exec(location.search);
       if (m) setTimeout(() => this.openPanel(cleanCode(m[1])), 400);
@@ -171,6 +186,7 @@
         const g = this.game;
         this.remote = g.input.remote = { down: new Set(), pressed: new Set() };
         g.setPlayers(2);
+        g.renderCap = 1; g.resize(); // 1280x720: menos para desenhar e para codificar no vídeo
         if (g.state !== 'play') { g.menuIdx = 0; }
         c.send({ t: 'hi', code: this.code });
         this.startStream(c.peer);
@@ -189,7 +205,9 @@
 
     // Manda a imagem do canvas (e o som do jogo) para o amigo.
     startStream(peerId) {
-      const canvas = this.game.canvas, stream = canvas.captureStream(60);
+      // 30 quadros por segundo de vídeo (o jogo continua a 60): metade do trabalho de codificação, imagem estável
+      const canvas = this.game.canvas, stream = canvas.captureStream(30);
+      for (const tr of stream.getVideoTracks()) { try { tr.contentHint = 'motion'; } catch (e) { /* ok */ } }
       try {
         A().init();
         const au = A(), ctx = au.ctx;
@@ -198,7 +216,7 @@
           for (const tr of this.audioDest.stream.getAudioTracks()) stream.addTrack(tr);
         }
       } catch (e) { /* sem som para o amigo */ }
-      this.call = this.peer.call(peerId, stream);
+      this.call = this.peer.call(peerId, stream, { sdpTransform: preferH264 });
       // limita a resolução/bitrate do vídeo (a tela do anfitrião pode ser 2x)
       setTimeout(() => {
         try {
@@ -206,12 +224,14 @@
           for (const s of pc ? pc.getSenders() : []) {
             if (!s.track || s.track.kind !== 'video') continue;
             const p = s.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}];
-            p.encodings[0].maxBitrate = 3000000;
-            p.encodings[0].scaleResolutionDownBy = Math.max(1, canvas.width / 1280);
+            p.encodings[0].maxBitrate = 2500000;
+            p.encodings[0].maxFramerate = 30;
+            p.encodings[0].scaleResolutionDownBy = Math.max(1, canvas.width / 960); // vídeo em 960x540
+            p.degradationPreference = 'maintain-framerate'; // se apertar, perde nitidez mas não trava
             s.setParameters(p).catch(() => {});
           }
         } catch (e) { /* o navegador escolhe */ }
-      }, 800);
+      }, 300);
     }
 
     friendLeft() {
@@ -221,6 +241,7 @@
       this.conn = null;
       if (this.call) { try { this.call.close(); } catch (e) { /* ok */ } this.call = null; }
       g.setPlayers(1);
+      g.renderCap = 0; g.resize();
       this.status(this.code ? 'ONLINE • SALA ' + this.code + ' • seu amigo saiu (pode entrar de novo)' : '');
       if (g.state === 'play' || g.state === 'pause') g.say(g.player, 'Meu amigo caiu! Sigo sozinho.', '#ffd0a0');
       if (this.panelOpen) this.showHost();
@@ -247,8 +268,8 @@
       peer.on('error', (err) => { clearTimeout(timer); fail(err.type === 'peer-unavailable' ? 'A sala ' + code + ' não existe (ou já foi fechada).' : 'Erro de conexão (' + err.type + ').'); });
       peer.on('call', (call) => {
         this.call = call;
-        call.answer();
-        call.on('stream', (s) => this.showVideo(s));
+        call.answer(undefined, { sdpTransform: preferH264 });
+        call.on('stream', (s) => { this.lowLatency(call); this.showVideo(s); });
       });
       peer.on('open', () => {
         const c = this.conn = peer.connect(PREFIX + code.toLowerCase(), { reliable: true });
@@ -273,6 +294,19 @@
       const p = v.play();
       if (p && p.catch) p.catch(() => { v.muted = true; v.play().catch(() => {}); this.status('ONLINE • toque na tela para ligar o som'); const on = () => { v.muted = false; v.play().catch(() => {}); this.status('ONLINE • SALA ' + this.code + ' • você é o P2'); window.removeEventListener('pointerdown', on); }; window.addEventListener('pointerdown', on); });
     }
+
+    // Pede ao navegador o menor atraso possível no vídeo recebido (sem "folga" no buffer).
+    lowLatency(call) {
+      try {
+        for (const r of call.peerConnection.getReceivers()) {
+          if ('jitterBufferTarget' in r) r.jitterBufferTarget = 0;
+          if ('playoutDelayHint' in r) r.playoutDelayHint = 0;
+        }
+      } catch (e) { /* o navegador decide */ }
+    }
+
+    // Manda os botões do convidado agora (chamado no aperto, sem esperar o próximo quadro).
+    flush() { if (this.connected) this.guestTick(); }
 
     hostLeft() {
       this.leave(false);
@@ -303,6 +337,7 @@
       if (this.peer) { try { this.peer.destroy(); } catch (e) { /* ok */ } }
       this.peer = this.conn = this.call = null;
       if (wasHost) { this.remote = this.game.input.remote = null; this.game.setPlayers(1); }
+      if (this.game.renderCap) { this.game.renderCap = 0; this.game.resize(); }
       if (this.role === 'guest') {
         this.video.srcObject = null; this.video.classList.remove('on');
         this.game.canvas.style.visibility = '';

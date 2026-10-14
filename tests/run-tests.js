@@ -875,6 +875,18 @@ async page => {
   await frames(40);
   tc.walked = Math.round((await ev(() => TT.game.player.x)) - tx0);
   await page.mouse.up(); await frames(5);
+  // polegar em arco: empurrando para a direita com o dedo descendo ~30° não pode virar "para baixo";
+  // a diagonal de verdade (45°) ainda vale as duas direções
+  const arc = async (pts) => {
+    await page.mouse.move(z.x, z.y); await page.mouse.down();
+    for (const [dx, dy] of pts) { await page.mouse.move(z.x + dx, z.y + dy, { steps: 3 }); await frames(2); }
+    const ty0 = await ev(() => TT.game.player.y); await frames(30);
+    const r = { dirs: await ev(() => [...TT.game.touch.dirs].sort().join('+')), dy: Math.round((await ev(() => TT.game.player.y)) - ty0) };
+    await page.mouse.up(); await frames(5);
+    return r;
+  };
+  tc.arc = await arc([[0, 8], [30, 18], [60, 30], [75, 40]]);
+  tc.diag = await arc([[40, 40], [60, 60]]);
   tc.moves = {};
   for (const a of ['light', 'heavy', 'special', 'jump']) { await frames(50); await ev(() => { TT.game.energy = 100; }); await tapBtn(a); tc.moves[a] = await ev(() => TT.game.player.state); }
   await frames(60);
@@ -896,6 +908,8 @@ async page => {
   ok('botões na tela: analógico navega no menu e ATAQUE começa o jogo', tc.menuMoved === 2 && tc.started, tc);
   ok('botões na tela: analógico anda e ATAQUE/FORTE/ESPECIAL/PULO funcionam',
     tc.walked > 100 && tc.moves.light === 'attack' && tc.moves.heavy === 'attack' && tc.moves.special === 'attack' && tc.moves.jump === 'air', tc);
+  ok('botões na tela: analógico em arco para a direita não puxa para baixo (diagonal de verdade ainda vale)',
+    tc.arc.dirs === 'right' && tc.arc.dy === 0 && tc.diag.dirs === 'down+right' && tc.diag.dy > 0, { arc: tc.arc, diag: tc.diag });
   ok('botões na tela: TROCAR, pausa (II) e opacidade pela pausa', tc.switched && tc.paused === 'pause' && tc.pauseItem === 'touch' && tc.opacity.lvl === 0.25 && tc.opacity.css === '0.25' && tc.opacity.saved === '0.25' && tc.resumed === 'play', tc);
 
   // 6a2) MENU INICIAL: pela pausa (pede confirmação) e pela tela de game over (Esc)

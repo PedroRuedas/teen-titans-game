@@ -896,7 +896,8 @@
       const ww = window.innerWidth, wh = window.innerHeight;
       const cssW = Math.min(ww, wh * 16 / 9), cssH = cssW * 9 / 16;
       const dpr = window.devicePixelRatio || 1;
-      const s = TT.clamp(Math.round((cssW * dpr / W) * 4) / 4, 0.5, 2);
+      // transmitindo para o amigo (online): resolução interna limitada, para sobrar processador para o vídeo
+      const s = TT.clamp(Math.round((cssW * dpr / W) * 4) / 4, 0.5, this.renderCap || 2);
       this.canvas.style.width = cssW + 'px';
       this.canvas.style.height = cssH + 'px';
       if (s !== this.scale || this.canvas.width !== Math.round(W * s)) {
