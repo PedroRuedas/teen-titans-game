@@ -10,6 +10,7 @@
   const TT = window.TT;
   const PEERJS = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
   const PREFIX = 'jovens-titas-';
+  const SITE = 'https://jovens-titas-jump-city.netlify.app/';
   const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O e 1/I, que se confundem
   const A = () => TT.audio;
 
@@ -159,7 +160,11 @@
       tryOpen(3);
     }
 
-    link() { return location.origin + location.pathname + '?sala=' + this.code; }
+    // No itch.io o jogo roda num quadro de outro endereço (itch.zone), que não recebe o ?sala=: o link vai para o site do jogo.
+    link() {
+      const base = /(^|\.)itch\.(zone|io)$/.test(location.hostname) ? SITE : location.origin + location.pathname;
+      return base + '?sala=' + this.code;
+    }
 
     showHost() {
       const friend = this.connected;

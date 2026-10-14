@@ -344,6 +344,12 @@ servidor do PeerJS, por isso fica fora da suíte principal e precisa de internet
 sala, entrar pelo link, imagem e som chegando, o amigo andando, atacando e pausando como P2, as setas
 continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexistente e o vídeo leve e com pouco atraso (14 verificações).
 
+## Publicar no itch.io
+
+A pasta `itch-io/` tem o passo a passo (`COMO-PUBLICAR.md`), a capa, as screenshots e a descrição. O zip
+para enviar é montado com `python itch-io/montar_zip.py` (fica fora do git). Ele não leva a fala da
+Ravena recortada da dublagem.
+
 ## Próximos passos sugeridos
 
 - Mais fases (Trigon…).
