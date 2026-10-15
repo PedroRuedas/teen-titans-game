@@ -48,7 +48,7 @@
       this.tz = 0; this.tvz = 0; this.tdx = 0; this.thurt = 0; this.gone = false;
       // quem chamou o "Titãs, avante!" começa; os outros vêm na ordem da equipe
       const order = TT.TITAN_ORDER.slice();
-      const first = order.indexOf(this.by.key);
+      const first = order.indexOf(this.by.base || this.by.key); // personagens que não são Titãs: ordem normal
       if (first > 0) order.unshift(order.splice(first, 1)[0]);
       this.queue = order.map((k) => {
         const a = new TT.Titan(game, k);

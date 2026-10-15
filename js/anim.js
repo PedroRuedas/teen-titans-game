@@ -439,7 +439,7 @@
     const t = f.animT;
     out.mouth = null; out.weapon = null; out.glow = null; out.form = null; out.eyes = null; out.handF = null; out.handB = null;
     out.cape = TT.clamp(Math.abs(f.vx) / 6, 0, 1);
-    const mv = f.key ? MOVES[f.key] : null;
+    const mv = f.key ? MOVES[f.base || f.key] || MOVES[f.key] : null; // base = Titã de origem das versões alternativas
     if (f.anim === 'attack') attackPose(out, f);
     else if (mv && mv[f.anim]) mv[f.anim](out, f, t);
     else generic(out, f, t);

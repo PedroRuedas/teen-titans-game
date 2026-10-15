@@ -845,7 +845,8 @@
       super(game, 300, 580);
       this.key = key;
       this.def = TITANS[key];
-      this.style = TT.STYLES[key];
+      this.base = this.def.base || key; // versões alternativas (Aprendiz, Mutano Palhaço...) usam a locomoção do Titã de origem
+      this.style = TT.STYLES[this.def.style || key];
       this.name = this.def.name;
       this.hp = this.maxHp = this.def.hp;
       this.team = 'hero';
@@ -917,14 +918,14 @@
             if (mx) this.facing = mx > 0 ? 1 : -1;
             this.vy = my * 3;
             A().play('whoosh');
-            if (this.key === 'beastboy') g.morph(this.x, this.y - 40);
-            else if (this.key === 'raven') { A().play('dark'); g.poof(this.x, this.y - 70); }
+            if (this.base === 'beastboy') g.morph(this.x, this.y - 40);
+            else if (this.base === 'raven') { A().play('dark'); g.poof(this.x, this.y - 70); }
           }
           return;
         }
         case 'air': {
           this.jumpT++;
-          if (this.key === 'cyborg' && this.vz > 0 && this.jumpT % 2 === 0) this.jets(g);
+          if (this.base === 'cyborg' && this.vz > 0 && this.jumpT % 2 === 0) this.jets(g);
           this.vx += (mx * this.def.speed - this.vx) * 0.08;
           this.vy = my * this.def.speed * 0.4;
           if (mx) this.facing = mx > 0 ? 1 : -1;
@@ -947,7 +948,7 @@
           this.dashFx(g);
           if (this.st > 14) {
             this.vy = 0; this.setState('idle'); this.setAnim('idle');
-            if (this.key === 'beastboy') g.morph(this.x, this.y - 40, true);
+            if (this.base === 'beastboy') g.morph(this.x, this.y - 40, true);
           }
           return;
         }
@@ -1069,7 +1070,8 @@
 
     // Efeitos de cada esquiva: rolamento, guepardo, propulsores, corvo de alma, cometa verde.
     dashFx(g) {
-      const k = this.key, t = this.st;
+      const k = this.base, t = this.st;
+      if (this.def.dashFx) { this.def.dashFx(this, g, t); return; }
       if (k === 'cyborg') { if (t % 2 === 0) this.jets(g); }
       else if (k === 'starfire') g.particles.spawn('glow', this.x - this.facing * 30, this.y - 92 + TT.rand(-8, 8), { color: GREEN, size: 34, life: 12, vx: -this.facing * 2 });
       else if (k === 'raven') g.particles.spawn('feather', this.x - this.facing * 20, this.y - 70 + TT.rand(-30, 30), { color: '#1a0f2e', size: 9, life: 20, vr: 0.2, vx: -this.facing });
@@ -1092,12 +1094,14 @@
         TT[FORM](ctx, sx, sy, this.facing, fa.t, fa.s, fa.end, fl); // forma da vez numa sequência de animais
       } else if (FORM && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
         TT[FORM](ctx, sx, sy, this.facing, a.t, a.def.s, a.def.s + a.def.a, fl);
-      } else if (this.state === 'dash' && this.key === 'beastboy') {
+      } else if (this.state === 'dash' && this.base === 'beastboy') {
         TT.drawCheetah(ctx, sx, sy, this.facing, this.animT, fl);
-      } else if (this.state === 'dash' && this.key === 'raven') {
+      } else if (this.state === 'dash' && this.def.drawDash) {
+        this.def.drawDash(ctx, this, sx, sy, fl);
+      } else if (this.state === 'dash' && this.base === 'raven') {
         TT.drawSoulRaven(ctx, sx, sy - 48, this.facing, this.animT);
       } else {
-        if (this.state === 'dash' && this.key === 'starfire') this.drawComet(ctx, sx, sy);
+        if (this.state === 'dash' && this.base === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
         TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: fl, t: this.animT, out: this.rigOut, cape: this.cape, camX });
       }
@@ -1107,7 +1111,9 @@
         if (a.def.beam) this.drawBeam(ctx, sx, sy, a);
         if (a.def.claw) this.drawClaw(ctx, sx, sy, a);
       }
-      if (a && a.def.dmg && !a.def.beam && !a.def.form && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
+      if (a && a.def.dmg && !a.def.beam && !a.def.form && !a.def.drawFx && a.t >= a.def.s && a.t < a.def.s + a.def.a + 5) this.drawSmear(ctx, sx, sy, a);
+      if (a && a.def.drawFx) a.def.drawFx(ctx, this, sx, sy, a); // efeitos próprios dos personagens extras (js/roster.js)
+      if (this.def.drawOver) this.def.drawOver(ctx, this, sx, sy);
       // hipnotizado pelo Irmão Sangue: espirais girando sobre a cabeça enquanto está tonto
       if (this.hypno && this.state === 'hurt') {
         for (let i = 0; i < 3; i++) {

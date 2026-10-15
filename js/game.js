@@ -15,14 +15,16 @@
       this.state = 'title';
       this.frame = 0;
       this.stateT = 0;
-      this.team = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
+      // equipe de 5 escolhida no menu PERSONAGENS (salva no navegador; padrão = os cinco Titãs)
+      this.team = TT.loadTeam().map((k) => new TT.Titan(this, k));
       // Jogadores: cada "slot" controla um Titã da equipe (o P2 só existe no modo 2 jogadores).
       this.numPlayers = 1;
       this.slots = [this.newSlot(0, 0), this.newSlot(1, 1)];
       this.score = 0;
       this.godMode = false;
       this.titleBg = TT.makeBackground(1);
-      this.titleTitans = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
+      this.titleTitans = this.team.map((t) => new TT.Titan(this, t.key));
+      this.newUnlocks = [];
       this.showControls = false;
       const sd = TT.store.get('dificuldade', 'normal');
       this.difficulty = TT.DIFFICULTY[sd] ? sd : 'normal';
@@ -58,6 +60,13 @@
       this.input.twoPlayers = this.numPlayers === 2;
     }
     get diff() { return TT.DIFFICULTY[this.difficulty]; }
+    get teamKeys() { return this.team.map((t) => t.key); }
+    // Troca a equipe (5 personagens) e salva a escolha.
+    setTeam(keys) {
+      this.team = keys.map((k) => new TT.Titan(this, k));
+      this.titleTitans = keys.map((k) => new TT.Titan(this, k));
+      TT.saveTeam(keys);
+    }
 
     // Troca a dificuldade (dir = +1/-1) e salva a escolha.
     setDifficulty(key) {
@@ -650,6 +659,7 @@
       if (inp.anyKey) { A().init(); inp.anyKey = false; }
       switch (this.state) {
         case 'title': this.updateTitle(inp); break;
+        case 'roster': this.updateRoster(inp); break;
         case 'play': this.updatePlay(inp); break;
         case 'pause': this.updatePause(inp); break;
         case 'gameover':
@@ -676,7 +686,7 @@
 
     // Itens do menu do título.
     titleItems() {
-      const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'controls'];
+      const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'chars', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'chars', 'controls'];
       if (!this.online) it.splice(1, 1);
       if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
       return it;
@@ -729,6 +739,7 @@
         if (it === 'online') { A().play('select'); this.online.openPanel(); return; }
         if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
+        if (it === 'chars') { this.openRoster(); return; }
         if (it === 'install') { this.installApp(); return; }
         A().play('select');
         this.score = 0;
@@ -856,6 +867,8 @@
       if (this.clearTimer > 0 && --this.clearTimer === 0) {
         this.state = 'clear'; this.stateT = 0;
         A().playSong('victory');
+        // zerou a fase: libera os personagens dela (menu PERSONAGENS)
+        this.newUnlocks = TT.Unlocks.markCleared(this.stage.id);
       }
     }
 
@@ -943,6 +956,7 @@
       ctx.imageSmoothingEnabled = true;
       switch (this.state) {
         case 'title': this.drawTitle(ctx); break;
+        case 'roster': this.drawRoster(ctx); break;
         case 'play': case 'pause': case 'gameover':
           this.drawWorld(ctx);
           this.drawHUD(ctx);
@@ -1281,7 +1295,8 @@
         TT.drawText(ctx, t.name.toUpperCase(), xs[i], by + 31, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, compact ? 526 : 572, compact ? (items.length > 7 ? 23 : 26) : items.length > 5 ? 24 : 27);
+      const many = items.length > 8;
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, many ? 514 : compact ? 526 : 572, many ? 21.5 : compact ? (items.length > 7 ? 23 : 26) : items.length > 5 ? 24 : 27);
       const tip = this.touch && this.touch.visible ? 'analógico escolhe e muda  •  ATAQUE confirma' : '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som';
       TT.drawText(ctx, tip, W / 2, 708, 16, '#bfc4e8', OUT, 'center', 4);
     }
@@ -1296,6 +1311,7 @@
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
+        case 'chars': return { text: 'PERSONAGENS (' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ')' };
         case 'touch': return this.touch.label();
         case 'online': return this.online.label();
         case 'install': return { text: 'INSTALAR APP', color: '#6fe3ff' };
@@ -1385,6 +1401,218 @@
       TT.drawText(ctx, tip, W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
     }
 
+    // ------------------------------------------------------------------ Menu PERSONAGENS
+    // Grade com os 36 personagens do jogo de PS2. Liberado = escolhe a vaga na equipe (1-5);
+    // bloqueado = diz qual fase zerar; "EM BREVE" = a fase dele ainda não existe.
+    openRoster() {
+      A().play('select');
+      this.state = 'roster'; this.stateT = 0;
+      this.rosterIdx = Math.max(0, TT.ROSTER.findIndex((r) => r.key === this.team[0].key));
+      this.rosterSlot = -1; this.rosterMsg = null;
+    }
+    rosterStatus(r) {
+      if (TT.Unlocks.isUnlocked(r.key)) return 'open';
+      return TT.Unlocks.available(r.key) ? 'locked' : 'soon';
+    }
+    updateRoster(inp) {
+      if (this.rosterMsg && ++this.rosterMsg.t > 120) this.rosterMsg = null;
+      const n = TT.ROSTER.length, COLS = 12, r = TT.ROSTER[this.rosterIdx];
+      const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
+      const back = inp.wasPressed('heavy') || inp.wasPressed('special') || inp.wasPressed('pause');
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      const ud = (inp.wasPressed('down') ? 1 : 0) - (inp.wasPressed('up') ? 1 : 0);
+      if (this.rosterSlot >= 0) { // escolhendo a vaga na equipe
+        if (lr) { this.rosterSlot = (this.rosterSlot + lr + 5) % 5; A().play('select'); }
+        for (let i = 0; i < 5; i++) if (inp.wasPressed('t' + i)) { this.placeInTeam(r.key, i); return; }
+        if (ok) this.placeInTeam(r.key, this.rosterSlot);
+        else if (back) { this.rosterSlot = -1; A().play('select'); }
+        return;
+      }
+      if (back && this.stateT > 8) { this.state = 'title'; this.stateT = 21; this.menuIdx = Math.max(0, this.titleItems().indexOf('chars')); A().play('select'); return; }
+      if (lr || ud) {
+        const row = Math.floor(this.rosterIdx / COLS), col = this.rosterIdx % COLS, rows = Math.ceil(n / COLS);
+        this.rosterIdx = Math.min(n - 1, ((row + ud + rows) % rows) * COLS + (col + lr + COLS) % COLS);
+        A().play('select');
+      }
+      if (ok && this.stateT > 8) {
+        const st = this.rosterStatus(r);
+        if (st === 'open') { const j = this.teamKeys.indexOf(r.key); this.rosterSlot = j >= 0 ? j : 0; A().play('select'); }
+        else {
+          A().play('ko');
+          this.rosterMsg = { t: 0, text: st === 'locked' ? 'Zere a ' + this.stageLabel(r.stage) + ' para liberar!' : 'A fase deste personagem ainda vai chegar!' };
+        }
+      }
+    }
+    stageLabel(id) { const s = TT.STAGES.find((x) => x.id === id); return s ? s.name.replace(' — ', ': ').replace('FASE', 'Fase') : 'fase ' + id; }
+    // Põe o personagem na vaga i (se já estiver na equipe, troca de lugar com quem estava lá).
+    placeInTeam(key, i) {
+      const keys = this.teamKeys, j = keys.indexOf(key);
+      if (j >= 0) keys[j] = keys[i];
+      keys[i] = key;
+      this.setTeam(keys);
+      this.rosterSlot = -1;
+      this.rosterMsg = { t: 0, text: TT.ROSTER_BY[key].name.toUpperCase() + ' ENTROU NA EQUIPE (VAGA ' + (i + 1) + ')!', good: true };
+      A().play('switch');
+    }
+
+    drawRoster(ctx) {
+      const f = this.frame, R = TT.ROSTER, touch = this.touch && this.touch.visible;
+      for (const l of this.titleBg.layers) l.draw(ctx, 600);
+      ctx.fillStyle = 'rgba(8,4,26,0.82)'; ctx.fillRect(0, 0, W, H);
+      TT.drawText(ctx, 'PERSONAGENS', 40, 40, 46, '#ffe14a', OUT, 'left', 9);
+      TT.drawText(ctx, 'LIBERADOS ' + TT.Unlocks.count() + '/' + R.length, W - 40, 40, 26, '#ffb0dc', OUT, 'right', 5);
+      TT.drawText(ctx, 'Zere a fase de cada personagem para liberar', W / 2 + 30, 42, 18, '#bfc4e8', OUT, 'center', 4);
+      // grade 12 x 3
+      const CW = 96, CH = 104, GAP = 6, x0 = (W - (12 * CW + 11 * GAP)) / 2, y0 = 76, keys = this.teamKeys;
+      R.forEach((r, i) => {
+        const x = x0 + (i % 12) * (CW + GAP), y = y0 + Math.floor(i / 12) * (CH + GAP), on = i === this.rosterIdx, st = this.rosterStatus(r);
+        const d = TT.TITANS[r.key];
+        ctx.save();
+        if (on) { ctx.translate(x + CW / 2, y + CH / 2); ctx.scale(1.08, 1.08); ctx.translate(-x - CW / 2, -y - CH / 2); }
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, CW, CH, 12); else ctx.rect(x, y, CW, CH);
+        ctx.fillStyle = st === 'open' ? TT.shade(d.color, -0.55) : st === 'locked' ? '#1d1838' : '#120e22'; ctx.fill();
+        ctx.lineWidth = on ? 4 : 2.5; ctx.strokeStyle = on ? ((f >> 3) % 2 ? '#ffe14a' : '#ffffff') : st === 'open' ? d.color : '#3a3360';
+        if (st === 'soon' && !on) ctx.setLineDash([6, 5]);
+        ctx.stroke(); ctx.setLineDash([]);
+        const cx = x + CW / 2, cy = y + 40;
+        if (st === 'soon') {
+          TT.drawText(ctx, '?', cx, cy, 46, '#3a3360', OUT, 'center', 5);
+          TT.drawText(ctx, 'EM BREVE', cx, y + 74, 12, '#8a84b8', OUT, 'center', 3);
+        } else {
+          ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, 31, 0, Math.PI * 2); ctx.fillStyle = st === 'open' ? d.color : '#2a2448'; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); ctx.clip();
+          ctx.drawImage(st === 'open' ? TT.portrait(r.key, 66) : TT.silhouette(r.key, 66), cx - 33, cy - 33, 66, 66);
+          ctx.restore();
+          if (st === 'locked') { this.drawLock(ctx, cx, cy + 4); TT.drawText(ctx, 'FASE ' + r.stage, cx, y + 76, 13, '#ffcf5a', OUT, 'center', 3); }
+        }
+        const nm = st === 'soon' && !on ? '???' : r.name.toUpperCase();
+        ctx.font = '14px ' + TT.FONT;
+        const sz = Math.min(14, 14 * (CW - 8) / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx, y + CH - 12, sz, st === 'open' ? '#ffffff' : '#9a95b8', OUT, 'center', 3);
+        const slot = keys.indexOf(r.key);
+        if (slot >= 0) {
+          ctx.beginPath(); ctx.arc(x + 14, y + 14, 12, 0, Math.PI * 2); ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+          TT.drawText(ctx, String(slot + 1), x + 14, y + 15, 16, OUT, null, 'center');
+        }
+        ctx.restore();
+      });
+      this.drawRosterInfo(ctx, R[this.rosterIdx]);
+      this.drawTeamBar(ctx);
+      if (this.rosterMsg) {
+        const m = this.rosterMsg, a = Math.min(1, (120 - m.t) / 15);
+        ctx.save(); ctx.globalAlpha = a;
+        ctx.fillStyle = m.good ? 'rgba(20,90,45,0.92)' : 'rgba(110,10,30,0.92)'; ctx.fillRect(W / 2 - 400, 396, 800, 34);
+        TT.drawText(ctx, m.text, W / 2, 413, 22, '#ffffff', OUT, 'center', 5);
+        ctx.restore();
+      }
+      const tip = this.rosterSlot >= 0
+        ? (touch ? 'analógico ◄ ► escolhe a vaga  •  ATAQUE confirma  •  FORTE cancela' : '← → escolhe a vaga (ou 1-5)  •  ENTER confirma  •  K / Esc cancela')
+        : (touch ? 'analógico escolhe  •  ATAQUE põe na equipe  •  FORTE volta' : 'setas escolhem  •  ENTER põe na equipe  •  K / Esc volta ao título');
+      TT.drawText(ctx, tip, W / 2, 708, 17, '#bfc4e8', OUT, 'center', 4);
+    }
+    drawLock(ctx, x, y) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(0, -8, 10, Math.PI, 0); ctx.stroke();
+      ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth = 3.5; ctx.stroke();
+      ctx.fillStyle = '#ffcf5a'; ctx.fillRect(-14, -8, 28, 22); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-14, -8, 28, 22);
+      ctx.fillStyle = OUT; ctx.fillRect(-2, -1, 4, 8);
+      ctx.restore();
+    }
+    // Painel do personagem selecionado: modelo animado, como liberar e golpes.
+    drawRosterInfo(ctx, r) {
+      const st = this.rosterStatus(r), d = TT.TITANS[r.key], x = 36, y = 446;
+      ctx.fillStyle = 'rgba(20,12,50,0.85)';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - 12, y - 12, 712, 250, 16); else ctx.rect(x - 12, y - 12, 712, 250); ctx.fill();
+      ctx.strokeStyle = st === 'open' ? d.color : '#3a3360'; ctx.lineWidth = 3; ctx.stroke();
+      if (st === 'open') { // modelo animado
+        let pv = this.rosterPreview;
+        if (!pv || pv.key !== r.key) pv = this.rosterPreview = new TT.Titan(this, r.key);
+        pv.animT++;
+        pv.anim = (this.frame % 240) > 170 ? 'victory' : 'idle'; pv.vx = 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(x + 104, y + 222, 66, 13, 0, 0, Math.PI * 2); ctx.fill();
+        TT.computePose(pv, pv.pose);
+        TT.drawRig(ctx, pv.style, pv.pose, x + 104, y + 222, 1, { t: pv.animT, scale: Math.min(1.25, 200 / Math.max(80, pv.height)) });
+      } else if (st === 'locked') {
+        ctx.save(); ctx.beginPath(); ctx.arc(x + 104, y + 112, 84, 0, Math.PI * 2); ctx.fillStyle = '#1d1838'; ctx.fill(); ctx.clip();
+        ctx.drawImage(TT.silhouette(r.key, 168), x + 20, y + 28, 168, 168); ctx.restore();
+        this.drawLock(ctx, x + 104, y + 124);
+      } else TT.drawText(ctx, '?', x + 104, y + 112, 150, '#2a2448', OUT, 'center', 10);
+      const tx = x + 222;
+      TT.drawText(ctx, r.name.toUpperCase(), tx, y + 14, 36, st === 'open' ? d.color : '#bfc4e8', OUT, 'left', 7);
+      let line;
+      if (st === 'open') line = { text: r.stage === 0 ? 'LIBERADO DESDE O INÍCIO' : 'LIBERADO — ' + this.stageLabel(r.stage).toUpperCase(), col: '#9effa8' };
+      else if (st === 'locked') line = { text: 'BLOQUEADO — zere a ' + this.stageLabel(r.stage), col: '#ffcf5a' };
+      else line = { text: 'EM BREVE — a fase deste personagem ainda vai chegar', col: '#ff9ac0' };
+      ctx.font = '19px ' + TT.FONT;
+      TT.drawText(ctx, line.text, tx, y + 48, Math.min(19, 19 * 450 / Math.max(1, ctx.measureText(line.text).width)), line.col, OUT, 'left', 4);
+      if (st === 'soon') { this.wrapText(ctx, r.plan || '', tx, y + 86, 450, 19, '#d8d4f0'); return; }
+      if (d.blurb) this.wrapText(ctx, d.blurb, tx, y + 78, 450, 17, '#d8d4f0');
+      const info = TT.MOVE_INFO[r.key];
+      if (info) {
+        const rows = [['COMBO  J J J', info[0]], ['FORTE  K', info[1]], ['ESPECIAL  L', info[2]], ['COMBO FINAL  J J K', info[3]]];
+        rows.forEach((rw, i) => {
+          const yy = y + 126 + i * 25;
+          TT.drawText(ctx, rw[0], tx, yy, 16, '#ffe14a', OUT, 'left', 4);
+          TT.drawText(ctx, rw[1], tx + 190, yy, 17, '#ffffff', OUT, 'left', 4);
+        });
+        TT.drawText(ctx, 'COMBO FINAL a partir da fase 8', tx, y + 228, 14, '#9a95b8', OUT, 'left', 3);
+      }
+    }
+    wrapText(ctx, text, x, y, w, size, col) {
+      ctx.font = size + 'px ' + TT.FONT;
+      let line = '', yy = y;
+      for (const wd of text.split(' ')) {
+        const t = line ? line + ' ' + wd : wd;
+        if (ctx.measureText(t).width > w && line) { TT.drawText(ctx, line, x, yy, size, col, OUT, 'left', 4); line = wd; yy += size * 1.3; }
+        else line = t;
+      }
+      if (line) TT.drawText(ctx, line, x, yy, size, col, OUT, 'left', 4);
+    }
+    // Equipe atual (5 vagas); no modo de escolher vaga, a vaga em foco pisca.
+    drawTeamBar(ctx) {
+      const x0 = 766, y = 446, picking = this.rosterSlot >= 0;
+      ctx.fillStyle = 'rgba(20,12,50,0.85)';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0 - 12, y - 12, 492, 250, 16); else ctx.rect(x0 - 12, y - 12, 492, 250); ctx.fill();
+      ctx.strokeStyle = picking ? '#ffe14a' : '#3a3360'; ctx.lineWidth = 3; ctx.stroke();
+      TT.drawText(ctx, picking ? 'ESCOLHA A VAGA' : 'SUA EQUIPE', x0 + 234, y + 16, 30, picking ? '#ffe14a' : '#ffffff', OUT, 'center', 6);
+      TT.drawText(ctx, 'no jogo, troque com 1-5 ou Q / E', x0 + 234, y + 46, 15, '#bfc4e8', OUT, 'center', 4);
+      this.team.forEach((t, i) => {
+        const cx = x0 + 42 + i * 96, cy = y + 116, on = picking && i === this.rosterSlot;
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, on ? 42 : 37, 0, Math.PI * 2); ctx.fillStyle = t.def.color; ctx.fill();
+        ctx.lineWidth = on ? 5 : 3; ctx.strokeStyle = on ? ((this.frame >> 3) % 2 ? '#ffe14a' : '#ffffff') : OUT; ctx.stroke(); ctx.clip();
+        ctx.drawImage(TT.portrait(t.key, 84), cx - 42, cy - 42, 84, 84);
+        ctx.restore();
+        TT.drawText(ctx, String(i + 1), cx - 30, cy - 32, 20, '#ffe14a', OUT, 'center', 4);
+        ctx.font = '15px ' + TT.FONT;
+        const nm = t.name.toUpperCase(), sz = Math.min(15, 15 * 90 / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx, cy + 56, sz, '#ffffff', OUT, 'center', 3);
+      });
+      const r = TT.ROSTER[this.rosterIdx];
+      if (picking) TT.drawText(ctx, r.name.toUpperCase() + ' vai para a vaga ' + (this.rosterSlot + 1), x0 + 234, y + 206, 20, '#9effa8', OUT, 'center', 4);
+      else TT.drawText(ctx, 'Escolha um personagem liberado e confirme', x0 + 234, y + 206, 17, '#bfc4e8', OUT, 'center', 4);
+    }
+    // Faixa "PERSONAGEM LIBERADO!" na tela de fase concluída.
+    drawUnlocks(ctx, y) {
+      const list = this.newUnlocks, k = TT.clamp((this.stateT - 30) / 20, 0, 1);
+      if (k <= 0) return;
+      ctx.save(); ctx.globalAlpha = k;
+      const w = 140 + list.length * 170;
+      ctx.fillStyle = 'rgba(90,20,90,0.9)'; ctx.fillRect(W / 2 - w / 2, y - 44, w, 104);
+      ctx.strokeStyle = '#ffb0dc'; ctx.lineWidth = 3; ctx.strokeRect(W / 2 - w / 2, y - 44, w, 104);
+      TT.drawText(ctx, list.length > 1 ? 'NOVOS PERSONAGENS LIBERADOS!' : 'NOVO PERSONAGEM LIBERADO!', W / 2, y - 24, 24, '#ffe14a', OUT, 'center', 5);
+      list.forEach((r, i) => {
+        const cx = W / 2 + (i - (list.length - 1) / 2) * 170, cy = y + 14;
+        ctx.save(); ctx.beginPath(); ctx.arc(cx - 46, cy, 25, 0, Math.PI * 2); ctx.fillStyle = TT.TITANS[r.key].color; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); ctx.clip();
+        ctx.drawImage(TT.portrait(r.key, 54), cx - 73, cy - 27, 54, 54); ctx.restore();
+        ctx.font = '18px ' + TT.FONT;
+        const nm = r.name.toUpperCase(), sz = Math.min(18, 18 * 104 / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx + 30, cy, sz, '#ffffff', OUT, 'center', 4);
+      });
+      TT.drawText(ctx, 'Monte sua equipe no menu PERSONAGENS', W / 2, y + 48, 15, '#ffd8f0', OUT, 'center', 3);
+      ctx.restore();
+    }
+
     drawGameOver(ctx) {
       const k = Math.min(1, this.stateT / 40);
       ctx.fillStyle = 'rgba(30,0,10,' + 0.7 * k + ')'; ctx.fillRect(0, 0, W, H);
@@ -1410,6 +1638,7 @@
         TT.computePose(t, t.pose);
         TT.drawRig(ctx, t.style, t.pose, xs[i], 560, 1, { t: t.animT + i * 7 });
       }
+      if (this.newUnlocks.length) this.drawUnlocks(ctx, 390); // por cima da equipe
       if (this.stateT > 70 && (this.frame >> 5) % 2 === 0) {
         const last = this.stageIdx + 1 >= TT.STAGES.length;
         TT.drawText(ctx, last ? 'ENTER para o final' : 'ENTER para a próxima fase', W / 2, 650, 32, '#9effa8', OUT, 'center', 6);
@@ -1432,7 +1661,7 @@
         TT.computePose(t, t.pose);
         TT.drawRig(ctx, t.style, t.pose, xs[i], 560, 1, { t: t.animT + i * 9, scale: 1.1 });
       }
-      TT.drawText(ctx, 'Torre Titã • Perfuratriz do Terror • Usina de Energia — 3 fases concluídas!', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
+      TT.drawText(ctx, TT.STAGES.length + ' fases concluídas!  •  ' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ' personagens liberados', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
       if (this.stateT > 120 && (f >> 5) % 2 === 0) TT.drawText(ctx, 'ENTER para voltar ao título', W / 2, 680, 26, '#9effa8', OUT, 'center', 5);
     }
   }

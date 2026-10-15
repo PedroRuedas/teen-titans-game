@@ -1247,6 +1247,48 @@ async page => {
   });
   ok('todos os golpes renderizam quadro a quadro sem erro (raio do Ciborgue)', allFrames.errors === 0 && allFrames.comp === 'source-over' && allFrames.alpha === 1, allFrames);
 
+  // Menu PERSONAGENS: 36 personagens, desbloqueio ao zerar a fase, equipe salva e golpes dos extras
+  const roster = await ev(() => {
+    const g = TT.game, out = {};
+    TT.Unlocks.reset(); g.setTeam(TT.DEFAULT_TEAM.slice());
+    out.total = TT.ROSTER.length; out.start = TT.Unlocks.count();
+    out.soon = TT.ROSTER.filter((r) => !TT.Unlocks.available(r.key)).length;
+    out.lockedGizmo = !TT.Unlocks.isUnlocked('gizmo');
+    // tentar pôr um bloqueado na equipe não faz nada
+    g.openRoster(); g.stateT = 20; g.rosterIdx = TT.ROSTER.findIndex((r) => r.key === 'gizmo');
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.lockedMsg = !!(g.rosterMsg && /Fase 2/.test(g.rosterMsg.text)) && g.rosterSlot === -1;
+    // zerar a fase 2 libera o Gizmo
+    out.newly = TT.Unlocks.markCleared(2).map((r) => r.key);
+    out.again = TT.Unlocks.markCleared(2).length;
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.picking = g.rosterSlot;
+    g.updateRoster({ wasPressed: (a) => a === 'right' });
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.team = g.teamKeys.slice(); out.saved = TT.store.get('equipe', '');
+    out.loaded = TT.loadTeam();
+    // sem o desbloqueio, a equipe salva volta para o Titã padrão
+    TT.Unlocks.reset(); out.fallback = TT.loadTeam();
+    g.updateRoster({ wasPressed: (a) => a === 'heavy' });
+    out.back = g.state;
+    g.setTeam(TT.DEFAULT_TEAM.slice());
+    return out;
+  });
+  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 17 && roster.lockedGizmo, roster);
+  ok('personagens: bloqueado não entra na equipe e diz a fase', roster.lockedMsg, roster);
+  ok('personagens: zerar a fase 2 libera o Gizmo (uma vez só)', roster.newly.join() === 'gizmo' && roster.again === 0, roster);
+  ok('personagens: escolher a vaga põe na equipe e salva', roster.picking === 0 && roster.team[1] === 'gizmo' && roster.saved.split(',')[1] === 'gizmo' && roster.loaded[1] === 'gizmo', roster);
+  ok('personagens: equipe salva com bloqueado volta ao padrão; FORTE volta ao título', roster.fallback[1] === 'beastboy' && roster.back === 'title', roster);
+  const clearUnlock = await ev(() => {
+    const g = TT.game; TT.Unlocks.reset(); TT.debug.god(true);
+    TT.debug.start(0); g.clearTimer = 1; TT.debug.step(2);
+    const out = { state: g.state, unlocked: g.newUnlocks.map((r) => r.key), count: TT.Unlocks.count() };
+    TT.debug.step(80);
+    TT.Unlocks.reset(); TT.debug.god(false); g.goTitle();
+    return out;
+  });
+  ok('personagens: concluir a fase 1 libera Soldado H.I.V.E., Robô do Slade e Cinderblock', clearUnlock.state === 'clear' && clearUnlock.unlocked.join() === 'hivesoldier,minion,cinderblock' && clearUnlock.count === 8, clearUnlock);
+
   ok('nenhum erro de JavaScript', errors.length === 0 && (await ev(() => (TT.errors || []).length)) === 0, errors.slice(0, 5));
   await ev(() => { TT.paused = false; TT.debug.start(0); TT.game.state = 'title'; });
   const failed = results.filter((r) => !r.pass).length;

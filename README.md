@@ -3,8 +3,9 @@
 Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): nove fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
 **O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade** e **O Canal do Control Freak**), os 5 Titãs jogáveis com troca
-em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), inimigos da série, **3 níveis de dificuldade** e
-**co-op local para 2 jogadores**.
+em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
+36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
+**3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
 **Jogue online:** https://jovens-titas-jump-city.netlify.app
 
@@ -13,7 +14,7 @@ em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a part
 Dê **dois cliques em `JOGAR.bat`** (ou abra `index.html` no Chrome/Edge/Firefox).
 Não precisa instalar nada nem de internet.
 
-No título escolha **JOGAR**, **JOGADORES (1 ou 2)**, **DIFICULDADE** e **CONTROLES**
+No título escolha **JOGAR**, **JOGADORES (1 ou 2)**, **DIFICULDADE**, **PERSONAGENS** e **CONTROLES**
 (↑↓ escolhe, ←→ muda, ENTER confirma). A dificuldade também pode ser trocada no menu de pausa
 e fica salva no navegador. Para **voltar ao menu inicial**, use **MENU INICIAL** na pausa (pede
 confirmação, porque a fase em andamento é perdida) ou **Esc / II** na tela de game over.
@@ -165,6 +166,48 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
 - Todo ataque de chefe tem aviso: pose exagerada, brilho na cor do golpe, um **"!"** sobre a cabeça e
   a **área exata** marcada em vermelho no chão, que vai se preenchendo até o impacto.
 
+## Personagens (menu PERSONAGENS)
+
+O menu **PERSONAGENS** do título mostra os **36 personagens jogáveis** do modo *Master of Games* do jogo de
+PS2. Os cinco Titãs começam liberados; cada outro personagem é **liberado quando você zera a fase dele** (a tela
+de FASE CONCLUÍDA avisa quem chegou). Os liberados entram na sua **equipe de 5** (escolha o personagem, ENTER e
+a vaga 1-5 com ← →); no jogo eles trocam como os Titãs (1-5, Q / E). A equipe e as fases zeradas ficam salvas
+no navegador. Personagem bloqueado aparece como silhueta com a fase que libera; quem ainda não tem fase aparece
+como **EM BREVE**.
+
+Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, especial, golpe no ar, investida
+(esquiva + ataque), golpes mais fortes a partir da fase 7 e, a partir da fase 8, combo de 5 golpes e COMBO FINAL
+(ataque, ataque, forte). O **Titãs, avante!** continua sendo a cena dos cinco Titãs, seja quem for que apertar:
+
+| Personagem | Libera na | Forte (K) | Especial (L) | COMBO FINAL (J J K) |
+|---|---|---|---|---|
+| **Soldado H.I.V.E.** | Fase 1 | rajada de blaster | granada H.I.V.E. | ESQUADRÃO H.I.V.E. (rajada + explosão) |
+| **Robô do Slade** | Fase 1 | punho-foguete | autodestruição (explode em volta) | LEGIÃO DE ROBÔS (robôs atravessam a tela) |
+| **Cinderblock** | Fase 1 | pisão sísmico (onda de choque) | arremesso de pedra | TERREMOTO (pedras brotam do chão em linha) |
+| **Gizmo** | Fase 2 | laser | chuva de mísseis teleguiados | MEGA-ARANHA (patas mecânicas + mísseis) |
+| **Plasmus** | Fase 4 | soco esticado | onda de lodo | MAR DE LODO (gêiseres embaixo de cada inimigo) |
+| **Plasmus Mirim** | Fase 4 | cuspe de gosma | chuva de gosma | BOLHA GIGANTE |
+| **Jinx** | Fase 5 | onda de azar pelo chão | desmoronamento embaixo de cada inimigo | MALDIÇÃO DO AZAR |
+| **Mammoth** | Fase 5 | pisão | supersalto (cai com onda de choque) | FÚRIA DO MAMMOTH (três pisões avançando) |
+| **Mumbo** | Fase 6 | leque de cartas | **MUMBO JUMBO!** (os inimigos viram coelhos) | O GRANDE FINAL (cartolas caem nos inimigos) |
+| **Coelho-Guarda** | Fase 6 | cenoura | estouro de coelhos | CENOURA EXPLOSIVA |
+| **Mutano Palhaço** | Fase 6 | golpes do Mutano, já com os combos da fase 8 | | |
+| **Slade** | Fase 7 | bomba de disco | fogo de Trigon (anéis de chamas) | XEQUE-MATE (teleporta e golpeia cada um) |
+| **Aprendiz** | Fase 7 | golpes do Robin, já com os combos da fase 8 | | |
+| **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
+
+### Personagens que entram nas próximas fases
+
+Estes estão no menu como **EM BREVE**; a lista com o plano de cada um fica em `TT.ROSTER` (`js/roster.js`,
+`stage: null` + `plan`). Ao criar a fase de um deles, basta pôr o id da fase em `stage` e escrever o modelo e os
+golpes (como os outros em `js/roster.js`):
+
+- **Bloqueador** (fase do Mestre dos Jogos), **Tempest/Aqualad** (fase no mar ou dos Titãs Leste)
+- **Ciclone**, **Ravena Vermelha** e **Ravena Branca** (fase de Trigon), **Blackfire**, **Mutano Funcionário**,
+  **Red X** — versões alternativas com os poderes de um dos Titãs
+- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)**, **Dr. Luz**,
+  **Mad Mod** e **Trigon**
+
 ## Fases
 
 Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil para testar.
@@ -276,7 +319,8 @@ js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
 js/stages.js      roteiro das fases (ondas, perseguição, chefes)
 js/cutscene.js    cutscene do "Titãs, avante!" (os cinco Titãs em combo)
-js/game.js        laço do jogo, câmera, HUD e telas
+js/game.js        laço do jogo, câmera, HUD e telas (inclui o menu PERSONAGENS)
+js/roster.js      os 36 personagens: lista, desbloqueio, modelos e golpes dos extras, equipe salva
 js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
 js/online.js      jogar online com um amigo (sala com código, WebRTC via PeerJS)
 js/main.js        inicialização, bot de teste e API de depuração
@@ -292,7 +336,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 201 verificações e todas passam:
+página e chame a função serve.) A suíte tem 207 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -323,7 +367,12 @@ página e chame a função serve.) A suíte tem 201 verificações e todas passa
   aviso de COMBOS NOVOS não se repete na fase 9.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
+- Menu PERSONAGENS: 36 na lista, bloqueado não entra na equipe, zerar a fase libera (uma vez só), a equipe
+  escolhida é salva e volta ao padrão se o personagem não estiver liberado.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
+
+`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 14 personagens extras: cada golpe nos três
+níveis de poder (fases 1, 7 e 8), 224 verificações, todas acertando o inimigo e sem erro de JavaScript.
 
 ## Publicar na web (Netlify)
 
@@ -352,6 +401,6 @@ Ravena recortada da dublagem.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Trigon…).
+- Mais fases (Trigon…), cada uma liberando os personagens **EM BREVE** dela.
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

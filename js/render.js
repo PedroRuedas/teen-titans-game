@@ -450,6 +450,10 @@
   }
   TT.drawEyes = eyes;
   TT.drawMouth = mouth;
+  // Para estilos definidos fora deste arquivo (js/roster.js): cabeça redonda e cor que vira branco no feedback de dano.
+  TT.headCircle = headCircle;
+  TT.rigC = C;
+  TT.rigFlash = () => FLASH;
 
   function spikyCap(ctx, r, color, spikes) {
     ctx.beginPath();
