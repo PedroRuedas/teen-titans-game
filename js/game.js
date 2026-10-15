@@ -15,14 +15,16 @@
       this.state = 'title';
       this.frame = 0;
       this.stateT = 0;
-      this.team = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
+      // equipe de 5 escolhida no menu PERSONAGENS (salva no navegador; padrão = os cinco Titãs)
+      this.team = TT.loadTeam().map((k) => new TT.Titan(this, k));
       // Jogadores: cada "slot" controla um Titã da equipe (o P2 só existe no modo 2 jogadores).
       this.numPlayers = 1;
       this.slots = [this.newSlot(0, 0), this.newSlot(1, 1)];
       this.score = 0;
       this.godMode = false;
       this.titleBg = TT.makeBackground(1);
-      this.titleTitans = TT.TITAN_ORDER.map((k) => new TT.Titan(this, k));
+      this.titleTitans = this.team.map((t) => new TT.Titan(this, t.key));
+      this.newUnlocks = [];
       this.showControls = false;
       const sd = TT.store.get('dificuldade', 'normal');
       this.difficulty = TT.DIFFICULTY[sd] ? sd : 'normal';
@@ -33,6 +35,10 @@
       this.stats = { frames: 0, renderMs: 0, maxRenderMs: 0 };
     }
 
+    // "Titãs, avante!" em andamento = cutscene ativa (js/cutscene.js). superT > 0 enquanto ela roda.
+    get superT() { return this.cut && !this.cut.done ? this.cut.left : 0; }
+    set superT(v) { if (!v) this.cut = null; }
+
     newSlot(id, ai) { return { id, ai, switchCool: 0, koTimer: 0, out: false }; }
     // Compatibilidade com o modo 1 jogador: "player" / "activeIdx" / "switchCool" são do P1.
     get player() { return this.team[this.slots[0].ai]; }
@@ -41,6 +47,8 @@
     get switchCool() { return this.slots[0].switchCool; }
     set switchCool(v) { this.slots[0].switchCool = v; }
     get coop() { return this.numPlayers > 1; }
+    // Jogando online como anfitrião: o P2 é o amigo, então o número de jogadores fica travado em 2.
+    get onlineLock() { return !!(this.online && this.online.hosting); }
     // Slots em jogo (1 ou 2).
     activeSlots() { return this.numPlayers > 1 ? this.slots : [this.slots[0]]; }
     slotTitan(s) { return this.team[this.slots[s].ai]; }
@@ -52,6 +60,13 @@
       this.input.twoPlayers = this.numPlayers === 2;
     }
     get diff() { return TT.DIFFICULTY[this.difficulty]; }
+    get teamKeys() { return this.team.map((t) => t.key); }
+    // Troca a equipe (5 personagens) e salva a escolha.
+    setTeam(keys) {
+      this.team = keys.map((k) => new TT.Titan(this, k));
+      this.titleTitans = keys.map((k) => new TT.Titan(this, k));
+      TT.saveTeam(keys);
+    }
 
     // Troca a dificuldade (dir = +1/-1) e salva a escolha.
     setDifficulty(key) {
@@ -80,7 +95,7 @@
       this.energy = 30; this.flashEnergy = 0;
       this.combo = 0; this.comboT = 0;
       this.tokens = this.baseTokens(2);
-      this.banner = null;
+      this.banner = null; this.powerBanner = 0; this.comboTag = null; this.tint = null;
       this.boss = null; this.bossShown = 0;
       this.drill = null;
       this.superT = 0;
@@ -98,7 +113,11 @@
       this.bg = TT.makeBackground(this.stage.id);
       this.applyScale();
       this.stageStartScore = this.score;
-      for (const t of this.team) t.reset();
+      // nível de poder dos Titãs: golpes novos a partir da fase 7 ("powerUp"), combos a partir da fase 8 ("combos")
+      const upTo = TT.STAGES.slice(0, i + 1);
+      this.power = upTo.some((s) => s.combos) ? 2 : upTo.some((s) => s.powerUp) ? 1 : 0;
+      this.powered = this.power > 0;
+      for (const t of this.team) { t.setPower(this.power); t.reset(); }
       this.slots[0].ai = 0;
       const p = this.player;
       p.x = 220; p.y = 590; p.facing = 1;
@@ -108,6 +127,12 @@
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
       this.banner = { text: this.stage.name, sub: this.stage.subtitle, t: 0, dur: 200 };
+      // história: cena de abertura (o jogo para) e o rádio dos Titãs durante a fase
+      this.comms = new TT.Comms(this); this.finale = null; this.storySeen = {};
+      this.story = this.stage.story && TT.storyOn() ? new TT.Story(this, this.stage.story) : null;
+      // depois do título da fase: "GOLPES NOVOS!" / "COMBOS NOVOS!" — só na fase que estreia o poder
+      const before = TT.STAGES.slice(0, i);
+      if ((this.stage.combos && !before.some((s) => s.combos)) || (this.stage.powerUp && !before.some((s) => s.powerUp))) this.powerBanner = 1;
       for (const l of this.bg.layers) l.warm(0);
       A().playSong(this.stage.song);
     }
@@ -118,7 +143,8 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const e = kind === 'drone' ? new TT.Drone(this, x, y) : kind === 'shock' ? new TT.ShockTrooper(this, x, y) : new TT.Enemy(this, kind, x, y);
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone }[kind];
+      const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
       return e;
@@ -133,7 +159,13 @@
           this.camX = trigger;
           this.secActive = true; this.waveIdx = 0; this.waveDelay = 20; this.goArrow = 0;
           if (sec.type === 'chase') this.startChase(sec);
-          if (sec.type === 'boss') this.startBoss(sec);
+          if (sec.talk && this.comms) this.comms.say(sec.talk);
+          if (sec.vents) for (const v of sec.vents) this.addEffect(new TT.FireVent(this, sec.camX + v[0], v[1], v[2] || 0));
+          if (sec.type === 'boss') {
+            if (this.comms) { this.comms.queue.length = 0; this.comms.cur = null; } // falas antigas não atrasam a luta
+            if (this.stage.bossStory && TT.storyOn() && !this.storySeen.boss) { this.storySeen.boss = 1; this.story = new TT.Story(this, this.stage.bossStory, () => this.startBoss(sec)); }
+            else this.startBoss(sec);
+          }
         }
         return;
       }
@@ -219,6 +251,44 @@
         b = new TT.Overload(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'zap';
+      } else if (sec.boss === 'plasmus') {
+        // sobe de uma poça de lodo no meio da arena
+        b = new TT.Plasmus(this, this.camX + 880, 590);
+        b.facing = -1; b.rise = 0;
+        this.introKind = 'rise';
+      } else if (sec.boss === 'blood') {
+        // surge num redemoinho de energia psíquica vermelha
+        b = new TT.BrotherBlood(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'psy';
+      } else if (sec.boss === 'freak') {
+        // aparece "sintonizando" no meio do chuvisco, como um canal de TV
+        b = new TT.ControlFreak(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'tv';
+      } else if (sec.boss === 'trigon') {
+        // sobe do chão rachado, gigante, com o céu ficando vermelho
+        b = new TT.Trigon(this, this.camX + 860, 590);
+        b.facing = -1; b.rise = 0;
+        this.introKind = 'trigon';
+      } else if (sec.boss === 'madmod') {
+        // surge girando no meio de uma espiral hipnótica, como um disco na vitrola
+        b = new TT.MadMod(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'spiral';
+      } else if (sec.boss === 'mallah') {
+        b = new TT.Mallah(this, this.camX + 880, 590);
+        b.facing = -1;
+      } else if (sec.boss === 'slade') {
+        // sai das sombras: primeiro só o olho brilhando, depois o corpo inteiro
+        b = new TT.Slade(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'shadow';
+      } else if (sec.boss === 'mumbo') {
+        // aparece com um "TA-DÁ!" numa nuvem de fumaça
+        b = new TT.Mumbo(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'magic';
       } else {
         b = new TT.GizmoMech(this, this.camX + W + 200, 590);
         b.facing = -1;
@@ -251,7 +321,57 @@
         if (k === 60) { b.alpha = 1; this.impact(b.x, b.y, 'KRAKA-BOOM!', '#6fe3ff', 1.5); A().play('thunder'); }
         if (k > 60 && k === 90) this.say(b, 'ENERGIA... MAIS ENERGIA!', '#bff6ff');
       }
-      if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; }
+      if (this.introKind === 'rise') {
+        const k = 170 - this.bossIntro;
+        b.rise = TT.clamp((k - 20) / 70, 0, 1);
+        if (k > 10 && k < 90 && k % 8 === 0) { b.splash(this, b.x, b.y, 4); A().play('land'); }
+        if (k === 92) { this.impact(b.x, b.y, 'GROOOAAAR!', '#ff5ab4', 1.4); this.shake = 16; A().play('roar'); }
+      }
+      if (this.introKind === 'psy') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 20) / 50, 0, 1);
+        if (k < 70 && k % 10 === 0) { this.particles.spawn('ring', b.x, b.y, { size: 60 + k * 2, color: '#ff3b4a', life: 18, flat: 0.4 }); A().play('dark'); }
+        if (k === 70) { this.impact(b.x, b.y, 'H.I.V.E.!', '#ff3b4a', 1.2); }
+        if (k === 95) this.say(b, 'Bem-vindos à H.I.V.E., Titãs.', '#ff8a9a');
+      }
+      if (this.introKind === 'magic') {
+        const k = 170 - this.bossIntro;
+        if (k < 60 && k % 6 === 0) { this.particles.spawn('star', b.x + TT.rand(-90, 90), b.y - TT.rand(20, 260), { vy: -1, color: TT.choice(['#7af0ff', '#ff7af0', '#ffe14a', '#ffffff']), size: 12, life: 22, vr: 0.2 }); A().play('birdarang'); }
+        if (k === 60) { b.alpha = 1; this.poof(b.x, b.y - 120); this.poof(b.x, b.y - 40); this.impact(b.x, b.y, 'TA-DÁ!', '#ff7af0', 1.3); }
+        if (k === 95) this.say(b, 'Que comece o espetáculo!', '#bff3ff');
+      }
+      if (this.introKind === 'shadow') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 50) / 40, 0, 1);
+        if (k === 20) A().play('dark');
+        if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
+        if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
+        if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
+      }
+      if (this.introKind === 'trigon') {
+        const k = 170 - this.bossIntro;
+        b.rise = TT.clamp((k - 20) / 100, 0, 1);
+        if (k < 120) { this.shake = Math.max(this.shake, 6); if (k % 6 === 0) this.debrisBurst(b.x + TT.rand(-120, 120), b.y - 10, 3, '#5a4a48'); }
+        if (k === 20) { A().play('roar'); this.tintScreen('#ff0000', 40); }
+        if (k === 120) { this.impact(b.x, b.y, 'TRIGON!', '#ff2a1a', 1.6); this.whiteFlash = 6; A().play('boom'); }
+        if (k === 145) this.say(b, 'Eu sou Trigon, o Terrível. E este mundo... é MEU.', '#ffb070');
+      }
+      if (this.introKind === 'spiral') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 15) / 55, 0, 1);
+        b.facing = (k < 70 && (k >> 3) % 2) ? 1 : -1; // gira enquanto aparece
+        if (k < 70 && k % 14 === 0) { this.particles.spawn('ring', b.x, b.y - 100, { size: 80 + k * 2, color: '#ff5ad0', life: 18 }); A().play('zap'); }
+        if (k === 70) { b.facing = -1; this.impact(b.x, b.y, 'GROOVY!', '#ff5ad0', 1.3); this.tintScreen('#ff5ad0', 10); }
+        if (k === 95) this.say(b, 'Bem-vindos à minha escola, meus patinhos!', '#ffc8f0');
+      }
+      if (this.introKind === 'tv') {
+        const k = 170 - this.bossIntro;
+        b.alpha = k < 60 ? ((k >> 2) % 3 === 0 ? 0.5 : 0.08) : 1; // sinal falhando até sintonizar
+        if (k < 60 && k % 10 === 0) A().play('zap');
+        if (k === 60) { this.impact(b.x, b.y, 'CLICK!', '#7bffea', 1.3); this.whiteFlash = 6; }
+        if (k === 90) this.say(b, 'Interrompemos a programação para... a DERROTA dos Titãs!', '#bffff4');
+      }
+      if (this.bossIntro === 0) { b.active = true; b.cool = 40; b.alpha = 1; if (b.rise != null) b.rise = 1; }
     }
 
     onBossKilled(b) {
@@ -338,6 +458,68 @@
         for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-6, 6), vy: TT.rand(-6, 6), color: TT.choice(['#6fe3ff', '#ffffff', '#ffe14a']), size: 3, life: 12 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'ZZT!', size: 34, color: '#bff6ff', color2: '#2a7bff', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
       }
+      if (d.hex && t.team === 'hero') {
+        // raio de azar da Jinx: estrelinhas rosa e "AZAR!"
+        for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: TT.choice(['#ff5fb4', '#ffb0dc', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'AZAR!', size: 34, color: '#ffb0dc', color2: '#a0287a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.pauseHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
+        // botão de pausa do Control Freak: o Titã fica parado como numa fita pausada
+        t.frozen = d.pauseHero; t.frozenKind = 'pause'; t.hitstun = Math.max(t.hitstun, d.pauseHero); t.vx = 0;
+        this.particles.spawn('text', t.x, hy - 60, { text: 'PAUSADO!', size: 30, color: '#ffe14a', color2: '#1c1a22', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.tvStatic && t.team === 'hero') {
+        // raio de chuvisco do TV-Robô: riscos brancos e "CHUVISCO!"
+        for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 30), { vx: TT.rand(-5, 5), vy: TT.rand(-4, 4), color: TT.choice(['#ffffff', '#c9d3e2', '#7bffea']), size: 3, life: 12 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'CHUVISCO!', size: 30, color: '#e6fffb', color2: '#3a4a6a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.invertHero && t.team === 'hero' && !t.ko) {
+        // hipnose do Mad Mod: controles invertidos até passar (apertar ATAQUE acorda mais rápido)
+        t.inverted = Math.max(t.inverted || 0, d.invertHero);
+        this.particles.spawn('ring', t.x, hy, { size: 80, color: '#ff5ad0', life: 18 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'HIPNOTIZADO!', size: 30, color: '#ffc8f0', color2: '#7a2bb5', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.ageHero && t.team === 'hero' && !t.ko) {
+        // raio da juventude: o Titã vira velhinho (lento) e o Mad Mod rejuvenesce (recupera vida)
+        t.aged = Math.max(t.aged || 0, d.ageHero);
+        this.poof(t.x, t.y - 60);
+        this.particles.spawn('text', t.x, hy - 60, { text: 'VIROU VELHINHO!', size: 30, color: '#fff0a8', color2: '#8a5a1a', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+        if (att && att.isBoss && !att.dead) { att.hp = Math.min(att.maxHp, att.hp + 90); this.popText(att.x, att.y - 260, 'REJUVENESCEU!', '#ffe14a'); }
+      }
+      if (d.dazzle && t.team === 'hero') {
+        // flash do Olho Hipnótico: estrelinhas brancas e "OFUSCADO!"
+        for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: '#ffffff', size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'OFUSCADO!', size: 30, color: '#ffffff', color2: '#3a4a6a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.freezeHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
+        // raio congelante da Irmandade: o Titã fica preso num bloco de gelo
+        t.frozen = d.freezeHero; t.frozenKind = null; t.hitstun = Math.max(t.hitstun, d.freezeHero); t.vx = 0;
+        for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 40, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.fire && t.team === 'hero') {
+        // fogo de Trigon (demônios e Slade): faíscas laranja e "QUEIMOU!"
+        for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-20, 20), hy + TT.rand(-30, 30), { vx: TT.rand(-4, 4), vy: TT.rand(-7, -2), color: TT.choice(['#ff7a1a', '#ffd23a', '#ffffff']), size: 4, life: 16, grav: 0.1 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'QUEIMOU!', size: 32, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 32, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (d.freeze && t.team === 'enemy' && !t.isBoss && !t.dead && t.state === 'hurt') {
+        // disco congelante do Robin: o inimigo fica preso num bloco de gelo
+        t.frozen = d.stun || 80; t.frozenKind = null;
+        for (let i = 0; i < 8; i++) this.particles.spawn('star', t.x + TT.rand(-26, 26), hy + TT.rand(-40, 30), { vx: TT.rand(-3, 3), vy: TT.rand(-4, 0), color: TT.choice(['#e6fbff', '#9fe8ff', '#ffffff']), size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'CONGELADO!', size: 30, color: '#e6fbff', color2: '#2a7bff', vy: -0.5, life: 44, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.bunny && t.team === 'hero' && !t.ko) {
+        // feitiço do Mumbo: o Titã vira coelho por um tempo (só anda e pula)
+        t.bunny = 150;
+        this.poof(t.x, t.y - 50);
+        this.particles.spawn('text', t.x, hy - 70, { text: 'VIROU COELHO!', size: 30, color: '#ffffff', color2: '#c04ab0', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.hypno && t.team === 'hero') {
+        // hipnose do Irmão Sangue: Titã fica tonto por um tempo
+        t.hypno = true;
+        this.particles.spawn('ring', t.x, hy, { size: 70, color: '#ff7af0', life: 18 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'HIPNOTIZADO!', size: 30, color: '#ffc0f6', color2: '#a01a6a', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+      }
       if (heroAtk) {
         this.energy = Math.min(100, this.energy + d.dmg * 0.4);
         this.combo++; this.comboT = 110;
@@ -373,9 +555,11 @@
       const n = this.team[i];
       if (n.ko || this.takenBy(i, sl)) return false;
       const p = this.team[sl.ai];
+      // troca em combo: com 3 ou mais golpes seguidos, dá para trocar no meio de um ataque
+      const tag = !forced && this.combo >= 3 && p.state === 'attack' && !p.ko;
       if (!forced) {
         if (sl.switchCool > 0 || sl.out) return false;
-        if (!(p.state === 'idle' || p.state === 'air')) return false;
+        if (!(p.state === 'idle' || p.state === 'air' || tag)) return false;
       }
       n.x = p.x; n.y = p.y; n.z = forced ? 0 : p.z; n.facing = p.facing;
       n.vx = 0; n.vy = 0; n.vz = forced ? 0 : p.vz;
@@ -386,6 +570,18 @@
       sl.switchCool = 18;
       this.poof(n.x, n.y - 60);
       A().play('switch');
+      if (tag) {
+        // quem sai fica; quem entra vira para o inimigo mais perto e já entra com a investida
+        p.atk = null; p.setState('idle'); p.setAnim('idle');
+        let near = null, bd = 1e9;
+        for (const e of this.enemies) { if (e.dead) continue; const d = Math.abs(e.x - n.x) + Math.abs(e.y - n.y) * 2; if (d < bd) { bd = d; near = e; } }
+        if (near) { n.facing = near.x > n.x ? 1 : -1; n.y += TT.clamp(near.y - n.y, -30, 30); }
+        if (n.z <= 0) { n.vy = 0; n.startAttack(n.def.dashAtk); }
+        this.tagSwitches = (this.tagSwitches || 0) + 1;
+        this.comboT = 110;
+        this.afterimage(p, p.def.fx || p.def.color);
+        this.particles.spawn('text', n.x, n.y - 200, { text: 'TROCA EM COMBO!', size: 32, color: '#ffe14a', color2: n.def.color, vy: -0.6, life: 46 });
+      }
       return true;
     }
     // Próximo/anterior: pula os caídos e o Titã em uso pelo outro jogador.
@@ -401,8 +597,8 @@
     triggerSuper(s) {
       if (this.energy < 100 || this.superT > 0) return;
       this.energy = 0;
-      this.superT = 110;
       this.superBy = this.slotTitan(s || 0);
+      this.cut = new TT.SuperCutscene(this, this.superBy);
       A().play('super');
       this.say(this.superBy, 'Titãs, AVANTE!', '#ffe14a');
     }
@@ -421,6 +617,13 @@
     }
 
     // ------------------------------------------------------------------ Efeitos visuais
+    // Imagem residual do Titã (combos da fase 8). Em forma de animal fica só um brilho.
+    afterimage(f, col, flip) {
+      if (f.atk && (f.atk.def.form || f.atk.def.formAt)) { this.particles.spawn('glow', f.x, f.y - f.z - 70, { color: col, size: 90, life: 10 }); return; }
+      this.addEffect(new TT.Afterimage(this, f, col, flip));
+    }
+    // Tela inteira tingida por um instante (Supernova, rugido...).
+    tintScreen(col, dur) { this.tint = { col, t: dur, dur }; }
     hitSpark(x, y, big, color) {
       const n = big ? 12 : 7;
       const cols = color ? [color, '#ffffff', color, '#fff6b0'] : ['#fff6b0', '#ffd23a', '#ffffff'];
@@ -463,21 +666,22 @@
     debrisBurst(x, y, n, color) {
       for (let i = 0; i < n; i++) this.particles.spawn('debris', x + TT.rand(-20, 20), y + TT.rand(-20, 20), { vx: TT.rand(-7, 7), vy: TT.rand(-11, -3), grav: 0.55, color, size: TT.rand(6, 13), vr: TT.rand(-0.3, 0.3), life: TT.randi(30, 50), floor: y + 60 });
     }
-    explosion(x, y, z, sc) {
+    // col = cor da explosão (padrão laranja; starbolt verde, telecinese violeta...).
+    explosion(x, y, z, sc, col) {
       sc = sc || 1;
       const sy = y - z;
-      this.particles.spawn('glow', x, sy, { size: 150 * sc, color: '#ff9a3a', life: 16 });
+      this.particles.spawn('glow', x, sy, { size: 150 * sc, color: col || '#ff9a3a', life: 16 });
       this.particles.spawn('ring', x, sy, { size: 90 * sc, color: '#ffe9a8', life: 14 });
       for (let i = 0; i < 14 * sc; i++) {
         const a = Math.random() * Math.PI * 2, s = TT.rand(3, 10) * sc;
-        this.particles.spawn('spark', x, sy, { vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, color: TT.choice(['#ffcf5a', '#ff7a2a', '#fff']), size: 5, life: TT.randi(12, 22), grav: 0.2 });
+        this.particles.spawn('spark', x, sy, { vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, color: TT.choice(col ? [col, '#ffffff', '#fff6b0'] : ['#ffcf5a', '#ff7a2a', '#fff']), size: 5, life: TT.randi(12, 22), grav: 0.2 });
       }
       for (let i = 0; i < 6 * sc; i++) this.particles.spawn('dust', x + TT.rand(-30, 30), sy + TT.rand(-30, 30), { vx: TT.rand(-2, 2), vy: TT.rand(-3, -0.5), color: 'rgba(80,60,70,0.8)', size: TT.rand(14, 24) * sc, life: TT.randi(26, 40) });
       this.shake = Math.max(this.shake, 9 * sc);
       A().play('boom');
     }
-    blast(x, y, radius, dmg, team, owner) {
-      this.explosion(x, y, 10, radius / 90);
+    blast(x, y, radius, dmg, team, owner, col) {
+      this.explosion(x, y, 10, radius / 90, col);
       const targets = team === 'hero' ? this.enemies : this.heroes();
       for (const t of targets) {
         if (!t || t.dead || t.ko) continue;
@@ -507,6 +711,7 @@
       this.particles.spawn('text', x, y, { text, size: big ? 38 : 26, color, vy: -0.8, life: 70 });
     }
     say(f, text, color) {
+      if (f && TT.VOICED.includes(f.key)) A().voice(f.key, text); // por enquanto só a Ravena fala
       this.bubbles = this.bubbles.filter((b) => b.f !== f);
       this.bubbles.push({ f, text, color: color || '#ffffff', t: 0, dur: 85 });
     }
@@ -521,11 +726,13 @@
       if (inp.anyKey) { A().init(); inp.anyKey = false; }
       switch (this.state) {
         case 'title': this.updateTitle(inp); break;
+        case 'roster': this.updateRoster(inp); break;
         case 'play': this.updatePlay(inp); break;
         case 'pause': this.updatePause(inp); break;
         case 'gameover':
           this.particles.update();
-          if (this.stateT > 60 && inp.wasPressed('menu')) { this.score = this.stageStartScore; this.startStage(this.stageIdx); }
+          if (this.stateT > 60 && inp.wasPressed('pause')) this.goTitle(); // Esc / II: menu inicial (antes do 'menu', que o Esc também manda)
+          else if (this.stateT > 60 && inp.wasPressed('menu')) { this.score = this.stageStartScore; this.startStage(this.stageIdx); }
           break;
         case 'clear':
           this.updateCelebration();
@@ -536,19 +743,46 @@
           break;
         case 'victory':
           this.updateCelebration();
-          if (this.stateT > 120 && inp.wasPressed('menu')) { this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; A().playSong('title'); }
+          if (this.stateT > 120 && inp.wasPressed('menu')) this.goTitle();
           break;
         default: break;
       }
       inp.endStep();
+      if (this.online) this.online.hostTick();
     }
 
     // Itens do menu do título.
-    titleItems() { return ['play', 'players', 'diff', 'controls']; }
+    titleItems() {
+      const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'chars', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'chars', 'controls'];
+      if (!this.online) it.splice(1, 1);
+      if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
+      return it;
+    }
+    // Itens do menu de pausa.
+    pauseItems() { return this.touch ? ['resume', 'diff', 'touch', 'quit'] : ['resume', 'diff', 'quit']; }
+
+    // Abre a janela de instalação do navegador (o item só aparece quando o navegador oferece).
+    installApp() {
+      const p = this.installPrompt;
+      if (!p) return;
+      A().play('select');
+      p.prompt();
+      p.userChoice.then((r) => { if (r && r.outcome === 'accepted') { this.installPrompt = null; this.menuIdx = 0; } }).catch(() => {});
+    }
+
+    // Volta para a tela de título (a fase em andamento é abandonada).
+    goTitle() {
+      this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; this.showControls = false; this.quitArm = false;
+      this.particles.clear();
+      A().playSong('theme');
+    }
+    // Fase inicial escolhida no título (para testar qualquer fase direto).
+    cycleStage(d) { const n = TT.STAGES.length; this.stageSel = ((this.stageSel || 0) + d + n) % n; A().play('select'); }
 
     updateTitle(inp) {
       for (const t of this.titleTitans) t.animT++;
-      if (!this.titleSong) { A().playSong('title'); this.titleSong = true; }
+      if (this.online && this.online.panelOpen) return; // janela do JOGAR ONLINE aberta
+      if (!this.titleSong) { A().playSong('theme'); this.titleSong = true; }
       const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
       if (this.showControls) {
         if (inp.wasPressed('heavy') || inp.wasPressed('special') || ok || inp.wasPressed('pause')) this.showControls = false;
@@ -561,15 +795,22 @@
       const it = items[this.menuIdx] || 'play';
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
-      if (lr && it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
+      if (lr && it === 'stage') this.cycleStage(lr);
+      if (lr && it === 'players' && !this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
+      if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
-        if (it === 'players') { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); return; }
+        if (it === 'stage') { this.cycleStage(1); return; }
+        if (it === 'players') { if (!this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); } return; }
+        if (it === 'online') { A().play('select'); this.online.openPanel(); return; }
+        if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
+        if (it === 'chars') { this.openRoster(); return; }
+        if (it === 'install') { this.installApp(); return; }
         A().play('select');
         this.score = 0;
-        this.startStage(0);
+        this.startStage(this.stageSel || 0);
       }
     }
 
@@ -578,27 +819,44 @@
       this.particles.update();
     }
 
-    // Menu de pausa: continuar / dificuldade.
+    // Menu de pausa: continuar / dificuldade / botões na tela.
     updatePause(inp) {
-      if (inp.wasPressed('pause')) { this.state = 'play'; return; }
-      const n = 2;
-      if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; A().play('select'); }
-      if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; A().play('select'); }
-      if (this.pauseIdx === 1) {
-        if (inp.wasPressed('left')) this.cycleDifficulty(-1);
-        if (inp.wasPressed('right')) this.cycleDifficulty(1);
-      }
+      if (inp.wasPressed('pause')) { this.state = 'play'; this.quitArm = false; return; }
+      const items = this.pauseItems(), n = items.length, it = items[this.pauseIdx] || 'resume';
+      if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; this.quitArm = false; A().play('select'); }
+      if (inp.wasPressed('down')) { this.pauseIdx = (this.pauseIdx + 1) % n; this.quitArm = false; A().play('select'); }
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      if (lr && it === 'diff') this.cycleDifficulty(lr);
+      if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (inp.wasPressed('menu') || inp.wasPressed('light')) {
-        if (this.pauseIdx === 0) this.state = 'play';
-        else this.cycleDifficulty(1);
+        if (it === 'resume') this.state = 'play';
+        else if (it === 'diff') this.cycleDifficulty(1);
+        else if (it === 'quit') {
+          // pede confirmação: o progresso da fase é perdido
+          if (this.quitArm) this.goTitle(); else { this.quitArm = true; A().play('select'); }
+        } else { this.touch.cycle(1); A().play('select'); }
       }
     }
 
     updatePlay(inp) {
+      if (this.story) { this.story.update(inp); this.particles.update(); return; }
+      if (this.finale) { this.finale.update(inp); return; }
       if (inp.wasPressed('pause')) { this.state = 'pause'; this.pauseIdx = 0; return; }
+      if (this.comms) this.comms.update();
       if (this.banner) { this.banner.t++; if (this.banner.t > this.banner.dur) this.banner = null; }
+      else if (this.powerBanner) {
+        // fase 7: anuncia os golpes novos logo depois do título da fase
+        this.powerBanner = 0;
+        this.banner = this.stage.combos
+          ? { text: 'COMBOS NOVOS!', sub: 'Ataque 5 vezes para o combo completo — ou ATAQUE, ATAQUE, FORTE para o COMBO FINAL!', t: 0, dur: 200, power: true }
+          : { text: 'GOLPES NOVOS!', sub: 'Os Titãs liberaram os poderes máximos: mais dano!', t: 0, dur: 170, power: true };
+        for (const p of this.players()) { this.particles.spawn('ring', p.x, p.y - 60, { color: p.def.color, size: 120, life: 22 }); this.popText(p.x, p.y - 170, 'PODER MÁXIMO!', '#ffe14a', true); }
+        A().play('super');
+      }
       if (this.whiteFlash > 0) this.whiteFlash--;
       if (this.flashEnergy > 0) this.flashEnergy--;
+      if (this.tint && --this.tint.t <= 0) this.tint = null;
+      if (this.comboTag && ++this.comboTag.t > 90) this.comboTag = null;
       this.shake *= 0.86; if (this.shake < 0.3) this.shake = 0;
 
       const slots = this.activeSlots();
@@ -613,10 +871,10 @@
           if (pi.wasPressed('super') && !sl.out) this.triggerSuper(sl.id);
         }
       }
-      // Cena do "Titãs, avante!": mundo congelado
-      if (this.superT > 0) {
-        this.superT--;
-        if (this.superT === 20) this.resolveSuper();
+      // Cutscene do "Titãs, avante!": mundo congelado (o dano sai no fim da cena)
+      if (this.cut) {
+        this.cut.update(inp);
+        if (this.cut.done) this.cut = null;
         this.particles.update();
         return;
       }
@@ -635,8 +893,8 @@
         const p = this.team[sl.ai];
         p.think(inp.pl[sl.id]);
         p.physics();
-        // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos
-        if (b && !b.dead && p.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
+        // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos (não quando o chefe está no ar, como no salto do Slade)
+        if (b && !b.dead && p.z < 40 && b.z < 40 && !p.ko && Math.abs(p.y - b.y) < 34) {
           const dx = p.x - b.x, min = (b.radius + p.radius) * 0.75;
           if (Math.abs(dx) < min) p.x = b.x + (dx >= 0 ? min : -min);
         }
@@ -677,8 +935,14 @@
         this.state = 'gameover'; this.stateT = 0; A().stopSong(); A().play('ko');
       }
       if (this.clearTimer > 0 && --this.clearTimer === 0) {
-        this.state = 'clear'; this.stateT = 0;
-        A().playSong('victory');
+        const clear = () => {
+          this.state = 'clear'; this.stateT = 0;
+          A().playSong('victory');
+          // zerou a fase: libera os personagens dela (menu PERSONAGENS)
+          this.newUnlocks = TT.Unlocks.markCleared(this.stage.id);
+        };
+        if (this.stage.epilogue && TT.storyOn()) { this.story = new TT.Story(this, this.stage.epilogue, clear); A().playSong('victory'); }
+        else clear();
       }
     }
 
@@ -743,7 +1007,8 @@
       const ww = window.innerWidth, wh = window.innerHeight;
       const cssW = Math.min(ww, wh * 16 / 9), cssH = cssW * 9 / 16;
       const dpr = window.devicePixelRatio || 1;
-      const s = TT.clamp(Math.round((cssW * dpr / W) * 4) / 4, 0.5, 2);
+      // transmitindo para o amigo (online): resolução interna limitada, para sobrar processador para o vídeo
+      const s = TT.clamp(Math.round((cssW * dpr / W) * 4) / 4, 0.5, this.renderCap || 2);
       this.canvas.style.width = cssW + 'px';
       this.canvas.style.height = cssH + 'px';
       if (s !== this.scale || this.canvas.width !== Math.round(W * s)) {
@@ -760,14 +1025,20 @@
       // estado limpo a cada quadro: um desenho que falhe no meio não "vaza" mistura/transparência
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
+      TT.renderScale = this.scale;
       ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
       ctx.imageSmoothingEnabled = true;
       switch (this.state) {
         case 'title': this.drawTitle(ctx); break;
+        case 'roster': this.drawRoster(ctx); break;
         case 'play': case 'pause': case 'gameover':
           this.drawWorld(ctx);
           this.drawHUD(ctx);
-          if (this.superT > 0) this.drawSuper(ctx);
+          if (this.comboTag) this.drawComboTag(ctx);
+          if (this.cut) this.cut.draw(ctx);
+          if (this.comms && !this.story && !this.finale && !this.cut) this.comms.draw(ctx);
+          if (this.finale) this.finale.draw(ctx);
+          if (this.story) this.story.draw(ctx);
           if (this.state === 'pause') this.drawPause(ctx);
           if (this.state === 'gameover') this.drawGameOver(ctx);
           break;
@@ -811,12 +1082,30 @@
       ctx.restore();
 
       ctx.drawImage(TT.vignette(), 0, 0, W, H);
+      if (this.tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * this.tint.t / this.tint.dur; ctx.fillStyle = this.tint.col; ctx.fillRect(0, 0, W, H); ctx.restore(); }
       if (this.whiteFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (this.whiteFlash / 14) + ')'; ctx.fillRect(0, 0, W, H); }
     }
 
     drawAmbient(ctx, camX) {
       const f = this.frame;
-      if (this.stage.id === 1) {
+      if (this.stage.id === 11) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 34; i++) {
+          const x = (i * 173 + Math.sin(f * 0.02 + i) * 30) % W, y = H - ((f * (1.2 + (i % 5) * 0.4) + i * 97) % (H + 40));
+          ctx.fillStyle = i % 3 ? 'rgba(255,140,40,0.75)' : 'rgba(255,220,120,0.85)'; ctx.fillRect(x, y, 3, 3);
+        }
+        ctx.globalAlpha = 0.06 + 0.04 * Math.sin(f * 0.05); ctx.fillStyle = '#ff2a1a'; ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      } else if (this.stage.id === 10) {
+        // luzes de discoteca varrendo o chão e, na sala de aula, a tela pulsando em rosa e azul
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+          const x = W / 2 + Math.sin(f * 0.013 + i * 2.1) * 520, col = ['#ff5ad0', '#5fc8ff', '#ffe14a'][i];
+          TT.drawGlow(ctx, col, x, TT.FLOOR_TOP + 120 + i * 40, 150, 0.13);
+        }
+        if (camX > 5600) { ctx.globalAlpha = 0.05 + 0.04 * Math.sin(f * 0.06); ctx.fillStyle = (f >> 5) % 2 ? '#ff5ad0' : '#5fc8ff'; ctx.fillRect(0, 0, W, H); }
+        ctx.restore();
+      } else if (this.stage.id === 1) {
         // brilhos no mar (só visíveis na parte externa)
         if (camX < 2700) {
           ctx.globalCompositeOperation = 'lighter';
@@ -846,6 +1135,56 @@
         ctx.globalCompositeOperation = 'source-over';
         const fl = (f % 240) < 4 ? 0.06 : 0;
         if (fl) { ctx.fillStyle = 'rgba(120,230,255,' + fl + ')'; ctx.fillRect(0, 0, W, H); }
+      } else if (this.stage.id === 6) {
+        // purpurina mágica caindo (dentro da cartola fica colorida e mais densa)
+        ctx.globalCompositeOperation = 'lighter';
+        const inHat = camX > 5500, n = inHat ? 26 : 10, cols = ['255,240,160', '160,240,255', '255,160,240'];
+        for (let i = 0; i < n; i++) {
+          const x = ((i * 197 - camX * 0.4 + Math.sin(f * 0.02 + i) * 20) % W + W) % W, y = (f * (0.5 + (i % 4) * 0.2) + i * 83) % 700;
+          ctx.fillStyle = 'rgba(' + (inHat ? cols[i % 3] : cols[0]) + ',' + (0.35 + 0.3 * Math.sin(f * 0.1 + i)) + ')';
+          ctx.fillRect(x, y, 3, 3);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (this.stage.id === 9) {
+        // sinal de TV fraco: faixa de interferência descendo e pontinhos de chuvisco (mais forte no porão)
+        const lair = camX > 5600, by = (f * 2.2) % (H + 120) - 60;
+        ctx.fillStyle = 'rgba(200,220,255,' + (lair ? 0.07 : 0.04) + ')'; ctx.fillRect(0, by, W, 26);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        for (let i = 0; i < (lair ? 30 : 12); i++) ctx.fillRect(((i * 211 + f * 37) % W), ((i * 97 + f * 53) % H), 3, 2);
+      } else if (this.stage.id === 8) {
+        // neve caindo na base da Irmandade (mais fraca dentro da base)
+        const n = camX > 2600 ? 12 : 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        for (let i = 0; i < n; i++) {
+          const sp = 0.8 + (i % 5) * 0.35, x = ((i * 157 - camX * (0.3 + (i % 3) * 0.2) + Math.sin(f * 0.02 + i) * 30) % W + W) % W, y = (f * sp + i * 89) % (H + 20) - 10;
+          const r = 1.5 + (i % 3);
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (this.stage.id === 7) {
+        // brasas do fogo de Trigon subindo; no covil, faíscas das engrenagens caindo
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 20; i++) {
+          const x = ((i * 241 - camX * 0.5 + Math.sin(f * 0.03 + i) * 16) % W + W) % W, y = 700 - ((f * (0.8 + (i % 4) * 0.3) + i * 67) % 660);
+          ctx.fillStyle = 'rgba(255,' + (110 + (i % 3) * 40) + ',40,' + (0.3 + 0.25 * Math.sin(f * 0.07 + i)) + ')';
+          ctx.fillRect(x, y, 3, 3);
+        }
+        if (camX > 2400) for (let i = 0; i < 4; i++) {
+          if (((f + i * 47) % 160) > 26) continue;
+          const k = ((f + i * 47) % 160) / 26, x = ((i * 389 - camX * 0.2) % W + W) % W;
+          ctx.fillStyle = 'rgba(255,200,120,' + (1 - k) + ')';
+          for (let j = 0; j < 4; j++) ctx.fillRect(x + j * 7 - 10, 120 + k * 260 + j * 9, 2, 6);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (this.stage.id === 5) {
+        // partículas de energia psíquica vermelha subindo (mais densas no salão do Irmão Sangue)
+        ctx.globalCompositeOperation = 'lighter';
+        const n = camX > 5500 ? 22 : 12;
+        for (let i = 0; i < n; i++) {
+          const x = ((i * 233 - camX * 0.5) % W + W) % W, y = 700 - ((f * (0.6 + (i % 3) * 0.25) + i * 71) % 640);
+          ctx.fillStyle = 'rgba(255,70,90,' + (0.25 + 0.2 * Math.sin(f * 0.05 + i)) + ')';
+          ctx.fillRect(x + Math.sin(f * 0.03 + i) * 12, y, 3, 3);
+        }
+        ctx.globalCompositeOperation = 'source-over';
       } else {
         // poeira flutuando nos túneis
         ctx.fillStyle = 'rgba(255,220,170,0.35)';
@@ -879,29 +1218,19 @@
       }
     }
 
-    drawSuper(ctx) {
-      const k = 1 - this.superT / 110;
-      ctx.fillStyle = 'rgba(10,0,30,' + Math.min(0.75, k * 3) + ')';
-      ctx.fillRect(0, 0, W, H);
-      // faixas diagonais com os cinco titãs
-      const n = 5, bw = W / n;
-      for (let i = 0; i < n; i++) {
-        const delay = i * 0.08, kk = TT.clamp((k - delay) * 4, 0, 1);
-        const x = i * bw, slide = (1 - TT.easeOut(kk)) * (i % 2 ? -H : H);
-        ctx.save();
-        ctx.beginPath(); ctx.moveTo(x + 40, slide + 90); ctx.lineTo(x + bw + 40, slide + 90); ctx.lineTo(x + bw - 40, slide + 600); ctx.lineTo(x - 40, slide + 600); ctx.closePath();
-        const key = TT.TITAN_ORDER[i];
-        ctx.fillStyle = TT.TITANS[key].color; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.stroke();
-        ctx.clip();
-        ctx.drawImage(TT.portrait(key, 260), x + bw / 2 - 130, slide + 200, 260, 260);
-        ctx.restore();
-      }
-      if (k > 0.4) {
-        const s = Math.min(1, (k - 0.4) * 5);
-        ctx.save(); ctx.translate(W / 2, 640); ctx.scale(s, s);
-        TT.drawText(ctx, 'TITÃS, AVANTE!', 0, 0, 84, '#ffe14a', OUT, 'center', 14);
-        ctx.restore();
-      }
+    // Nome do COMBO FINAL: faixa inclinada na cor do Titã que entra pela esquerda e sai pela direita.
+    drawComboTag(ctx) {
+      const c = this.comboTag, t = c.t;
+      const inK = TT.easeOut(Math.min(1, t / 10)), outK = t > 70 ? TT.easeInOut((t - 70) / 20) : 0;
+      const x = W / 2 + (1 - inK) * -W + outK * W, y = 168;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-0.05);
+      ctx.fillStyle = c.col; ctx.strokeStyle = OUT; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(-330, -34); ctx.lineTo(350, -34); ctx.lineTo(330, 34); ctx.lineTo(-350, 34); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-330, -30, 680, 14);
+      TT.drawText(ctx, 'COMBO FINAL', -300, -48, 22, '#ffe14a', OUT, 'left', 5);
+      TT.drawText(ctx, c.text + '!', 0, 2, 48, '#ffffff', OUT, 'center', 9);
+      ctx.restore();
+      if (t < 8) TT.drawGlow(ctx, c.fx, W / 2, y, 400 * (1 - t / 8), 0.6);
     }
 
     // ------------------------------------------------------------------ HUD
@@ -1008,7 +1337,7 @@
         ctx.save();
         ctx.globalAlpha = a;
         const y = bn.boss ? 250 : 210;
-        ctx.fillStyle = bn.boss ? 'rgba(120,0,20,0.75)' : 'rgba(20,10,60,0.72)';
+        ctx.fillStyle = bn.boss ? 'rgba(120,0,20,0.75)' : bn.power ? 'rgba(150,70,0,0.78)' : 'rgba(20,10,60,0.72)';
         ctx.beginPath(); ctx.moveTo(0, y - 60); ctx.lineTo(W, y - 76); ctx.lineTo(W, y + 56); ctx.lineTo(0, y + 70); ctx.closePath(); ctx.fill();
         ctx.fillStyle = bn.boss ? '#ff3b30' : '#ffe14a';
         ctx.fillRect(0, y - 66, W * inK, 5); ctx.fillRect(W * (1 - inK), y + 60, W, 5);
@@ -1044,22 +1373,26 @@
       ctx.fillStyle = 'rgba(255,220,120,0.08)';
       for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(900, -80); ctx.lineTo(900, 80); ctx.fill(); }
       ctx.restore();
-      this.drawLogo(ctx, W / 2, 150 + Math.sin(f * 0.04) * 6, 1);
-      TT.drawText(ctx, 'A BATALHA DE JUMP CITY', W / 2, 250, 36, '#ffffff', OUT, 'center', 7);
+      const items = this.titleItems(), compact = items.length > 6, ty = compact ? -46 : 0;
+      this.drawLogo(ctx, W / 2, 150 + ty * 0.6 + Math.sin(f * 0.04) * 6, compact ? 0.9 : 1);
+      TT.drawText(ctx, 'A BATALHA DE JUMP CITY', W / 2, 250 + ty * 0.8, 36, '#ffffff', OUT, 'center', 7);
       // os cinco Titãs
       const xs = [250, 445, 640, 835, 1030];
       for (let i = 0; i < 5; i++) {
         const t = this.titleTitans[i];
         t.anim = (Math.floor(f / 90) % 5 === i) ? 'victory' : 'idle';
         t.vx = 0;
-        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], 515, 44, 11, 0, 0, Math.PI * 2); ctx.fill();
+        const by = 515 + ty;
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(xs[i], by, 44, 11, 0, 0, Math.PI * 2); ctx.fill();
         TT.computePose(t, t.pose);
-        TT.drawRig(ctx, t.style, t.pose, xs[i], 515, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.25 });
-        TT.drawText(ctx, t.name.toUpperCase(), xs[i], 546, 22, t.def.color, OUT, 'center', 5);
+        TT.drawRig(ctx, t.style, t.pose, xs[i], by, i < 2 ? 1 : i > 2 ? -1 : 1, { t: t.animT, scale: 1.25 });
+        TT.drawText(ctx, t.name.toUpperCase(), xs[i], by + 31, 22, t.def.color, OUT, 'center', 5);
       }
       if (this.showControls) { this.drawControls(ctx, W / 2, 400); return; }
-      this.drawMenu(ctx, this.titleItems().map((it) => this.menuLabel(it)), this.menuIdx, W / 2, 584, 29);
-      TT.drawText(ctx, '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som', W / 2, 706, 16, '#bfc4e8', OUT, 'center', 4);
+      const many = items.length > 8;
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.menuIdx, W / 2, many ? 514 : compact ? 526 : 572, many ? 21.5 : compact ? (items.length > 7 ? 23 : 26) : items.length > 5 ? 24 : 27);
+      const tip = this.touch && this.touch.visible ? 'analógico escolhe e muda  •  ATAQUE confirma' : '↑↓ escolher  •  ←→ mudar  •  ENTER confirmar  •  M = som';
+      TT.drawText(ctx, tip, W / 2, 708, 16, '#bfc4e8', OUT, 'center', 4);
     }
 
     // Texto e cor de cada item de menu.
@@ -1068,9 +1401,15 @@
       switch (it) {
         case 'play': return { text: 'JOGAR' };
         case 'resume': return { text: 'CONTINUAR' };
-        case 'players': return { text: 'JOGADORES:', value: this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
+        case 'players': return { text: 'JOGADORES:', value: this.onlineLock ? '2 (ONLINE)' : this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
+        case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'controls': return { text: 'CONTROLES' };
+        case 'chars': return { text: 'PERSONAGENS (' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ')' };
+        case 'touch': return this.touch.label();
+        case 'online': return this.online.label();
+        case 'install': return { text: 'INSTALAR APP', color: '#6fe3ff' };
+        case 'quit': return this.quitArm ? { text: 'SAIR DA FASE?', value: 'CONFIRMAR', color: '#ff5a4a' } : { text: 'MENU INICIAL' };
         default: return { text: String(it) };
       }
     }
@@ -1111,9 +1450,19 @@
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(cx - 360, cy - 150, 720, 350, 20); else ctx.rect(cx - 360, cy - 150, 720, 350); ctx.fill();
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.stroke();
       TT.drawText(ctx, 'CONTROLES', cx, cy - 118, 34, '#ffe14a', OUT);
-      const rows = [
+      const touch = this.touch && this.touch.visible;
+      const rows = touch ? [
+        ['Mover', 'analógico (lado esquerdo)'],
+        this.power >= 2 ? ['Combo (5) / COMBO FINAL', 'ATAQUE ×5  •  ATAQUE ×2 + FORTE'] : ['Ataque (combo)', 'ATAQUE'],
+        ['Ataque forte', 'FORTE'],
+        ['Especial (gasta energia)', 'ESPECIAL'],
+        ['Pular / Esquiva (+ataque = investida)', 'PULO / ESQUIVA'],
+        ['Trocar Titã', 'TROCAR'],
+        ['Titãs, avante! (energia cheia)', 'AVANTE!'],
+        ['Pausa / Tela cheia', 'II / cantos'],
+      ] : [
         ['Mover', this.coop ? 'WASD' : 'WASD / Setas'],
-        ['Ataque (combo)', 'J  ou  Z'],
+        this.power >= 2 ? ['Combo (5) / COMBO FINAL', 'J ×5  •  J, J, K'] : ['Ataque (combo)', 'J  ou  Z'],
         ['Ataque forte', 'K  ou  X'],
         ['Especial (gasta energia)', 'L  ou  C'],
         ['Pular / Esquiva (+ataque = investida)', 'Espaço / Shift'],
@@ -1125,6 +1474,11 @@
         TT.drawText(ctx, r[0], cx - 330, cy - 76 + i * 30, 21, '#ffffff', OUT, 'left', 4);
         TT.drawText(ctx, r[1], cx + 330, cy - 76 + i * 30, 21, '#9effa8', OUT, 'right', 4);
       });
+      if (touch) {
+        TT.drawText(ctx, 'Opacidade dos botões: item BOTÕES NA TELA (título ou pausa), com ← →', cx, cy + 160, 17, '#bfc4e8', OUT, 'center', 4);
+        TT.drawText(ctx, 'Teclado e controle (gamepad) continuam funcionando', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
+        return;
+      }
       TT.drawText(ctx, 'Controle (gamepad) também funciona!' + (this.coop ? '  •  2º controle = P2' : ''), cx, cy + 160, 17, '#bfc4e8', OUT, 'center', 4);
       if (this.coop) TT.drawText(ctx, 'P2: setas • Num1/2/3 golpes • Num0 pula • Num, esquiva • Num4/6 troca • Num5 avante', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
       else TT.drawText(ctx, 'Co-op: escolha 2 JOGADORES no título (P2 usa setas + teclado numérico)', cx, cy + 184, 16, '#6fe3ff', OUT, 'center', 4);
@@ -1133,9 +1487,224 @@
     drawPause(ctx) {
       ctx.fillStyle = 'rgba(5,0,20,0.6)'; ctx.fillRect(0, 0, W, H);
       TT.drawText(ctx, 'PAUSA', W / 2, 92, 72, '#ffe14a', OUT, 'center', 12);
-      this.drawMenu(ctx, ['resume', 'diff'].map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, 168, 38);
+      const items = this.pauseItems();
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.pauseIdx, W / 2, items.length > 3 ? 148 : 158, items.length > 3 ? 27 : 32);
       this.drawControls(ctx, W / 2, 400);
-      TT.drawText(ctx, 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar a dificuldade', W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
+      const tip = this.touch && this.touch.visible ? 'II para continuar  •  analógico escolhe  •  ←→ muda dificuldade e opacidade dos botões'
+        : 'ESC para continuar  •  ↑↓ escolher  •  ←→ mudar dificuldade e botões na tela';
+      TT.drawText(ctx, tip, W / 2, 640, 22, '#ffffff', OUT, 'center', 5);
+    }
+
+    // ------------------------------------------------------------------ Menu PERSONAGENS
+    // Grade com os 36 personagens do jogo de PS2. Liberado = escolhe a vaga na equipe (1-5);
+    // bloqueado = diz qual fase zerar; "EM BREVE" = a fase dele ainda não existe.
+    openRoster() {
+      A().play('select');
+      this.state = 'roster'; this.stateT = 0;
+      this.rosterIdx = Math.max(0, TT.ROSTER.findIndex((r) => r.key === this.team[0].key));
+      this.rosterSlot = -1; this.rosterMsg = null;
+    }
+    rosterStatus(r) {
+      if (TT.Unlocks.isUnlocked(r.key)) return 'open';
+      return TT.Unlocks.available(r.key) ? 'locked' : 'soon';
+    }
+    updateRoster(inp) {
+      if (this.rosterMsg && ++this.rosterMsg.t > 120) this.rosterMsg = null;
+      const n = TT.ROSTER.length, COLS = 12, r = TT.ROSTER[this.rosterIdx];
+      const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
+      const back = inp.wasPressed('heavy') || inp.wasPressed('special') || inp.wasPressed('pause');
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      const ud = (inp.wasPressed('down') ? 1 : 0) - (inp.wasPressed('up') ? 1 : 0);
+      if (this.rosterSlot >= 0) { // escolhendo a vaga na equipe
+        if (lr) { this.rosterSlot = (this.rosterSlot + lr + 5) % 5; A().play('select'); }
+        for (let i = 0; i < 5; i++) if (inp.wasPressed('t' + i)) { this.placeInTeam(r.key, i); return; }
+        if (ok) this.placeInTeam(r.key, this.rosterSlot);
+        else if (back) { this.rosterSlot = -1; A().play('select'); }
+        return;
+      }
+      if (back && this.stateT > 8) { this.state = 'title'; this.stateT = 21; this.menuIdx = Math.max(0, this.titleItems().indexOf('chars')); A().play('select'); return; }
+      if (lr || ud) {
+        const row = Math.floor(this.rosterIdx / COLS), col = this.rosterIdx % COLS, rows = Math.ceil(n / COLS);
+        this.rosterIdx = Math.min(n - 1, ((row + ud + rows) % rows) * COLS + (col + lr + COLS) % COLS);
+        A().play('select');
+      }
+      if (ok && this.stateT > 8) {
+        const st = this.rosterStatus(r);
+        if (st === 'open') { const j = this.teamKeys.indexOf(r.key); this.rosterSlot = j >= 0 ? j : 0; A().play('select'); }
+        else {
+          A().play('ko');
+          this.rosterMsg = { t: 0, text: st === 'locked' ? 'Zere a ' + this.stageLabel(r.stage) + ' para liberar!' : 'A fase deste personagem ainda vai chegar!' };
+        }
+      }
+    }
+    stageLabel(id) { const s = TT.STAGES.find((x) => x.id === id); return s ? s.name.replace(' — ', ': ').replace('FASE', 'Fase') : 'fase ' + id; }
+    // Põe o personagem na vaga i (se já estiver na equipe, troca de lugar com quem estava lá).
+    placeInTeam(key, i) {
+      const keys = this.teamKeys, j = keys.indexOf(key);
+      if (j >= 0) keys[j] = keys[i];
+      keys[i] = key;
+      this.setTeam(keys);
+      this.rosterSlot = -1;
+      this.rosterMsg = { t: 0, text: TT.ROSTER_BY[key].name.toUpperCase() + ' ENTROU NA EQUIPE (VAGA ' + (i + 1) + ')!', good: true };
+      A().play('switch');
+    }
+
+    drawRoster(ctx) {
+      const f = this.frame, R = TT.ROSTER, touch = this.touch && this.touch.visible;
+      for (const l of this.titleBg.layers) l.draw(ctx, 600);
+      ctx.fillStyle = 'rgba(8,4,26,0.82)'; ctx.fillRect(0, 0, W, H);
+      TT.drawText(ctx, 'PERSONAGENS', 40, 40, 46, '#ffe14a', OUT, 'left', 9);
+      TT.drawText(ctx, 'LIBERADOS ' + TT.Unlocks.count() + '/' + R.length, W - 40, 40, 26, '#ffb0dc', OUT, 'right', 5);
+      TT.drawText(ctx, 'Zere a fase de cada personagem para liberar', W / 2 + 30, 42, 18, '#bfc4e8', OUT, 'center', 4);
+      // grade 12 x 3
+      const CW = 96, CH = 104, GAP = 6, x0 = (W - (12 * CW + 11 * GAP)) / 2, y0 = 76, keys = this.teamKeys;
+      R.forEach((r, i) => {
+        const x = x0 + (i % 12) * (CW + GAP), y = y0 + Math.floor(i / 12) * (CH + GAP), on = i === this.rosterIdx, st = this.rosterStatus(r);
+        const d = TT.TITANS[r.key];
+        ctx.save();
+        if (on) { ctx.translate(x + CW / 2, y + CH / 2); ctx.scale(1.08, 1.08); ctx.translate(-x - CW / 2, -y - CH / 2); }
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, CW, CH, 12); else ctx.rect(x, y, CW, CH);
+        ctx.fillStyle = st === 'open' ? TT.shade(d.color, -0.55) : st === 'locked' ? '#1d1838' : '#120e22'; ctx.fill();
+        ctx.lineWidth = on ? 4 : 2.5; ctx.strokeStyle = on ? ((f >> 3) % 2 ? '#ffe14a' : '#ffffff') : st === 'open' ? d.color : '#3a3360';
+        if (st === 'soon' && !on) ctx.setLineDash([6, 5]);
+        ctx.stroke(); ctx.setLineDash([]);
+        const cx = x + CW / 2, cy = y + 40;
+        if (st === 'soon') {
+          TT.drawText(ctx, '?', cx, cy, 46, '#3a3360', OUT, 'center', 5);
+          TT.drawText(ctx, 'EM BREVE', cx, y + 74, 12, '#8a84b8', OUT, 'center', 3);
+        } else {
+          ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, 31, 0, Math.PI * 2); ctx.fillStyle = st === 'open' ? d.color : '#2a2448'; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); ctx.clip();
+          ctx.drawImage(st === 'open' ? TT.portrait(r.key, 66) : TT.silhouette(r.key, 66), cx - 33, cy - 33, 66, 66);
+          ctx.restore();
+          if (st === 'locked') { this.drawLock(ctx, cx, cy + 4); TT.drawText(ctx, 'FASE ' + r.stage, cx, y + 76, 13, '#ffcf5a', OUT, 'center', 3); }
+        }
+        const nm = st === 'soon' && !on ? '???' : r.name.toUpperCase();
+        ctx.font = '14px ' + TT.FONT;
+        const sz = Math.min(14, 14 * (CW - 8) / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx, y + CH - 12, sz, st === 'open' ? '#ffffff' : '#9a95b8', OUT, 'center', 3);
+        const slot = keys.indexOf(r.key);
+        if (slot >= 0) {
+          ctx.beginPath(); ctx.arc(x + 14, y + 14, 12, 0, Math.PI * 2); ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+          TT.drawText(ctx, String(slot + 1), x + 14, y + 15, 16, OUT, null, 'center');
+        }
+        ctx.restore();
+      });
+      this.drawRosterInfo(ctx, R[this.rosterIdx]);
+      this.drawTeamBar(ctx);
+      if (this.rosterMsg) {
+        const m = this.rosterMsg, a = Math.min(1, (120 - m.t) / 15);
+        ctx.save(); ctx.globalAlpha = a;
+        ctx.fillStyle = m.good ? 'rgba(20,90,45,0.92)' : 'rgba(110,10,30,0.92)'; ctx.fillRect(W / 2 - 400, 396, 800, 34);
+        TT.drawText(ctx, m.text, W / 2, 413, 22, '#ffffff', OUT, 'center', 5);
+        ctx.restore();
+      }
+      const tip = this.rosterSlot >= 0
+        ? (touch ? 'analógico ◄ ► escolhe a vaga  •  ATAQUE confirma  •  FORTE cancela' : '← → escolhe a vaga (ou 1-5)  •  ENTER confirma  •  K / Esc cancela')
+        : (touch ? 'analógico escolhe  •  ATAQUE põe na equipe  •  FORTE volta' : 'setas escolhem  •  ENTER põe na equipe  •  K / Esc volta ao título');
+      TT.drawText(ctx, tip, W / 2, 708, 17, '#bfc4e8', OUT, 'center', 4);
+    }
+    drawLock(ctx, x, y) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(0, -8, 10, Math.PI, 0); ctx.stroke();
+      ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth = 3.5; ctx.stroke();
+      ctx.fillStyle = '#ffcf5a'; ctx.fillRect(-14, -8, 28, 22); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(-14, -8, 28, 22);
+      ctx.fillStyle = OUT; ctx.fillRect(-2, -1, 4, 8);
+      ctx.restore();
+    }
+    // Painel do personagem selecionado: modelo animado, como liberar e golpes.
+    drawRosterInfo(ctx, r) {
+      const st = this.rosterStatus(r), d = TT.TITANS[r.key], x = 36, y = 446;
+      ctx.fillStyle = 'rgba(20,12,50,0.85)';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - 12, y - 12, 712, 250, 16); else ctx.rect(x - 12, y - 12, 712, 250); ctx.fill();
+      ctx.strokeStyle = st === 'open' ? d.color : '#3a3360'; ctx.lineWidth = 3; ctx.stroke();
+      if (st === 'open') { // modelo animado
+        let pv = this.rosterPreview;
+        if (!pv || pv.key !== r.key) pv = this.rosterPreview = new TT.Titan(this, r.key);
+        pv.animT++;
+        pv.anim = (this.frame % 240) > 170 ? 'victory' : 'idle'; pv.vx = 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(x + 104, y + 222, 66, 13, 0, 0, Math.PI * 2); ctx.fill();
+        TT.computePose(pv, pv.pose);
+        TT.drawRig(ctx, pv.style, pv.pose, x + 104, y + 222, 1, { t: pv.animT, scale: Math.min(1.25, 200 / Math.max(80, pv.height)) });
+      } else if (st === 'locked') {
+        ctx.save(); ctx.beginPath(); ctx.arc(x + 104, y + 112, 84, 0, Math.PI * 2); ctx.fillStyle = '#1d1838'; ctx.fill(); ctx.clip();
+        ctx.drawImage(TT.silhouette(r.key, 168), x + 20, y + 28, 168, 168); ctx.restore();
+        this.drawLock(ctx, x + 104, y + 124);
+      } else TT.drawText(ctx, '?', x + 104, y + 112, 150, '#2a2448', OUT, 'center', 10);
+      const tx = x + 222;
+      TT.drawText(ctx, r.name.toUpperCase(), tx, y + 14, 36, st === 'open' ? d.color : '#bfc4e8', OUT, 'left', 7);
+      let line;
+      if (st === 'open') line = { text: r.stage === 0 ? 'LIBERADO DESDE O INÍCIO' : 'LIBERADO — ' + this.stageLabel(r.stage).toUpperCase(), col: '#9effa8' };
+      else if (st === 'locked') line = { text: 'BLOQUEADO — zere a ' + this.stageLabel(r.stage), col: '#ffcf5a' };
+      else line = { text: 'EM BREVE — a fase deste personagem ainda vai chegar', col: '#ff9ac0' };
+      ctx.font = '19px ' + TT.FONT;
+      TT.drawText(ctx, line.text, tx, y + 48, Math.min(19, 19 * 450 / Math.max(1, ctx.measureText(line.text).width)), line.col, OUT, 'left', 4);
+      if (st === 'soon') { this.wrapText(ctx, r.plan || '', tx, y + 86, 450, 19, '#d8d4f0'); return; }
+      if (d.blurb) this.wrapText(ctx, d.blurb, tx, y + 78, 450, 17, '#d8d4f0');
+      const info = TT.MOVE_INFO[r.key];
+      if (info) {
+        const rows = [['COMBO  J J J', info[0]], ['FORTE  K', info[1]], ['ESPECIAL  L', info[2]], ['COMBO FINAL  J J K', info[3]]];
+        rows.forEach((rw, i) => {
+          const yy = y + 126 + i * 25;
+          TT.drawText(ctx, rw[0], tx, yy, 16, '#ffe14a', OUT, 'left', 4);
+          TT.drawText(ctx, rw[1], tx + 190, yy, 17, '#ffffff', OUT, 'left', 4);
+        });
+        TT.drawText(ctx, 'COMBO FINAL a partir da fase 8', tx, y + 228, 14, '#9a95b8', OUT, 'left', 3);
+      }
+    }
+    wrapText(ctx, text, x, y, w, size, col) {
+      ctx.font = size + 'px ' + TT.FONT;
+      let line = '', yy = y;
+      for (const wd of text.split(' ')) {
+        const t = line ? line + ' ' + wd : wd;
+        if (ctx.measureText(t).width > w && line) { TT.drawText(ctx, line, x, yy, size, col, OUT, 'left', 4); line = wd; yy += size * 1.3; }
+        else line = t;
+      }
+      if (line) TT.drawText(ctx, line, x, yy, size, col, OUT, 'left', 4);
+    }
+    // Equipe atual (5 vagas); no modo de escolher vaga, a vaga em foco pisca.
+    drawTeamBar(ctx) {
+      const x0 = 766, y = 446, picking = this.rosterSlot >= 0;
+      ctx.fillStyle = 'rgba(20,12,50,0.85)';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0 - 12, y - 12, 492, 250, 16); else ctx.rect(x0 - 12, y - 12, 492, 250); ctx.fill();
+      ctx.strokeStyle = picking ? '#ffe14a' : '#3a3360'; ctx.lineWidth = 3; ctx.stroke();
+      TT.drawText(ctx, picking ? 'ESCOLHA A VAGA' : 'SUA EQUIPE', x0 + 234, y + 16, 30, picking ? '#ffe14a' : '#ffffff', OUT, 'center', 6);
+      TT.drawText(ctx, 'no jogo, troque com 1-5 ou Q / E', x0 + 234, y + 46, 15, '#bfc4e8', OUT, 'center', 4);
+      this.team.forEach((t, i) => {
+        const cx = x0 + 42 + i * 96, cy = y + 116, on = picking && i === this.rosterSlot;
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, on ? 42 : 37, 0, Math.PI * 2); ctx.fillStyle = t.def.color; ctx.fill();
+        ctx.lineWidth = on ? 5 : 3; ctx.strokeStyle = on ? ((this.frame >> 3) % 2 ? '#ffe14a' : '#ffffff') : OUT; ctx.stroke(); ctx.clip();
+        ctx.drawImage(TT.portrait(t.key, 84), cx - 42, cy - 42, 84, 84);
+        ctx.restore();
+        TT.drawText(ctx, String(i + 1), cx - 30, cy - 32, 20, '#ffe14a', OUT, 'center', 4);
+        ctx.font = '15px ' + TT.FONT;
+        const nm = t.name.toUpperCase(), sz = Math.min(15, 15 * 90 / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx, cy + 56, sz, '#ffffff', OUT, 'center', 3);
+      });
+      const r = TT.ROSTER[this.rosterIdx];
+      if (picking) TT.drawText(ctx, r.name.toUpperCase() + ' vai para a vaga ' + (this.rosterSlot + 1), x0 + 234, y + 206, 20, '#9effa8', OUT, 'center', 4);
+      else TT.drawText(ctx, 'Escolha um personagem liberado e confirme', x0 + 234, y + 206, 17, '#bfc4e8', OUT, 'center', 4);
+    }
+    // Faixa "PERSONAGEM LIBERADO!" na tela de fase concluída.
+    drawUnlocks(ctx, y) {
+      const list = this.newUnlocks, k = TT.clamp((this.stateT - 30) / 20, 0, 1);
+      if (k <= 0) return;
+      ctx.save(); ctx.globalAlpha = k;
+      const w = 140 + list.length * 170;
+      ctx.fillStyle = 'rgba(90,20,90,0.9)'; ctx.fillRect(W / 2 - w / 2, y - 44, w, 104);
+      ctx.strokeStyle = '#ffb0dc'; ctx.lineWidth = 3; ctx.strokeRect(W / 2 - w / 2, y - 44, w, 104);
+      TT.drawText(ctx, list.length > 1 ? 'NOVOS PERSONAGENS LIBERADOS!' : 'NOVO PERSONAGEM LIBERADO!', W / 2, y - 24, 24, '#ffe14a', OUT, 'center', 5);
+      list.forEach((r, i) => {
+        const cx = W / 2 + (i - (list.length - 1) / 2) * 170, cy = y + 14;
+        ctx.save(); ctx.beginPath(); ctx.arc(cx - 46, cy, 25, 0, Math.PI * 2); ctx.fillStyle = TT.TITANS[r.key].color; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); ctx.clip();
+        ctx.drawImage(TT.portrait(r.key, 54), cx - 73, cy - 27, 54, 54); ctx.restore();
+        ctx.font = '18px ' + TT.FONT;
+        const nm = r.name.toUpperCase(), sz = Math.min(18, 18 * 104 / Math.max(1, ctx.measureText(nm).width));
+        TT.drawText(ctx, nm, cx + 30, cy, sz, '#ffffff', OUT, 'center', 4);
+      });
+      TT.drawText(ctx, 'Monte sua equipe no menu PERSONAGENS', W / 2, y + 48, 15, '#ffd8f0', OUT, 'center', 3);
+      ctx.restore();
     }
 
     drawGameOver(ctx) {
@@ -1144,7 +1713,9 @@
       ctx.save(); ctx.translate(W / 2, 280); ctx.scale(0.5 + k * 0.5, 0.5 + k * 0.5);
       TT.drawText(ctx, 'OS TITÃS CAÍRAM...', 0, 0, 84, '#ff3b30', OUT, 'center', 12);
       ctx.restore();
-      if (this.stateT > 60 && (this.frame >> 5) % 2 === 0) TT.drawText(ctx, 'ENTER para tentar de novo', W / 2, 420, 34, '#ffffff', OUT, 'center', 6);
+      const touch = this.touch && this.touch.visible;
+      if (this.stateT > 60 && (this.frame >> 5) % 2 === 0) TT.drawText(ctx, touch ? 'ATAQUE para tentar de novo' : 'ENTER para tentar de novo', W / 2, 420, 34, '#ffffff', OUT, 'center', 6);
+      if (this.stateT > 60) TT.drawText(ctx, touch ? 'II para voltar ao menu inicial' : 'ESC para voltar ao menu inicial', W / 2, 470, 24, '#bfc4e8', OUT, 'center', 5);
     }
 
     drawClear(ctx) {
@@ -1161,6 +1732,7 @@
         TT.computePose(t, t.pose);
         TT.drawRig(ctx, t.style, t.pose, xs[i], 560, 1, { t: t.animT + i * 7 });
       }
+      if (this.newUnlocks.length) this.drawUnlocks(ctx, 390); // por cima da equipe
       if (this.stateT > 70 && (this.frame >> 5) % 2 === 0) {
         const last = this.stageIdx + 1 >= TT.STAGES.length;
         TT.drawText(ctx, last ? 'ENTER para o final' : 'ENTER para a próxima fase', W / 2, 650, 32, '#9effa8', OUT, 'center', 6);
@@ -1183,7 +1755,7 @@
         TT.computePose(t, t.pose);
         TT.drawRig(ctx, t.style, t.pose, xs[i], 560, 1, { t: t.animT + i * 9, scale: 1.1 });
       }
-      TT.drawText(ctx, 'Torre Titã • Perfuratriz do Terror • Usina de Energia — 3 fases concluídas!', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
+      TT.drawText(ctx, TT.STAGES.length + ' fases concluídas!  •  ' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ' personagens liberados', W / 2, 630, 24, '#bfc4e8', OUT, 'center', 5);
       if (this.stateT > 120 && (f >> 5) % 2 === 0) TT.drawText(ctx, 'ENTER para voltar ao título', W / 2, 680, 26, '#9effa8', OUT, 'center', 5);
     }
   }

@@ -1,3 +1,6 @@
 .playwright-cli/
 node_modules/
 *.log
+.netlify/
+itch-io/*.zip
+itch-io/candidatas/

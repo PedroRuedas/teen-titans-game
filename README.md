@@ -1,17 +1,24 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): três fases
-(**Torre Titã**, **Perfuratriz do Terror** e **Usina de Energia**), os 5 Titãs jogáveis com troca
-em tempo real, inimigos da série, **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): onze fases
+(**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
+**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak**, **A Academia do
+Mad Mod** e **O Fim: o Reino de Trigon**), os 5 Titãs jogáveis com troca
+em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
+36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
+**3 níveis de dificuldade** e **co-op local para 2 jogadores**.
+
+**Jogue online:** https://pedroruedas.github.io/teen-titans-game/
 
 ## Como jogar
 
 Dê **dois cliques em `JOGAR.bat`** (ou abra `index.html` no Chrome/Edge/Firefox).
 Não precisa instalar nada nem de internet.
 
-No título escolha **JOGAR**, **JOGADORES (1 ou 2)**, **DIFICULDADE** e **CONTROLES**
+No título escolha **JOGAR**, **JOGADORES (1 ou 2)**, **DIFICULDADE**, **PERSONAGENS** e **CONTROLES**
 (↑↓ escolhe, ←→ muda, ENTER confirma). A dificuldade também pode ser trocada no menu de pausa
-e fica salva no navegador.
+e fica salva no navegador. Para **voltar ao menu inicial**, use **MENU INICIAL** na pausa (pede
+confirmação, porque a fase em andamento é perdida) ou **Esc / II** na tela de game over.
 
 | Ação | Teclado (P1) | Controle |
 |---|---|---|
@@ -41,6 +48,54 @@ Titã do parceiro), a câmera segue o meio dos dois e ninguém sai da tela. Pont
 compartilhados. Se um jogador ficar sem Titã livre, ele volta na próxima área; o jogo só acaba quando
 **todos** os Titãs caírem.
 
+### Jogar online com um amigo
+
+No título, escolha **JOGAR ONLINE** (logo abaixo de JOGAR):
+
+1. Um de vocês toca em **CRIAR SALA**. Aparece um código de 5 letras (ex.: `K7QX2`) e os botões
+   **COPIAR LINK** / **COMPARTILHAR LINK**. Mande o código ou o link para o amigo.
+2. O amigo abre o link (ou escolhe JOGAR ONLINE e digita o código) e toca em **ENTRAR**.
+3. Quando aparecer **AMIGO CONECTADO!**, quem criou a sala escolhe **JOGAR**. É o co-op normal:
+   quem criou é o P1 e o amigo é o P2.
+
+Como funciona: a partida roda no aparelho de quem criou a sala, e o amigo recebe a imagem e o som do
+jogo ao vivo e manda os botões dele (teclado, controle ou botões na tela), direto entre os dois
+aparelhos (WebRTC). Os dois veem sempre a mesma partida. Para ter pouco atraso, enquanto o amigo está
+conectado o jogo de quem criou a sala desenha em 1280x720 e manda o vídeo em 960x540 a 30 quadros (H.264
+pelo hardware quando o aparelho tem), e o aparelho do amigo manda cada botão na hora e toca o vídeo sem folga
+no buffer. O servidor gratuito do PeerJS só faz a
+apresentação entre os dois navegadores.
+
+- Quem cria a sala deve deixar o jogo aberto e na frente: se trocar de aba ou bloquear a tela, o jogo
+  para para os dois. É bom que seja quem tem o aparelho mais rápido e a melhor internet.
+- Quem cria joga com WASD **ou** setas (as setas não viram controles do P2).
+- Se o amigo sair ou a conexão cair, a partida continua para quem criou a sala, sozinho.
+- Algumas redes bem fechadas (de empresa ou escola) podem bloquear a conexão.
+
+### Instalar como app (celular e computador)
+
+O jogo é um **app instalável** (PWA), com o ícone do "T" amarelo da aba do navegador:
+
+- **Android (Chrome):** abra o link, toque em **INSTALAR APP** no menu do título (ou no menu ⋮ do Chrome
+  → *Instalar app*). O ícone aparece na tela inicial e o jogo abre em tela cheia, deitado.
+- **iPhone (Safari):** botão Compartilhar → *Adicionar à Tela de Início*.
+- **Computador (Chrome/Edge):** ícone de instalar na barra de endereço, ou **INSTALAR APP** no título.
+- Depois de aberto uma vez, o jogo **funciona sem internet**.
+
+### Celular e tablet (botões na tela)
+
+Abra o link do jogo no navegador do celular, **na horizontal**. Os botões aparecem sozinhos em aparelhos
+de toque:
+
+- **Analógico** no lado esquerdo: encoste em qualquer ponto da metade esquerda e arraste (também
+  navega nos menus). Ele dá preferência à horizontal (o arco natural do polegar não puxa para baixo) e
+  acompanha o dedo quando ele passa do curso.
+- À direita: **ATAQUE**, **FORTE**, **ESPECIAL**, **PULO** e **ESQUIVA**. Nos menus, ATAQUE confirma.
+- No alto: **AVANTE!** (pisca quando a energia está cheia), **TROCAR** Titã, **II** (pausa) e tela cheia.
+- O item **BOTÕES NA TELA** (no título e na pausa) liga e desliga os botões e muda a **opacidade**
+  (25% a 100%) com ← →. A escolha fica salva no navegador. No computador eles começam desligados.
+- Os botões controlam o P1; teclado e controle (gamepad) continuam funcionando juntos.
+
 ## Dificuldade
 
 | | Fácil | Normal | Difícil |
@@ -55,46 +110,248 @@ Todos os valores ficam na tabela `TT.DIFFICULTY` em `js/util.js`.
 
 ## Os Titãs
 
-| Titã | Combo | Forte | Especial |
+Cada Titã tem modelo, corrida, pulo, esquiva e golpes próprios:
+
+| Titã | Correr / pular / esquivar | Combo (J J J) | Forte | Especial |
+|---|---|---|---|---|
+| **Robin** | corrida atlética, arrancada baixa na esquiva | bastão: **estocada → golpe lateral → golpe por cima** | **chute lateral** | 3 birdarangues |
+| **Mutano** | corrida agitada, vira **guepardo** na esquiva | socos e chute giratório, e no fim vira um **animal aleatório** (gorila, rinoceronte, canguru ou carneiro) | **gorila** | **T-Rex** |
+| **Ciborgue** | passada pesada, **propulsores** na esquiva e no pulo | **punho-pistão**, gancho, **canhão à queima-roupa** | martelo duplo no chão | canhão sônico |
+| **Ravena** | **flutua** e desliza, levita no pulo, vira **corvo de alma** na esquiva | **mãos de energia negra com círculo mágico**, e no fim abre um **portal** de onde sai a garra | corvo de energia | *"Azarath Metrion Zinthos!"* |
+| **Estelar** | **voa**, esquiva como **cometa verde** | **punhos de energia verde** com círculo, starbolt à queima-roupa | starbolt carregado | raios oculares |
+
+### Golpes novos (fase 7 em diante)
+
+Na fase 7 os Titãs liberam os poderes máximos: **todos os golpes dão mais dano** e o golpe forte e o
+especial de cada um mudam, com referências da série:
+
+| Titã | Forte (novo) | Especial (novo) | Também |
 |---|---|---|---|
-| **Robin** | bastão | voadora | 3 birdarangues |
-| **Mutano** | socos/garra | vira **gorila** | vira **T-Rex** e atropela |
-| **Ciborgue** | socos pesados | soco no chão (onda) | **canhão sônico** ("BOOYAH!") |
-| **Ravena** | garras de energia | corvo sombrio | *"Azarath Metrion Zinthos!"* (área) |
-| **Estelar** | socos + starbolt | starbolt carregado | **raios oculares** |
+| **Robin** | **disco congelante**: atravessa a fila e prende os inimigos num bloco de gelo | **discos explosivos** (três, explodem no impacto) | o fim do combo vira o **bastão elétrico**, com descarga no chão |
+| **Mutano** | **elefante**: empina e pisa com tudo | **A Fera** (de *A Fera Interior*): avança dando seis garradas | animais do combo mais fortes |
+| **Ciborgue** | **mísseis do ombro**, teleguiados, que explodem no impacto | **canhão sônico na potência máxima** (mais largo e mais forte) | canhão à queima-roupa com mais alcance |
+| **Ravena** | **telecinese**: arranca um pedaço do chão e arremessa | *"Azarath Metrion Zinthos!"* agora faz **tentáculos de sombra** saírem do chão embaixo de todos os inimigos da tela | — |
+| **Estelar** | **starbolt gigante**, que explode no impacto | **chuva de starbolts** em cima de cada inimigo da tela | dois starbolts de uma vez no combo e no ar |
+
+### Combos novos (fase 8 em diante)
+
+Na fase 8 os Titãs mantêm os golpes novos e ganham **combos**:
+
+- **Combo de 5 golpes** (ataque × 5): o 3º e o 4º golpe são novos e não derrubam, para o combo entrar
+  inteiro; o 5º é o finalizador da fase 7.
+- **COMBO FINAL** (ataque, ataque, **forte**): um golpe próprio de cada Titã, com o nome numa faixa na
+  tela, imagens residuais, tela colorida e explosões:
+
+| Titã | 3º e 4º golpes | COMBO FINAL |
+|---|---|---|
+| **Robin** | bastão de baixo para cima; **chute giratório** com imagens vermelhas | **GOLPE RELÂMPAGO**: atravessa a fila num risco de luz e, um instante depois, cada inimigo atravessado explode com o "R" |
+| **Mutano** | garrada; **guepardo** dando arranhões rápidos | **ESTOURO DA MANADA**: rinoceronte em investida → gorila esmurrando o chão → T-Rex rugindo (onda de choque) |
+| **Ciborgue** | gancho com faíscas; **punho-foguete** que atravessa a fila | **RAJADA BOOYAH**: os canhões alternam tiros sônicos e terminam numa explosão sônica azul |
+| **Ravena** | varrida de energia negra; **mãos de sombra** saindo do chão | **ESFERAS DE AZARATH**: prende cada inimigo à frente numa esfera negra, ergue e esmaga |
+| **Estelar** | gancho de energia verde; **giro** com anéis em órbita (5º: espiral de seis starbolts) | **SUPERNOVA**: a raiva tamaraneana — ela brilha e uma onda verde explode em volta |
+
+Os modelos seguem o traço da **série animada de 2003** (a mesma do jogo de PS2): corpos esguios,
+rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos são arte vetorial
+(caminhos SVG em `js/faces.js`) e a capa do Robin tem física de tecido.
 
 - Cada Titã tem vida própria. Quem está fora de campo recupera vida aos poucos.
 - Se o Titã ativo cair, entra o próximo. Ao fim de cada seção, os caídos voltam com 30% de vida.
-- Acertar inimigos enche a energia. Com a barra cheia, **Titãs, avante!** acerta todos na tela.
+- Acertar inimigos enche a energia. Com a barra cheia, **Titãs, avante!** abre uma **cutscene**: o jogo
+  congela e, numa cena de cinema, os cinco Titãs entram um de cada vez e fazem um combo no chefe (ou no
+  inimigo mais perto). Quem apertou começa; depois vêm Robin (bastão + birdarangues), Mutano (T-Rex),
+  Ciborgue (canhão sônico), Ravena (corvo de alma — *"Azarath Metrion Zinthos!"*) e Estelar (starbolt +
+  raios oculares). Na fase 7 eles usam os golpes novos (A Fera, chuva de starbolts, tentáculos de
+  sombra...). No fim os cinco aparecem juntos, disparam ao mesmo tempo e a explosão acerta todos os
+  inimigos da tela. A cena dura uns 6 segundos; **ENTER** (ou **ATAQUE** no celular) pula para o final.
 - Caixas guardam **pizza** (vida) e **cristais** (energia).
 - Todo ataque de chefe tem aviso: pose exagerada, brilho na cor do golpe, um **"!"** sobre a cabeça e
   a **área exata** marcada em vermelho no chão, que vai se preenchendo até o impacto.
 
+### Esquiva perfeita e troca em combo
+
+- **Esquiva perfeita:** esquive (Shift / RT) **bem na hora** em que um golpe ia acertar. O jogo entra em câmera
+  lenta, aparece **ESQUIVA PERFEITA!**, a energia sobe e o Titã fica brilhando: por um tempo, **todos os golpes
+  dele dão 60% a mais** (o contra-ataque), inclusive os tiros. Esquivar cedo demais não conta.
+- **Troca em combo:** com **3 ou mais golpes seguidos** na tela, dá para trocar de Titã **no meio de um ataque**
+  (1-5 ou Q / E). Quem sai deixa uma imagem residual e quem entra já chega com a investida, virado para o
+  inimigo mais perto — dá para emendar combos de vários Titãs sem parar.
+
+## Personagens (menu PERSONAGENS)
+
+O menu **PERSONAGENS** do título mostra os **36 personagens jogáveis** do modo *Master of Games* do jogo de
+PS2. Os cinco Titãs começam liberados; cada outro personagem é **liberado quando você zera a fase dele** (a tela
+de FASE CONCLUÍDA avisa quem chegou). Os liberados entram na sua **equipe de 5** (escolha o personagem, ENTER e
+a vaga 1-5 com ← →); no jogo eles trocam como os Titãs (1-5, Q / E). A equipe e as fases zeradas ficam salvas
+no navegador. Personagem bloqueado aparece como silhueta com a fase que libera; quem ainda não tem fase aparece
+como **EM BREVE**.
+
+Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, especial, golpe no ar, investida
+(esquiva + ataque), golpes mais fortes a partir da fase 7 e, a partir da fase 8, combo de 5 golpes e COMBO FINAL
+(ataque, ataque, forte). O **Titãs, avante!** continua sendo a cena dos cinco Titãs, seja quem for que apertar:
+
+| Personagem | Libera na | Forte (K) | Especial (L) | COMBO FINAL (J J K) |
+|---|---|---|---|---|
+| **Soldado H.I.V.E.** | Fase 1 | rajada de blaster | granada H.I.V.E. | ESQUADRÃO H.I.V.E. (rajada + explosão) |
+| **Robô do Slade** | Fase 1 | punho-foguete | autodestruição (explode em volta) | LEGIÃO DE ROBÔS (robôs atravessam a tela) |
+| **Cinderblock** | Fase 1 | pisão sísmico (onda de choque) | arremesso de pedra | TERREMOTO (pedras brotam do chão em linha) |
+| **Gizmo** | Fase 2 | laser | chuva de mísseis teleguiados | MEGA-ARANHA (patas mecânicas + mísseis) |
+| **Plasmus** | Fase 4 | soco esticado | onda de lodo | MAR DE LODO (gêiseres embaixo de cada inimigo) |
+| **Plasmus Mirim** | Fase 4 | cuspe de gosma | chuva de gosma | BOLHA GIGANTE |
+| **Jinx** | Fase 5 | onda de azar pelo chão | desmoronamento embaixo de cada inimigo | MALDIÇÃO DO AZAR |
+| **Mammoth** | Fase 5 | pisão | supersalto (cai com onda de choque) | FÚRIA DO MAMMOTH (três pisões avançando) |
+| **Mumbo** | Fase 6 | leque de cartas | **MUMBO JUMBO!** (os inimigos viram coelhos) | O GRANDE FINAL (cartolas caem nos inimigos) |
+| **Coelho-Guarda** | Fase 6 | cenoura | estouro de coelhos | CENOURA EXPLOSIVA |
+| **Mutano Palhaço** | Fase 6 | golpes do Mutano, já com os combos da fase 8 | | |
+| **Slade** | Fase 7 | bomba de disco | fogo de Trigon (anéis de chamas) | XEQUE-MATE (teleporta e golpeia cada um) |
+| **Aprendiz** | Fase 7 | golpes do Robin, já com os combos da fase 8 | | |
+| **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
+| **Mad Mod** | Fase 10 | raio hipnótico | espiral que puxa os inimigos e explode | REVOLUÇÃO BRITÂNICA (Guardas Reais marcham pela tela) |
+| **Trigon** | Fase 11 | raios dos quatro olhos | chuva de fogo embaixo de cada inimigo | O FIM (onda vermelha e colunas de fogo) |
+| **Ravena Vermelha** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (manto vermelho e quatro olhos) | | |
+| **Ravena Branca** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (o manto branco do fim de "O Fim") | | |
+
+### Personagens que entram nas próximas fases
+
+Estes estão no menu como **EM BREVE**; a lista com o plano de cada um fica em `TT.ROSTER` (`js/roster.js`,
+`stage: null` + `plan`). Ao criar a fase de um deles, basta pôr o id da fase em `stage` e escrever o modelo e os
+golpes (como os outros em `js/roster.js`):
+
+- **Bloqueador** (fase do Mestre dos Jogos), **Tempest/Aqualad** (fase no mar ou dos Titãs Leste)
+- **Ciclone**, **Blackfire**, **Mutano Funcionário**,
+  **Red X** — versões alternativas com os poderes de um dos Titãs
+- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)** e **Dr. Luz**
+
+
 ## Fases
 
-1. **Torre Titã**: a H.I.V.E. invade a ilha e a torre. Você enfrenta Soldados H.I.V.E., Robôs do Slade
-   e Drones do Gizmo. O chefe é o **Cinderblock**, com soco giratório, onda de choque (pule!),
-   investida (desvie e ele fica tonto ao bater na parede) e arremesso de pedras.
+Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil para testar.
+
+1. **Torre Titã**: a H.I.V.E. invade a ilha e a torre. Inimigos: **Soldados H.I.V.E.** e os
+   **Robôs do Slade** (máscara laranja). O chefe é o **Cinderblock**, com soco giratório, onda de
+   choque (pule!), investida (desvie e ele fica tonto ao bater na parede) e arremesso de pedras.
 2. **Perfuratriz do Terror**: túneis sob Jump City, com uma **perseguição** contra uma
-   perfuratriz gigante da H.I.V.E. O chefe é o **Gizmo** num robô-aranha, com broca, chuva de
-   mísseis (fuja dos círculos vermelhos), invocação de drones e, na fase 2, um laser.
+   perfuratriz gigante da H.I.V.E. Inimigos: **Soldados H.I.V.E.** e **Abelhas H.I.V.E.** (listradas,
+   com asas; dão uma ferroada em voo rasante e recuam). O chefe é o **Gizmo** num robô-aranha, com
+   broca, chuva de mísseis (fuja dos círculos vermelhos), invocação de drones e, na fase 2, um laser.
 3. **Usina de Energia**: pátio de transformadores, galpão de turbinas e o núcleo com bobinas de Tesla.
-   Novo inimigo: o **Soldado Elétrico** da H.I.V.E. (bastão elétrico, bate e recua). O chefe é o
+   Inimigos: só **Soldados Elétricos** (bastão elétrico, bate e recua). O chefe é o
    **Overload**: raio em linha, poças elétricas, teleporte com descarga e, abaixo de 50% de vida,
    anel de descarga e raio duplo. **Fraqueza:** depois do teleporte ele superaquece e fica com o
    **chip exposto** — dano dobrado!
+4. **Fábrica de Gosma**: linha de envase com esteiras e potes, salão dos misturadores de vidro e a
+   câmara de contenção estourada — tudo em azulejo verde-água e gosma rosa. Inimigos: **Gosmas**
+   (pulam em cima de você; as grandes se dividem em duas pequenas) e **Soldados Químicos** (roupa
+   amarela e máscara de gás; jato de gosma). O chefe é o **Plasmus**, um gigante musculoso de
+   lodo: soco esticado em linha, cusparada de lodo (fuja dos círculos), onda de lodo (pule!) e,
+   abaixo de 50% de vida, mergulho no chão para emergir embaixo de você. **Fraqueza:** depois do
+   soco esticado o braço fica **grudado no chão** — ele trava no lugar e leva dano dobrado!
+5. **Academia H.I.V.E.**: pátio da escola do crime à noite, corredor de armários e salas de aula
+   ("Vilania Avançada", "Laboratório do Mal") e o salão vermelho do diretor. Inimigos: **Alunos da
+   H.I.V.E.** (hipnotizados, de olhos vermelhos), **Jinx** (raio de azar rosa que corre pelo chão e
+   estrela girando de perto) e **Mammoth** (super armadura: não cai com golpe comum; soco de varrer
+   e pisão, ambos marcados no chão). O chefe é o **Irmão Sangue**: empurrão psíquico, raio do braço
+   cibernético, **hipnose** (o círculo segue você; quem fica dentro fica tonto) e telecinese que
+   arremessa carteiras e armários nos círculos marcados; abaixo de 50% chama alunos para ajudar.
+   **Fraqueza:** depois da telecinese a **mente fica esgotada** — ele para e leva dano dobrado!
+6. **O Show do Mumbo**: rua do teatro à noite (letreiro "MUMBO — O MAGNÍFICO"), bastidores do palco e o
+   mundo **dentro da cartola**, com espiral hipnótica e cartas e cartolas flutuando. Inimigos:
+   **Soldados-Carta** (cartas de baralho vivas com lança; estocada em investida) e **Coelhos Mágicos**
+   gigantes (bote e salto esmagador). O chefe é o **Mumbo**: raio da varinha, leque de cartas em três
+   faixas (fique no vão entre elas!), coelhos que saem de cartolas nos círculos marcados e o feitiço
+   **"MUMBO JUMBO!"**, que transforma o Titã em **coelho** por alguns segundos (só anda e pula).
+   **Fraqueza:** depois dos coelhos da cartola ele **deixa a varinha cair** — fica sem magia e leva
+   dano dobrado!
+7. **O Covil do Slade**: Jump City em ruínas sob o céu vermelho de Trigon (com os quatro olhos dele no
+   céu e os cidadãos virados pedra, como em *O Fim*), o covil subterrâneo cheio de engrenagens, canos e
+   telões com a máscara, e o salão do trono com o "S" gigante. **Os Titãs ganham os golpes novos.**
+   Inimigos: **Robôs do Slade**, **Comandos do Slade** (armadura cobre e bastão; estocada em investida e
+   giro do bastão) e **Demônios de Fogo** de Trigon (bola de fogo no círculo marcado e garrada). O chefe
+   é o **Slade**, com mais vida que todos: sequência de bastão, bombas de disco nos círculos marcados e
+   o **salto com o bastão** (o círculo segue você até a metade do aviso). Abaixo de 50% ganha o fogo
+   de Trigon: **anel de chamas** em volta dele (fique colado nele ou bem longe) e chama comandos.
+   **Fraqueza:** depois do salto ele aterrissa de joelho — **guarda aberta**, leva dano dobrado!
+8. **A Base da Irmandade**: a base da Irmandade do Mal nas montanhas nevadas, sob a aurora boreal; o hangar
+   onde ela guarda **heróis congelados em blocos de gelo** (como no fim da série) e o laboratório do Cérebro,
+   com tanques e telões. Neva lá fora. **Os Titãs ganham os combos novos.** Inimigos: **Robôs do Slade**,
+   **Soldados Congeladores** (raio congelante em linha: quem é atingido fica preso no gelo) e a **Madame
+   Rouge** (corpo elástico: chute esticado de longe e giro com os braços esticados). O chefe é o
+   **Monsieur Mallah com o Cérebro** no ombro: tapa de gorila, investida até a parede (fica tonto se
+   bater), laser do Cérebro e, abaixo de 50%, raio congelante em círculos e chama congeladores.
+   **Fraqueza:** depois do laser a cúpula superaquece e **abre** — cérebro exposto, dano dobrado!
+9. **O Canal do Control Freak**: a rua do Cine Jump e da loja de eletrônicos à noite (vitrine cheia de TVs
+   com barras coloridas e chuvisco), o estúdio do Canal 9 com o cenário de ficção científica, refletores e a
+   placa "NO AR", e o porão do Control Freak, com pôsteres, estantes de bonecos e o telão gigante. A imagem
+   tem interferência de TV. Os Titãs já começam com os golpes e combos novos. Inimigos: **TV-Robôs**
+   (raio de chuvisco em linha, que deixa o Titã tonto, e cabeçada) e **Monstros de Pipoca** (cospem
+   pipocas que estouram em três círculos marcados à frente; barrigada de perto). O chefe é o **Control
+   Freak**, que aparece "sintonizando" no meio do chuvisco: pancada com o controle, **chuva de TVs** nos
+   círculos marcados e o **ZAP MÁXIMO** em linha; abaixo de 50% usa o **botão de PAUSA** (quem fica no
+   círculo fica pausado como numa fita) e troca de canal para chamar TV-Robôs.
+   **Fraqueza:** depois do ZAP MÁXIMO a **pilha do controle acaba** — ele fica sacudindo o controle,
+   parado, e leva dano dobrado!
+10. **A Academia do Mad Mod**: a Londres de mentira que o Mad Mod montou (a "Mod Boutique", a loja de discos,
+   cabines telefônicas vermelhas, lambretas e bandeirinhas, com a torre do relógio e a roda-gigante ao fundo),
+   o corredor da escola com paredes op-art preto e branco, armários com a bandeira e telas com a espiral, e a
+   sala de aula com o telão hipnótico gigante, quadros-negros ("Lição 1: obedeça o Mad Mod") e piso xadrez
+   rosa com o alvo mod. Luzes de discoteca varrem o chão. Inimigos: **Guardas Reais** (robôs de guarda do
+   palácio; investida com a baioneta em linha e coronhada) e **Olhos Hipnóticos** (olhos voadores de latão:
+   raio hipnótico em linha que **inverte os controles** e flash da câmera em volta). O chefe é o **Mad Mod**:
+   bengalada, raio hipnótico (controles invertidos) e a **ESPIRAL GIGANTE** (a marca segue você, trava, **puxa
+   os Titãs para o centro** e explode — esquive para não ser puxado). Abaixo de 50%, o **raio da juventude**
+   deixa o Titã **velhinho** (mais lento) e o Mad Mod recupera vida, e ele chama Guardas Reais.
+   **Fraqueza:** depois da espiral gigante ele **fica tonto com a própria hipnose** — parado, dano dobrado!
+   Zerar a fase libera o **Mad Mod** no menu PERSONAGENS.
+   - **Hipnotizado:** com os controles invertidos aparecem espirais sobre a cabeça do Titã; **aperte ATAQUE**
+     várias vezes para acordar mais rápido.
+11. **O Fim: o Reino de Trigon** — a fase contada como o episódio *O Fim*, para jogar **na pele dos Titãs**:
+   - **História:** cena de abertura em estilo HQ (o jogo para; ATAQUE avança, Esc pula), com os cinco Titãs
+     falando antes da batalha; cena antes de Trigon; e epílogo antes da tela de fase concluída. Durante a
+     fase, o **rádio dos Titãs** traz as falas dos amigos na parte de baixo da tela (sem parar o jogo) — eles
+     comentam o que está acontecendo e avisam das ameaças.
+   - **Cenário:** Jump City virada em pedra sob o eclipse vermelho (a pizzaria dos Titãs e os cidadãos viraram
+     estátuas, a Torre Titã partida ao fundo), a ponte de basalto sobre o mar de lava com cachoeiras de fogo e
+     correntes, e o templo de obsidiana com pilares de runas, braseiros e a **Marca de Scath** gigante. Brasas
+     sobem pela tela e o céu pulsa em vermelho.
+   - **Inimigos:** **Clones Sombrios** — cópias de sombra dos próprios Titãs, que usam os poderes deles
+     (birdarangues do Robin, bote do Mutano, canhão sônico do Ciborgue, garras de sombra da Ravena, starbolts da
+     Estelar, todos com aviso no chão) — e os **Demônios de Fogo**.
+   - **Fissuras de fogo:** rachaduras no chão que avisam e entram em erupção em ciclos, queimando **qualquer
+     um** em cima — Titã ou inimigo. Dá para atrair os inimigos para dentro delas.
+   - **Chefe: Trigon**, gigante (quase a altura da tela), sobe do chão: pisão em meia-lua, **PUNHO DUPLO** e
+     **raios dos quatro olhos** (uma faixa na altura de cada Titã). Abaixo de 50% fica enfurecido: **chuva de
+     meteoros** e **Clones Sombrios**; e a Ravena manda **Esferas de Luz de Azarath** — quem pega brilha e bate
+     **75% mais forte** nele (e o dobro nas sombras). **Fraqueza:** depois do punho duplo os punhos ficam presos no
+     chão — ele fica de joelhos, dano dobrado!
+   - **O final da luz:** com Trigon quase vencido a luta para e a Ravena pede ajuda: **aperte ATAQUE várias
+     vezes** para dar a força dos amigos a ela. Robin, Estelar, Ciborgue e Mutano acendem um por um, torcendo;
+     com a barra cheia a **Ravena Branca** derrota o pai com a luz — *"Azarath Metrion Zinthos!"*.
+   - Zerar a fase libera **Trigon**, a **Ravena Vermelha** e a **Ravena Branca** no menu PERSONAGENS.
+
+## Música e vozes
+
+- A trilha das fases e do título é a **abertura de Teen Titans**, num arranjo sintetizado feito de
+  memória. Os chefes têm músicas próprias.
+- Por enquanto só a **Ravena fala**: "Azarath Metrion Zinthos!" no especial. O jogo toca
+  `audio/vozes/ravena-azarath.mp3` (recortado da dublagem brasileira de *O Contrato de Judas*); se o
+  arquivo não existir, usa a voz sintetizada do navegador.
+  Os outros Titãs só mostram o balão de fala.
+- Para usar a **música original** ou mais falas reais, coloque os arquivos (mp3/ogg/wav) na pasta
+  `audio/` e escreva os caminhos em `audio/arquivos.js`. Se algum não for encontrado, o jogo volta
+  sozinho para o som sintetizado.
 
 ## Tecnologia
 
 - **HTML5 Canvas + JavaScript puro**, sem bibliotecas nem arquivos externos. Todos os gráficos são
-  desenhados em vetor, em estilo cartoon com contorno grosso, e todo o áudio (efeitos e 7 músicas
-  originais) é sintetizado na hora com WebAudio.
+  desenhados em vetor, em estilo cartoon com contorno grosso, e o áudio (efeitos e músicas) é
+  sintetizado na hora com WebAudio; as vozes usam a síntese de fala do navegador.
 - **Por que não Unity/Unreal:** o objetivo era entregar algo pronto e **testado de verdade** sem
   ninguém por perto. Com Canvas eu pude rodar e jogar o jogo de forma automatizada, tirar prints
   e conferir cada tela.
 - **Otimização:**
   - Passo fixo de 60 Hz.
-  - Cenários com parallax pré-renderizados em blocos cacheados (só um `drawImage` por bloco),
+  - Cada fase tem uma camada de detalhes (objetos de cenário, luminárias com cone de luz, poças com reflexo,
+    marcas no chão) e uma passada de luz e sombra, pintadas no mesmo bloco em cache do primeiro plano.
+- Cenários com parallax pré-renderizados em blocos cacheados (só um `drawImage` por bloco),
     com pré-geração à frente da câmera.
   - Pool de partículas, brilhos pré-renderizados (nada de `shadowBlur`) e retratos do HUD em cache.
   - Resolução interna adaptada à tela (nítido em 1080p e 4K).
@@ -102,13 +359,22 @@ Todos os valores ficam na tabela `TT.DIFFICULTY` em `js/util.js`.
 
 ```
 index.html        página do jogo
+manifest.webmanifest, sw.js, icons/   app instalável (ícones, modo offline)
 js/util.js        constantes, matemática, teclado e gamepad
-js/audio.js       efeitos e músicas sintetizados
-js/render.js      rig dos personagens, poses e rostos
+js/audio.js       efeitos, músicas e vozes sintetizados
+audio/arquivos.js seus próprios arquivos de música e voz (opcional)
+js/render.js      modelos (rig sombreado), rostos e formas animais
+js/faces.js       rostos dos Titãs em arte vetorial (caminhos SVG)
+js/anim.js        animações: quadros-chave, locomoção e golpes de cada Titã
 js/backgrounds.js cenários em camadas (cache em blocos)
 js/entities.js    Titãs, inimigos, chefes, projéteis, itens
 js/stages.js      roteiro das fases (ondas, perseguição, chefes)
-js/game.js        laço do jogo, câmera, HUD e telas
+js/cutscene.js    cutscene do "Titãs, avante!" (os cinco Titãs em combo)
+js/game.js        laço do jogo, câmera, HUD e telas (inclui o menu PERSONAGENS)
+js/roster.js      os 36 personagens: lista, desbloqueio, modelos e golpes dos extras, equipe salva
+js/story.js       história: cenas em estilo HQ, rádio dos Titãs e o final da luz da fase 11
+js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
+js/online.js      jogar online com um amigo (sala com código, WebRTC via PeerJS)
 js/main.js        inicialização, bot de teste e API de depuração
 tests/            testes automatizados (Playwright)
 ```
@@ -122,23 +388,86 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 72 verificações e todas passam:
+página e chame a função serve.) A suíte tem 258 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
   NORMAL igual ao balanceamento original.
 - Cada golpe de cada Titã acerta (incluindo o ataque em corrida e o rinoceronte do Mutano).
-- Cada ataque dos 3 chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
-  fora não acerta). Golpes e tokens do Soldado Elétrico; fraqueza do Overload.
-- Titãs, avante! e regressões.
-- 3 partidas completas (3 fases) do início ao fim com um bot.
-- Os três chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- App instalável: manifesto sem erros, service worker guarda o jogo e ele abre sem internet, item
+  INSTALAR APP abre a instalação do navegador.
+- Voltar ao menu inicial pela pausa (com confirmação) e pelo game over.
+- Botões na tela: o item do menu liga/desliga e muda a opacidade (e salva); o analógico navega nos
+  menus e anda; ATAQUE, FORTE, ESPECIAL, PULO, TROCAR e pausa funcionam.
+- Combos novos (fase 8): o combo de 5 golpes entra inteiro em cada Titã e dá mais dano que o da fase 7;
+  ataque, ataque, forte solta o COMBO FINAL (com o nome na tela), que não existe antes da fase 8.
+- Golpes novos: só a partir da fase 7, e cada golpe novo dá mais dano que o original; disco
+  congelante prende o inimigo no gelo.
+- Cada ataque dos chefes: aviso no chão antes do golpe e hitbox igual à marcação (dentro acerta,
+  fora não acerta). Golpes e tokens do Soldado Elétrico; fraquezas do Overload, do Plasmus, do Irmão Sangue, do Mumbo
+  e do Slade; golpes da Jinx, do Mammoth, do Soldado-Carta, do Coelho Mágico, do Comando do Slade e do
+  Demônio de Fogo com aviso no chão; Titã virando coelho; Slade chamando comandos.
+- Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
+- Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
+  golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
+- 3 partidas completas (11 fases) do início ao fim com um bot.
+- Os onze chefes vencidos pelo bot **sem trapaça** no NORMAL (Trigon inclusive, com o final da luz).
+- Fase 8: raio congelante, chute e giro da Madame Rouge com aviso no chão; cúpula do Mallah abre depois do
+  laser (dano dobrado), ele chama congeladores e o raio do Cérebro congela o Titã.
+- Fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca com aviso no chão; pilha do Control
+  Freak acaba depois do ZAP MÁXIMO (dano dobrado), ele chama TV-Robôs, o botão de PAUSA pausa o Titã e o
+  aviso de COMBOS NOVOS não se repete na fase 9.
+- Fase 10: investida do Guarda Real, raio e flash do Olho Hipnótico com aviso no chão (o raio inverte os
+  controles); o Mad Mod fica tonto depois da espiral (dano dobrado), a espiral puxa o Titã, o raio hipnótico
+  inverte os controles, o raio da juventude deixa o Titã velhinho e cura o Mad Mod, e ele chama Guardas Reais.
+- Fase 11: o Clone Sombrio de cada Titã usa o poder dele com aviso no chão; fissura de fogo avisa antes e queima
+  Titãs e inimigos; Trigon fica de joelhos depois do punho duplo (dano dobrado), chama clones, solta Esferas de
+  Luz (75% a mais) e só cai pelo final da luz; cena de abertura (para o jogo, avança e pula), rádio, cena antes do
+  chefe e epílogo.
+- Esquiva perfeita (sem dano, energia, contra-ataque com 60% a mais; esquivar à toa não conta), troca em
+  combo (só com 3+ golpes; quem entra já ataca), controles invertidos (ATAQUE acorda) e velhinho mais lento.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
+- Menu PERSONAGENS: 36 na lista, bloqueado não entra na equipe, zerar a fase libera (uma vez só), a equipe
+  escolhida é salva e volta ao padrão se o personagem não estiver liberado.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
+
+`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 18 personagens extras: cada golpe nos três
+níveis de poder (fases 1, 7 e 8), 288 verificações, todas acertando o inimigo e sem erro de JavaScript.
+
+## Publicar na web (GitHub Pages)
+
+O jogo fica em https://pedroruedas.github.io/teen-titans-game/ (GitHub Pages: grátis e sem limite mensal de publicações,
+porque o repositório é público). O site é o conteúdo do ramo `gh-pages`. Para publicar uma versão nova, rode
+na pasta do projeto:
+
+```
+python publicar.py
+```
+
+Ele copia `index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `js/` e `audio/` para o ramo `gh-pages` (com um
+`.nojekyll`, para o GitHub servir os arquivos como estão) e envia para o GitHub. O site atualiza sozinho em
+um ou dois minutos. Precisa só do `git` com acesso de escrita ao repositório.
+
+O endereço antigo (jovens-titas-jump-city.netlify.app) parou de receber versões novas: o plano grátis do
+Netlify bloqueou os deploys quando os créditos da conta acabaram.
+
+### Teste do jogo online
+
+`tests/online-test.js` abre duas janelas (quem cria a sala e o amigo) e conecta as duas de verdade pelo
+servidor do PeerJS, por isso fica fora da suíte principal e precisa de internet. Ele confere: criar a
+sala, entrar pelo link, imagem e som chegando, o amigo andando, atacando e pausando como P2, as setas
+continuando no P1, o amigo saindo sem quebrar a partida e o aviso de sala inexistente e o vídeo leve e com pouco atraso (14 verificações).
+
+## Publicar no itch.io
+
+A pasta `itch-io/` tem o passo a passo (`COMO-PUBLICAR.md`), a capa, as screenshots e a descrição. O zip
+para enviar é montado com `python itch-io/montar_zip.py` (fica fora do git). Ele não leva a fala da
+Ravena recortada da dublagem.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Academia H.I.V.E., Mumbo, Slade…).
+- Mais fases (Terra, Titãs Leste, Blackfire, Red X, Mestre dos Jogos…), cada uma liberando os personagens
+  **EM BREVE** dela — e com cenas de história como a fase 11.
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

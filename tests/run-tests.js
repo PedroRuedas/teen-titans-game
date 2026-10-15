@@ -11,6 +11,8 @@ async page => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   await page.setViewportSize({ width: 1280, height: 720 });
+  // cenas de história desligadas (os testes vão direto à ação); o teste da história liga de novo
+  await page.addInitScript(() => { window.TT_NOSTORY = true; });
   await page.goto('http://localhost:8765/?t=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);
   await sleep(400);
@@ -22,9 +24,11 @@ async page => {
   await ev(() => { TT.game.setDifficulty('normal'); TT.game.menuIdx = 0; });
   await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
+  await page.keyboard.press('ArrowDown'); await sleep(60);
   await page.keyboard.press('ArrowRight'); await sleep(60);
   const dTitle = await ev(() => ({ d: TT.game.difficulty, idx: TT.game.menuIdx, saved: localStorage.getItem('jovensTitas.dificuldade') }));
-  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 2 && dTitle.saved === 'hard', dTitle);
+  ok('dificuldade: trocar no título (↓ →)', dTitle.d === 'hard' && dTitle.idx === 4 && dTitle.saved === 'hard', dTitle);
   await page.reload(); await page.waitForFunction(() => window.TT && TT.debug); await sleep(300);
   const dReload = await ev(() => TT.game.difficulty);
   ok('dificuldade: escolha persiste ao recarregar', dReload === 'hard', dReload);
@@ -39,8 +43,10 @@ async page => {
     return { err, d, fallback: (() => { Storage.prototype.getItem = () => { throw 1; }; const v = TT.store.get('x', 'def'); Storage.prototype.getItem = origGet; return v; })() };
   });
   ok('dificuldade: jogo funciona com storage bloqueado', !dFail.err && dFail.d === 'easy' && dFail.fallback === 'def', dFail);
-  await ev(() => { TT.game.menuIdx = 2; });
+  await ev(() => { TT.game.menuIdx = 4; });
   await page.keyboard.press('ArrowRight'); await sleep(60); // fácil -> normal
+  await page.keyboard.press('ArrowUp'); await sleep(60);
+  await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   await page.keyboard.press('ArrowUp'); await sleep(60);
   ok('dificuldade: volta para NORMAL e cursor em JOGAR', await ev(() => TT.game.difficulty === 'normal' && TT.game.menuIdx === 0));
@@ -49,6 +55,21 @@ async page => {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => TT.game.state === 'play', null, { timeout: 3000 }).catch(() => {});
   ok('ENTER inicia a fase 1', await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0));
+
+  // 1b) Escolha de fase no título: ↓ até FASE, ← volta para a última (fase 9) e ENTER começa nela
+  const pick = await ev(() => {
+    const g = TT.game;
+    g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
+    g.input.endStep(); // descarta o ENTER real ainda pendente (senão vira "confirmar" no 1º passo)
+    const press = (k) => { g.input.pressed.add(k); g.step(); };
+    press('down'); press('down'); press('left');
+    const sel = g.stageSel, label = g.menuLabel('stage').value;
+    press('up'); press('up'); press('menu');
+    const res = { sel, label, st: g.state, stage: g.stageIdx };
+    g.stageSel = 0; TT.debug.start(0);
+    return res;
+  });
+  ok('menu: escolher a última fase (11) no título e começar nela', pick.sel === 10 && /TRIGON/.test(pick.label) && pick.st === 'play' && pick.stage === 10, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -147,6 +168,100 @@ async page => {
   });
   for (const k in moves) ok('todos os golpes acertam: ' + k, Object.values(moves[k]).every((d) => d > 0), moves[k]);
 
+  // 3a) Golpes novos da fase 7: todos acertam e cada um dá mais dano que o golpe original
+  const plus = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {}, flags = {};
+    for (const st of [5, 6]) { TT.debug.start(st); flags[st] = g.team.every((t) => !!t.def.plus === (st === 6)); }
+    for (const st of [0, 6]) {
+      TT.debug.start(st); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true);
+        const p = g.player, res = {};
+        const tryMove = (name, seq) => {
+          g.enemies.length = 0; g.projectiles.length = 0; g.effects.length = 0;
+          p.atk = null; p.setState('idle'); p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0; p.invul = 0; p.facing = 1; p.y = 590;
+          const e = new TT.Enemy(g, 'slade', p.x + 70, p.y);
+          e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+          g.addEnemy(e); g.energy = 100;
+          for (const [a, n] of seq) { g.input.pressed.add(a); TT.debug.step(n); }
+          res[name] = Math.round(9999 - e.hp);
+        };
+        tryMove('leve', [['light', 30]]);
+        tryMove('combo', [['light', 10], ['light', 10], ['light', 40]]);
+        tryMove('forte', [['heavy', 70]]);
+        tryMove('especial', [['special', 110]]);
+        tryMove('aereo', [['jump', 8], ['light', 50]]);
+        tryMove('corrida', [['dash', 3], ['light', 45]]);
+        (out[p.key] = out[p.key] || {})[st] = res;
+      }
+    }
+    g.enemies.length = 0;
+    return { out, flags };
+  });
+  ok('golpes novos só a partir da fase 7', plus.flags[5] && plus.flags[6], plus.flags);
+  for (const k in plus.out) {
+    const a = plus.out[k][0], b = plus.out[k][6];
+    ok('golpes novos (fase 7) dão mais dano: ' + k, Object.keys(a).every((m) => b[m] > a[m]), { original: a, novo: b });
+  }
+
+  // 3a1) Combos novos (fase 8): o combo de 5 golpes entra inteiro (cada golpe acerta) e dá mais dano que o
+  //      combo de 3 da fase 7; ATAQUE, ATAQUE, FORTE solta o COMBO FINAL (com o nome na tela), que só existe na fase 8
+  const combos = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {};
+    const mash = (p, plan, frames) => {
+      const e = new TT.Enemy(g, 'slade', p.x + 80, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 }); g.addEnemy(e);
+      const per = [], defs = []; let last = null, h = e.hp, k = 0, tag = null;
+      for (let f = 0; f < frames; f++) {
+        if (k < plan.length && f % 3 === 0) g.input.pressed.add(plan[k]);
+        g.step();
+        if (g.comboTag) tag = g.comboTag.text;
+        if (p.atk && p.atk.def !== last) { if (last) per.push(Math.round(h - e.hp)); h = e.hp; last = p.atk.def; defs.push(last); k++; }
+      }
+      per.push(Math.round(h - e.hp));
+      return { per, defs, total: Math.round(9999 - e.hp), tag };
+    };
+    for (const st of [6, 7]) {
+      TT.debug.start(st); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true); TT.debug.step(95);
+        const p = g.player;
+        const reset = () => { g.enemies.length = 0; g.projectiles.length = 0; g.effects.length = 0; g.comboTag = null; p.atk = null; p.setState('idle'); p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0; p.invul = 0; p.facing = 1; p.y = 590; p.x = g.camX + 300; };
+        reset(); const chain = mash(p, ['light', 'light', 'light', 'light', 'light'], 200);
+        reset(); const fin = mash(p, ['light', 'light', 'heavy'], 200);
+        out[st + ':' + p.key] = { chain: chain.per, chainTotal: chain.total, n: p.def.light.length, finTotal: fin.total, ender: !!p.def.ender && fin.defs.includes(p.def.ender), tag: fin.tag };
+      }
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k of ['robin', 'beastboy', 'cyborg', 'raven', 'starfire']) {
+    const a = combos['6:' + k], b = combos['7:' + k];
+    ok('combos novos (fase 8): combo de 5 golpes entra inteiro e dá mais dano: ' + k,
+      a.n === 3 && b.n === 5 && b.chain.length >= 5 && b.chain.slice(0, 5).every((d) => d > 0) && b.chainTotal > a.chainTotal, { fase7: a, fase8: b });
+    ok('combos novos (fase 8): ATAQUE, ATAQUE, FORTE solta o COMBO FINAL: ' + k,
+      !a.ender && b.ender && b.finTotal > 30 && !!b.tag, { fase7: a, fase8: b });
+  }
+
+  // 3a2) Disco congelante do Robin: o inimigo fica preso no gelo (parado) por bem mais tempo que um golpe comum
+  const ice = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(6); TT.debug.toSection(0); TT.debug.step(5);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    const p = g.player; p.facing = 1; p.y = 590; p.invul = 0;
+    g.enemies.length = 0;
+    const e = new TT.Enemy(g, 'hive', p.x + 200, p.y); e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 }); g.addEnemy(e);
+    g.input.pressed.add('heavy');
+    let frozen = 0, maxFrozen = 0;
+    for (let t = 0; t < 140; t++) { g.step(); if (e.frozen > 0) { frozen++; maxFrozen = Math.max(maxFrozen, e.frozen); } }
+    g.enemies.length = 0;
+    return { frozen, maxFrozen, after: e.frozen };
+  });
+  ok('Robin (fase 7): disco congelante prende o inimigo no gelo', ice.frozen >= 60 && ice.after === 0, ice);
+
   // 3b) Nova forma do Mutano: rinoceronte no ataque em corrida (esquiva + ataque)
   const rhino = await ev(() => {
     const g = TT.game;
@@ -171,11 +286,54 @@ async page => {
     const g = TT.game;
     for (let i = 0; i < 3; i++) TT.debug.game.spawnEnemy('hive', i, 3);
     TT.debug.step(150);
-    g.energy = 100; g.input.pressed.add('super');
-    TT.debug.step(140);
-    return { energy: g.energy, alive: g.enemies.filter((e) => !e.dead).length };
+    g.energy = 100; g.input.pressed.add('super'); g.step();
+    let n = 0; while (g.cut && n++ < 900) g.step();
+    TT.debug.step(20);
+    return { energy: g.energy, alive: g.enemies.filter((e) => !e.dead).length, frames: n };
   });
   ok('Titãs, avante! derrota inimigos', sup.alive === 0 && sup.energy < 100, sup);
+
+  // 4a) Cutscene do "Titãs, avante!": os cinco Titãs aparecem e fazem o combo no alvo; o mundo fica
+  //     congelado; cada quadro é desenhado sem erro com cada chefe como alvo (e com golpes novos na fase 7);
+  //     ATAQUE pula para o final e o dano sai do mesmo jeito
+  const cut = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = { runs: {} }, before = (TT.errors || []).length;
+    for (let st = 0; st < TT.STAGES.length; st++) {
+      TT.debug.start(st); TT.debug.toSection(4); TT.debug.god(true);
+      let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+      const b = g.boss, hp0 = b.hp, x0 = b.x;
+      g.energy = 100; g.input.pressed.add('super'); g.step();
+      const c = g.cut, by = c && c.by.key;
+      let frames = 0, frozen = true, maxLive = 0;
+      while (g.cut && frames < 900) {
+        g.step(); g.render(); frames++;
+        if (Math.abs(b.x - x0) > 0.01) frozen = false;
+        if (c) maxLive = Math.max(maxLive, c.live.length);
+      }
+      out.runs[st] = { target: c && c.target === b, by, first: c && c.queue[0].key, shown: c ? [...c.shown].sort().join(',') : '', hits: c ? c.hits : 0,
+        frames, frozen, dmg: Math.round(hp0 - b.hp), plus: c && c.queue.every((q) => !!q.a.def.plus === (st >= 6)) };
+    }
+    // pular: ATAQUE depois da entrada vai direto para a explosão final (e o dano sai)
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    g.stage = Object.assign({}, g.stage, { sections: [] });
+    for (let i = 0; i < 3; i++) { const e = g.spawnEnemy('hive', i, 3); e.entering = false; e.x = g.player.x + 200 + i * 70; }
+    g.energy = 100; g.input.pressed.add('super'); g.step();
+    for (let i = 0; i < 60; i++) g.step();
+    g.input.pressed.add('light');
+    let n = 0; while (g.cut && n++ < 400) g.step();
+    out.skip = { frames: n, alive: g.enemies.filter((e) => !e.dead).length };
+    TT.debug.god(false);
+    out.errors = (TT.errors || []).length - before;
+    out.comp = g.ctx.globalCompositeOperation; out.alpha = g.ctx.globalAlpha;
+    return out;
+  });
+  for (const st in cut.runs) {
+    const r = cut.runs[st];
+    ok('cutscene do avante (fase ' + (+st + 1) + '): os cinco Titãs fazem o combo no chefe', r.target && r.shown === 'beastboy,cyborg,raven,robin,starfire' && r.first === r.by && r.hits >= 15 && r.frozen && r.dmg > 0 && r.plus && r.frames < 420, r);
+  }
+  ok('cutscene do avante: ATAQUE pula para o final e o dano sai', cut.skip.frames < 60 && cut.skip.alive === 0, cut.skip);
+  ok('cutscene do avante: todos os quadros desenhados sem erro', cut.errors === 0 && cut.comp === 'source-over' && cut.alpha === 1, cut);
 
   // 4b) Regressões: Titã revivido volta a levantar; botão apertado durante o "hit-stop" não se perde
   const reg = await ev(() => {
@@ -200,7 +358,8 @@ async page => {
     TT.debug.start(0); TT.debug.step(10);
     g.hitstop = 5; g.energy = 100; g.input.pressed.add('super'); TT.debug.step(1);
     const superOk = g.superT > 0;
-    TT.debug.step(150);
+    let n = 0; while (g.cut && n++ < 900) g.step(); // espera a cutscene do avante acabar
+    TT.debug.step(20);
     g.hitstop = 5; g.switchCool = 0; g.input.pressed.add('t2'); TT.debug.step(1);
     return { superOk, switched: g.player.key === 'cyborg' };
   });
@@ -253,6 +412,573 @@ async page => {
     return { st, normal, exposed };
   });
   ok('Overload: chip exposto após o teleporte (dano dobrado)', weak.st === 'overheat' && weak.exposed === weak.normal * 2, weak);
+
+  // 4b4) Fraqueza do Plasmus: o soco esticado gruda o braço no chão — fica parado e leva dano dobrado
+  const sticky = await ev(() => {
+    const g = TT.game;
+    TT.debug.start(3); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const normal = h - b.hp;
+    b.startAttack(b.ATK.punch);
+    for (let t = 0; t < 120 && b.state !== 'stuck'; t++) g.step();
+    const st = b.state, x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); const stuckDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    const moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'stuck'; t++) g.step();
+    TT.debug.god(false);
+    return { st, normal, stuckDmg, moved, after: b.state };
+  });
+  ok('Plasmus: braço grudado após o soco (parado, dano dobrado) e depois se solta', sticky.st === 'stuck' && sticky.stuckDmg === sticky.normal * 2 && sticky.moved < 1 && sticky.after !== 'stuck', sticky);
+
+  // 4b4b) Fraqueza do Irmão Sangue: depois da telecinese fica com a mente esgotada (parado, dano dobrado);
+  //       na fase 2 chama alunos hipnotizados; a hipnose deixa o Titã tonto
+  const blood = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(4); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.hurl);
+    for (let t = 0; t < 160 && b.state !== 'tired'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.tiredDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'tired'; t++) g.step();
+    out.after = b.state;
+    // fase 2: invocação de alunos
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.cadets = g.enemies.filter((e) => e.kind === 'cadet' && !e.dead).length;
+    // hipnose: Titã dentro do círculo fica tonto (hurt) por bem mais tempo que um golpe comum
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.mind);
+    let hurt = 0;
+    for (let t = 0; t < 200; t++) { p.vx = p.vy = 0; g.step(); if (p.state === 'hurt') hurt++; }
+    out.hypnoFrames = hurt;
+    TT.debug.god(false); g.enemies.length = 0;
+    return out;
+  });
+  ok('Irmão Sangue: mente esgotada após a telecinese (parado, dano dobrado) e depois se recupera', blood.st === 'tired' && blood.tiredDmg === blood.normal * 2 && blood.moved < 1 && blood.after !== 'tired', blood);
+  ok('Irmão Sangue: chama alunos hipnotizados na fase 2', blood.cadets === 2, blood);
+  ok('Irmão Sangue: hipnose deixa o Titã tonto', blood.hypnoFrames >= 70, blood);
+
+  // 4b4c) Inimigos da fase 5: raio de azar da Jinx e os dois golpes do Mammoth acertam só depois do aviso no chão
+  const s5 = await ev(() => {
+    const g = TT.game, out = {};
+    const cases = [['jinx', 0, 160], ['mammoth', 0, 110], ['mammoth', 1, 120]];
+    for (const [kind, i, dist] of cases) {
+      TT.debug.start(4); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    // super armadura do Mammoth: um golpe comum não o derruba
+    TT.debug.start(4); TT.debug.toSection(0); TT.debug.step(5);
+    g.enemies.length = 0;
+    const m = g.spawnEnemy('mammoth', 0, 1); m.entering = false; m.x = g.player.x + 90; m.cool = 9999;
+    m.takeHit(g.player, { dmg: 8, knockdown: true, launch: 6, kb: 4 });
+    out.armor = m.state;
+    g.enemies.length = 0;
+    return out;
+  });
+  // 4b4d) Mumbo (fase 6): varinha cai depois dos coelhos da cartola (parado, dano dobrado);
+  //       o feitiço "MUMBO JUMBO!" transforma o Titã em coelho (não ataca) até o feitiço acabar
+  const mumbo = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(5); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.hat);
+    for (let t = 0; t < 160 && b.state !== 'fumble'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.fumbleDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'fumble'; t++) g.step();
+    out.after = b.state;
+    // feitiço: Titã parado dentro do círculo vira coelho
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.spell);
+    for (let t = 0; t < 90; t++) { p.vx = p.vy = 0; g.step(); }
+    out.bunny = p.bunny;
+    p.invul = 0; p.setState('idle');
+    g.input.pressed.add('light'); g.step(); g.step();
+    out.attackAsBunny = p.state === 'attack';
+    for (let t = 0; t < 200 && p.bunny > 0; t++) g.step();
+    for (let t = 0; t < 30; t++) g.step();
+    out.bunnyAfter = p.bunny;
+    p.setState('idle'); g.input.pressed.add('light'); g.step(); g.step();
+    out.attackAfter = p.state === 'attack';
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('Mumbo: varinha cai após os coelhos da cartola (parado, dano dobrado) e depois ele a recupera', mumbo.st === 'fumble' && mumbo.fumbleDmg === mumbo.normal * 2 && mumbo.moved < 1 && mumbo.after !== 'fumble', mumbo);
+  ok('Mumbo: "MUMBO JUMBO!" transforma o Titã em coelho (sem atacar) até o feitiço passar', mumbo.bunny > 0 && !mumbo.attackAsBunny && mumbo.bunnyAfter === 0 && mumbo.attackAfter, mumbo);
+
+  // 4b4e) Inimigos da fase 6: estocada do Soldado-Carta e salto do Coelho Mágico acertam só depois do aviso
+  const s6 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['card', 0, 160], ['bunny', 1, 100]]) {
+      TT.debug.start(5); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s6) ok('fase 6: golpe ' + k + ' acerta após o aviso', s6[k].zone && s6[k].inside && s6[k].hitT >= s6[k].s, s6[k]);
+
+  // 4b4f) Inimigos da fase 7: estocada e giro do Comando do Slade e bola de fogo do Demônio acertam só depois do aviso
+  const s7 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['commando', 0, 160], ['commando', 1, 80], ['demon', 0, 150]]) {
+      TT.debug.start(6); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s7) ok('fase 7: golpe ' + k + ' acerta após o aviso', s7[k].zone && s7[k].inside && s7[k].hitT >= s7[k].s, s7[k]);
+
+  // 4b4f2) Inimigos da fase 8: raio congelante (congela o Titã), chute esticado e giro da Madame Rouge acertam só depois do aviso
+  const s8 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist] of [['freezer', 0, 200], ['rouge', 0, 200], ['rouge', 1, 90]]) {
+      TT.debug.start(7); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1, frozen = 0;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; if (p.frozen > 0) frozen++; }
+      out[kind + ':' + i] = { zone, inside, hitT, s: e.def.attacks[i].s, frozen };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s8) ok('fase 8: golpe ' + k + ' acerta após o aviso', s8[k].zone && s8[k].inside && s8[k].hitT >= s8[k].s, s8[k]);
+  ok('fase 8: o raio congelante prende o Titã no gelo', s8['freezer:0'].frozen >= 30, s8['freezer:0']);
+
+  // 4b4f3) Mallah e o Cérebro (fase 8): depois do laser a cúpula abre (parado, dano dobrado); na fase 2 chama
+  //        congeladores; o raio congelante do Cérebro congela o Titã dentro do círculo
+  const mallah = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(7); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.beam);
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.freezers = g.enemies.filter((e) => e.kind === 'freezer' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.freeze);
+    let frozen = 0;
+    for (let t = 0; t < 120; t++) { p.vx = p.vy = 0; g.step(); if (p.frozen > 0) frozen++; }
+    out.frozenFrames = frozen;
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('Mallah: cúpula do Cérebro abre depois do laser (parado, dano dobrado) e depois fecha', mallah.st === 'open' && mallah.openDmg === mallah.normal * 2 && mallah.moved < 1 && mallah.after !== 'open', mallah);
+  ok('Mallah: chama soldados congeladores na fase 2', mallah.freezers === 2, mallah);
+  ok('Mallah: o raio congelante do Cérebro congela o Titã', mallah.frozenFrames >= 40, mallah);
+
+  // 4b4f4) Inimigos da fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca acertam só depois do aviso
+  const s9 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist, dy] of [['tvbot', 0, 200, 0], ['popcorn', 0, 160, 0], ['popcorn', 0, 250, 14]]) {
+      TT.debug.start(8); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y - dy; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i + '@' + dist] = { zone, inside, hitT, s: e.def.attacks[i].s };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s9) ok('fase 9: golpe ' + k + ' acerta após o aviso', s9[k].zone && s9[k].inside && s9[k].hitT >= s9[k].s, s9[k]);
+
+  // 4b4f5) Control Freak (fase 9): depois do ZAP MÁXIMO a pilha acaba (parado, dano dobrado) e depois volta;
+  //        na fase 2 chama TV-Robôs; o botão de PAUSA pausa o Titã dentro do círculo; e "COMBOS NOVOS!"
+  //        só é anunciado na fase 8 (a fase 9 já começa com eles)
+  const freak = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(8); TT.debug.toSection(4); TT.debug.god(true);
+    out.banner9 = g.powerBanner;
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.zap);
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.tvbots = g.enemies.filter((e) => e.kind === 'tvbot' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player; p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0;
+    b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; p.x = b.x - 400; p.y = 590;
+    b.startAttack(b.ATK.pause);
+    let paused = 0, kind = null;
+    for (let t = 0; t < 120; t++) { p.vx = p.vy = 0; g.step(); if (p.frozen > 0) { paused++; kind = p.frozenKind; } }
+    out.pausedFrames = paused; out.kind = kind;
+    g.enemies.length = 0;
+    TT.debug.start(7); out.banner8 = g.powerBanner;
+    TT.debug.start(6); out.banner7 = g.powerBanner;
+    return out;
+  });
+  ok('Control Freak: a pilha acaba depois do ZAP MÁXIMO (parado, dano dobrado) e depois volta', freak.name === 'CONTROL FREAK' && freak.st === 'open' && freak.openDmg === freak.normal * 2 && freak.moved < 1 && freak.after !== 'open', freak);
+  ok('Control Freak: chama TV-Robôs na fase 2', freak.tvbots === 2, freak);
+  ok('Control Freak: o botão de PAUSA pausa o Titã', freak.pausedFrames >= 40 && freak.kind === 'pause', freak);
+  ok('fase 9 já começa com os combos (sem repetir o aviso de COMBOS NOVOS das fases 7 e 8)', freak.banner9 === 0 && freak.banner8 === 1 && freak.banner7 === 1, freak);
+
+  // 4b4f6) Inimigos da fase 10: investida do Guarda Real, raio e flash do Olho Hipnótico acertam só depois do aviso
+  const s10 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist, dy] of [['guard', 0, 180, 0], ['eye', 0, 200, 0], ['eye', 1, 60, 10]]) {
+      TT.debug.start(9); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y - dy; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i + '@' + dist] = { zone, inside, hitT, s: e.def.attacks[i].s, inverted: p.inverted };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s10) ok('fase 10: golpe ' + k + ' acerta após o aviso', s10[k].zone && s10[k].inside && s10[k].hitT >= s10[k].s, s10[k]);
+  ok('fase 10: o raio do Olho Hipnótico inverte os controles', s10['eye:0@200'].inverted > 0, s10['eye:0@200']);
+
+  // 4b4f7) Mad Mod (fase 10): fica tonto depois da espiral gigante (parado, dano dobrado), a espiral puxa o
+  //        Titã para o centro, o raio hipnótico inverte os controles, o raio da juventude deixa o Titã velhinho
+  //        e o Mad Mod recupera vida, e na fase 2 ele chama Guardas Reais
+  const mod = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(9); TT.debug.toSection(4); TT.debug.god(true);
+    out.banner10 = g.powerBanner;
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.spiral);
+    for (let t = 0; t < 200 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 220 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.guards = g.enemies.filter((e) => e.kind === 'guard' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player, reset = () => { p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0; p.inverted = 0; p.aged = 0; b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; b.facing = -1; };
+    // espiral: o Titã parado perto da marca é puxado para o centro
+    reset(); p.x = b.x - 420; p.y = 600;
+    b.startAttack(b.ATK.spiral);
+    const lockT = Math.ceil(b.ATK.spiral.s * 0.4);
+    for (let t = 0; t < lockT; t++) g.step();
+    const z = b.atk.zones[0]; p.x = z.x + 220; p.y = z.y; const d0p = Math.abs(p.x - z.x);
+    for (let t = 0; t < 20; t++) { p.vx = p.vy = 0; g.step(); }
+    out.pulled = Math.round(d0p - Math.abs(p.x - z.x));
+    // raio hipnótico
+    reset(); p.x = b.x - 420; p.y = 590;
+    b.startAttack(b.ATK.hypno);
+    for (let t = 0; t < 80; t++) { p.vx = p.vy = 0; g.step(); }
+    out.inverted = p.inverted;
+    // raio da juventude
+    reset(); p.x = b.x - 420; p.y = 590; b.hp = b.maxHp * 0.4; const bh = b.hp;
+    b.startAttack(b.ATK.youth);
+    for (let t = 0; t < 80; t++) { p.vx = p.vy = 0; g.step(); }
+    out.aged = p.aged; out.healed = Math.round(b.hp - bh);
+    g.enemies.length = 0; p.inverted = 0; p.aged = 0;
+    return out;
+  });
+  ok('Mad Mod: fica tonto depois da espiral gigante (parado, dano dobrado) e depois volta', mod.name === 'MAD MOD' && mod.st === 'open' && mod.openDmg === mod.normal * 2 && mod.moved < 1 && mod.after !== 'open', mod);
+  ok('Mad Mod: a espiral gigante puxa o Titã para o centro', mod.pulled > 20, mod);
+  ok('Mad Mod: o raio hipnótico inverte os controles', mod.inverted > 0, mod);
+  ok('Mad Mod: o raio da juventude deixa o Titã velhinho e ele recupera vida', mod.aged > 0 && mod.healed > 0, mod);
+  ok('Mad Mod: chama Guardas Reais na fase 2', mod.guards === 2, mod);
+  ok('fase 10 já começa com os combos (sem repetir o aviso)', mod.banner10 === 0, mod);
+
+  // 4b4f8) Mecânicas novas: esquiva perfeita (câmera lenta + contra-ataque), troca em combo, controles
+  //        invertidos (apertar ATAQUE acorda) e velhinho mais lento
+  const mech = await ev(() => {
+    const g = TT.game, out = {}; TT.debug.god(false);
+    const fresh = (stage) => {
+      TT.debug.start(stage); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] }); g.enemies.length = 0; g.banner = null; g.powerBanner = 0;
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590; p.setState('idle'); p.atk = null; p.x = g.camX + 600;
+      return p;
+    };
+    let p = fresh(0);
+    let e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 70; e.y = p.y; e.entering = false; e.facing = -1;
+    e.startAttack(e.def.attacks[0]);
+    const s0 = e.atk.def.s; let dodged = false;
+    for (let t = 0; t < 60; t++) { if (!dodged && e.atk && e.atk.t >= s0 - 3) { g.input.pressed.add('dash'); dodged = true; } g.step(); }
+    out.perfect = { count: g.perfectDodges || 0, mul: p.dmgMul, full: p.hp === p.maxHp, energy: Math.round(g.energy) };
+    e.hp = e.maxHp = 9999; e.cool = 9999; p.counterT = 50; p.dmgMul = 1.6;
+    let h = e.hp; e.takeHit(p, { dmg: 10 }, 1); out.counterDmg = Math.round(h - e.hp);
+    p.counterT = 0; p.dmgMul = 1; h = e.hp; e.takeHit(p, { dmg: 10 }, 1); out.plainDmg = Math.round(h - e.hp);
+    // esquiva cedo demais (sem golpe chegando) não conta
+    p = fresh(0); g.perfectDodges = 0; g.input.pressed.add('dash'); for (let t = 0; t < 20; t++) g.step();
+    out.noFalse = g.perfectDodges;
+    // troca em combo
+    p = fresh(0);
+    e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 60; e.y = p.y; e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+    g.combo = 4; p.startAttack(p.def.light[0]); g.step();
+    g.input.pressed.add('t2'); g.step();
+    out.tag = { key: g.player.key, dash: !!(g.player.atk && g.player.atk.def === g.player.def.dashAtk) };
+    p = fresh(0); g.combo = 0; p.startAttack(p.def.light[0]); g.step(); g.input.pressed.add('t2'); g.step();
+    out.noTag = g.player.key;
+    // andar: normal, invertido e velhinho
+    const walk = (setup) => {
+      const q = fresh(9); setup(q); const x0 = q.x;
+      g.input.pl[0].bot = { down: new Set(['right']), pressed: new Set(), update() {} };
+      for (let t = 0; t < 20; t++) g.step();
+      g.input.pl[0].bot = null;
+      return Math.round(q.x - x0);
+    };
+    out.walk = { normal: walk(() => {}), inverted: walk((q) => { q.inverted = 200; }), aged: walk((q) => { q.aged = 200; }) };
+    p = fresh(9); p.inverted = 200;
+    for (let t = 0; t < 6; t++) { g.input.pressed.add('light'); for (let k = 0; k < 4; k++) g.step(); }
+    out.shake = p.inverted; p.inverted = 0;
+    return out;
+  });
+  ok('esquiva perfeita: esquivar bem na hora não leva dano e dá energia e contra-ataque', mech.perfect.count === 1 && mech.perfect.mul > 1 && mech.perfect.full, mech);
+  ok('esquiva perfeita: o contra-ataque dá 60% a mais de dano', mech.counterDmg === Math.round(mech.plainDmg * 1.6), mech);
+  ok('esquiva perfeita: esquivar sem golpe chegando não conta', mech.noFalse === 0, mech);
+  ok('troca em combo: com 3+ golpes troca no meio do ataque e quem entra já ataca', mech.tag.key === 'cyborg' && mech.tag.dash && mech.noTag === 'robin', mech);
+  ok('hipnose: controles invertidos e apertar ATAQUE acorda mais rápido', mech.walk.normal > 50 && mech.walk.inverted === -mech.walk.normal && mech.shake < 200 - 24 - 60, mech);
+  ok('raio da juventude: o velhinho anda mais devagar', mech.walk.aged > 0 && mech.walk.aged < mech.walk.normal * 0.7, mech);
+
+  // 4b4f9) Fase 11: cada Clone Sombrio usa o poder do Titã copiado (marcado no chão, acerta só depois do aviso)
+  const s11 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const key of TT.TITAN_ORDER) {
+      TT.debug.start(10); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] }); g.effects.length = 0;
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = new TT.ShadowClone(g, p.x + 180, p.y, key); e.entering = false; e.facing = -1; g.addEnemy(e);
+      e.startAttack(e.def.attacks[0]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      g.render();
+      out[key] = { zone, inside, hitT, s: e.def.attacks[0].s, style: e.style === TT.STYLES[key] };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s11) ok('fase 11: o Clone Sombrio do(a) ' + k + ' usa o poder dele e acerta após o aviso', s11[k].zone && s11[k].inside && s11[k].hitT >= s11[k].s && s11[k].style, s11[k]);
+
+  // 4b4f10) Fissuras de fogo: avisam antes, queimam o Titã e também os inimigos que estiverem em cima
+  const vent = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(10); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+    g.stage = Object.assign({}, g.stage, { sections: [] }); g.effects.length = 0; g.enemies.length = 0; g.secActive = true;
+    const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 600; p.x = g.camX + 400;
+    const v = new TT.FireVent(g, p.x, p.y, 0); g.addEffect(v);
+    const e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 30; e.y = p.y; e.entering = false; e.cool = 1e9; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+    const h0 = p.hp, eh0 = e.hp; let warnT = -1, hitT = -1;
+    for (let t = 1; t < 260; t++) { p.vx = p.vy = 0; p.x = v.x; p.y = v.y; e.x = v.x + 30; e.y = v.y; g.step(); if (warnT < 0 && g.dangerZones().length) warnT = t; if (hitT < 0 && p.hp < h0) hitT = t; }
+    out.warnT = warnT; out.hitT = hitT; out.enemyHurt = Math.round(eh0 - e.hp);
+    g.secIdx++; g.step(); out.removed = !g.effects.includes(v);
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('fase 11: a fissura de fogo avisa antes e queima o Titã', vent.warnT > 0 && vent.hitT > vent.warnT + 40, vent);
+  ok('fase 11: a fissura de fogo também queima os inimigos (e some quando a área termina)', vent.enemyHurt > 0 && vent.removed, vent);
+
+  // 4b4f11) Trigon: punhos presos depois do punho duplo (parado, dano dobrado), Clones Sombrios e Esferas de
+  //         Luz na fase 2 (quem pega bate 75% mais forte) e o final da luz (só ele derrota Trigon)
+  const tri = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(10); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name; out.big = b.height;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1, lightT: 100 }, d0); out.lit = Math.round(h - b.hp);
+    b.startAttack(b.ATK.fists);
+    for (let t = 0; t < 200 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 220 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.clones = g.enemies.filter((e) => e.kind === 'clone' && !e.dead).length;
+    g.enemies.length = 0; g.enemies.push(b); b.cool = 1e9; b.setState('idle'); b.atk = null;
+    // esfera de luz aparece e quem pega fica iluminado
+    let orb = null; for (let t = 0; t < 500 && !orb; t++) { g.step(); b.cool = 1e9; orb = g.pickups.find((k) => k.kind === 'light'); }
+    out.orb = !!orb;
+    if (orb) { const p = g.player; p.x = orb.x; p.y = orb.y; for (let t = 0; t < 40; t++) { p.x = orb.x; p.y = orb.y; g.step(); } out.lightT = p.lightT; }
+    // golpe "fatal" antes do final: não derrota; o final da luz começa
+    b.hp = b.maxHp * 0.3; b.takeHit({ x: b.x - 10, dmgMul: 1 }, { dmg: 99999 });
+    out.finale = !!g.finale; out.deadEarly = b.dead;
+    // aperta ATAQUE: a barra enche e a luz derrota Trigon
+    let t = 0; while (g.finale && t++ < 2000) { if (t % 4 === 0) g.input.pressed.add('light'); g.step(); if (t % 20 === 0) g.render(); }
+    out.finaleFrames = t; out.dead = b.dead;
+    let k = 0; while (g.state === 'play' && k++ < 1500) g.step();
+    out.state = g.state;
+    TT.debug.god(false);
+    return out;
+  });
+  ok('Trigon: gigante, fica de joelhos com os punhos presos (parado, dano dobrado) e depois volta', tri.name === 'TRIGON' && tri.big >= 300 && tri.st === 'open' && tri.openDmg === tri.normal * 2 && tri.moved < 1 && tri.after !== 'open', tri);
+  ok('Trigon: chama Clones Sombrios na fase 2', tri.clones === 2, tri);
+  ok('Trigon: Esfera de Luz aparece na fase 2 e quem pega bate 75% mais forte', tri.orb && tri.lightT > 0 && tri.lit === Math.round(tri.normal * 1.75), tri);
+  ok('Trigon: o final da luz começa antes de ele cair e, com ATAQUE, a Ravena vence (fase concluída)', tri.finale && !tri.deadEarly && tri.dead && tri.finaleFrames < 700 && tri.state === 'clear', tri);
+
+  // 4b4f12) História: cena de abertura (para o jogo, ATAQUE avança, Esc pula), cena antes do chefe, rádio dos
+  //         Titãs nas áreas e epílogo antes da tela de fase concluída
+  const story = await ev(() => {
+    const g = TT.game, out = {};
+    window.TT_NOSTORY = false;
+    TT.debug.start(10);
+    out.opening = !!g.story; out.lines = g.story ? g.story.lines.length : 0;
+    const x0 = g.player.x; g.input.pl[0].bot = { down: new Set(['right']), pressed: new Set(), update() {} };
+    for (let t = 0; t < 30; t++) g.step();
+    g.input.pl[0].bot = null; out.frozen = Math.abs(g.player.x - x0) < 1;
+    g.input.pressed.add('light'); g.step(); g.input.pressed.add('light'); g.step(); out.advanced = g.story && g.story.i;
+    g.input.pressed.add('pause'); g.step(); out.skipped = !g.story && g.state === 'play';
+    TT.debug.toSection(0); for (let t = 0; t < 30; t++) g.step();
+    out.radio = !!(g.comms && g.comms.cur && g.comms.cur.key);
+    TT.debug.toSection(4); for (let t = 0; t < 10; t++) g.step();
+    out.bossStory = !!g.story && !g.boss;
+    for (let t = 0; t < 14; t++) g.step(); // a cena ignora o botão nos primeiros quadros (não pula sem querer)
+    g.input.pressed.add('pause'); g.step();
+    let n = 0; while (!g.boss && n++ < 20) g.step();
+    out.bossAfter = !!g.boss;
+    // epílogo: aparece antes da tela de FASE CONCLUÍDA
+    g.boss = null; g.enemies.length = 0; g.clearTimer = 1; g.step();
+    out.epilogue = !!g.story && g.state === 'play';
+    for (let t = 0; t < 14; t++) g.step();
+    g.input.pressed.add('pause'); g.step();
+    out.clearAfter = g.state;
+    window.TT_NOSTORY = true;
+    g.render();
+    return out;
+  });
+  ok('história: cena de abertura para o jogo, ATAQUE avança e Esc pula', story.opening && story.lines >= 5 && story.frozen && story.advanced >= 1 && story.skipped, story);
+  ok('história: rádio dos Titãs fala durante as áreas', story.radio, story);
+  ok('história: cena antes de Trigon e o chefe entra depois', story.bossStory && story.bossAfter, story);
+  ok('história: epílogo antes da tela de fase concluída', story.epilogue && story.clearAfter === 'clear', story);
+
+  // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
+  //       na fase 2 chama comandos
+  const slade = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(6); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.leap);
+    let maxZ = 0;
+    for (let t = 0; t < 160 && b.state !== 'open'; t++) { g.step(); maxZ = Math.max(maxZ, b.z); }
+    out.st = b.state; out.maxZ = Math.round(maxZ); out.z = b.z; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 200 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.commandos = g.enemies.filter((e) => e.kind === 'commando' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0;
+    return out;
+  });
+  ok('Slade: salto com o bastão e guarda aberta depois (parado, dano dobrado), depois se recupera', slade.st === 'open' && slade.maxZ > 200 && slade.z === 0 && slade.openDmg === slade.normal * 2 && slade.moved < 1 && slade.after !== 'open', slade);
+  ok('Slade: chama comandos na fase 2', slade.commandos === 2, slade);
+  for (const k in s5) if (k !== 'armor') ok('fase 5: golpe ' + k + ' acerta após o aviso', s5[k].zone && s5[k].inside && s5[k].hitT >= s5[k].s, s5[k]);
+  ok('fase 5: Mammoth não cai com golpe comum (super armadura)', s5.armor !== 'down' && s5.armor !== 'hurt', s5.armor);
+
+  // 4b5) Vozes: só a Ravena fala ("Azarath Metrion Zinthos!"); os outros Titãs ficam só no balão
+  const voices = await ev(() => {
+    const g = TT.game, A = TT.audio, calls = [], orig = A.voice;
+    A.voice = (k, t) => calls.push(k + ':' + t);
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    for (const i of [3, 2, 0, 4]) {
+      g.switchCool = 0; g.switchTo(i, true); TT.debug.step(60);
+      g.energy = 100; g.input.pressed.add('special'); TT.debug.step(30);
+    }
+    A.voice = orig;
+    return calls;
+  });
+  ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
+  const songs = await ev(() => TT.STAGES.map((s) => s.song));
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 11 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -315,6 +1041,79 @@ async page => {
     C(2, 'teleport', (b) => ({ x: b.x - 400, y: b.y + 20 }),
       (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
     C(2, 'ring', (b) => ({ x: b.x - 250, y: b.y }), (b) => ({ x: b.x - 80, y: b.y + 20 }));
+    // Plasmus (fase 4)
+    C(3, 'punch', (b) => ({ x: b.x - 320, y: b.y + 10 }), (b) => ({ x: b.x - 320, y: b.y + 70 }));
+    C(3, 'spit', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    C(3, 'wave', (b) => ({ x: b.x - 300, y: b.y + 40 }), (b) => ({ x: b.x - 610, y: 695 }));
+    C(3, 'dive', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    // Irmão Sangue (fase 5)
+    C(4, 'palm', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(4, 'beam', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(4, 'mind', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(4, 'hurl', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    // Mumbo (fase 6)
+    C(5, 'wand', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(5, 'cards', (b) => ({ x: b.x - 400, y: b.y }), (b) => ({ x: b.x - 400, y: b.y + 40 }));
+    C(5, 'spell', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(5, 'hat', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    // Slade (fase 7)
+    C(6, 'combo', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 270, y: b.y }));
+    C(6, 'leap', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + z.rx + 50, y: z.y }) }));
+    C(6, 'fire', (b) => ({ x: b.x - 200, y: b.y }), (b) => ({ x: b.x - 420, y: b.y }));
+    C(6, 'bombs', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    // Mallah e o Cérebro (fase 8)
+    C(7, 'smash', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 270, y: b.y }));
+    C(7, 'charge', (b) => ({ x: b.x - 420, y: b.y + 20 }), (b) => ({ x: b.x - 420, y: b.y + 84 }));
+    C(7, 'beam', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(7, 'freeze', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    // Control Freak (fase 9)
+    C(8, 'swat', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(8, 'zap', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    for (const nm of ['tvs', 'pause']) C(8, nm, (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
+    // Mad Mod (fase 10)
+    C(9, 'cane', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(9, 'hypno', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(9, 'youth', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    // espiral: a marca segue o Titã e trava; fora = longe o bastante para a espiral não puxar
+    C(9, 'spiral', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + 345, y: z.y }) }));
+    // Trigon (fase 11)
+    C(10, 'stomp', (b) => ({ x: b.x - 180, y: b.y + 10 }), (b) => ({ x: b.x - 330, y: b.y }));
+    C(10, 'fists', (b) => ({ x: b.x - 230, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y }));
+    C(10, 'eyes', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 70 }));
+    C(10, 'meteors', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 150) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -328,14 +1127,14 @@ async page => {
     ok('aviso do chefe: ' + k + (expectHit ? ' (acerta)' : ' (não acerta)'), warned && r.hit === expectHit && r.inside === expectHit, r);
   }
 
-  // 5) Jogo completo com bot (modo deus): fase 1 -> fase 2 -> final, 3 vezes (detecta travamentos raros)
+  // 5) Jogo completo com bot (modo deus): todas as fases até a vitória, 3 vezes (detecta travamentos raros)
   for (let run = 1; run <= 3; run++) {
     const full = await ev(() => {
       const g = TT.game;
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 70000) {
+      while (g.state !== 'victory' && steps < 340000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -354,60 +1153,212 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (3 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:2') && full.seen.includes('clear:2'), full);
+    ok('jogo completo (11 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:10') && full.seen.includes('clear:10'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);
       TT.debug.start(stage); TT.debug.toSection(4); TT.debug.bot(true);
       let steps = 0;
-      while (g.state === 'play' && steps < 20000) { g.step(); steps++; }
+      while (g.state === 'play' && steps < 26000) { g.step(); steps++; }
       TT.debug.bot(false);
       return { stage, result: g.state, steps, koTitans: g.team.filter((t) => t.ko).length, bossHp: g.boss ? Math.round(g.boss.hp) : 0 };
     }, st);
     ok('bot vence o chefe da fase ' + (st + 1) + ' sem trapaça (NORMAL)', r.result === 'clear', r);
   }
 
+  // 6a) BOTÕES NA TELA (celular): liga pelo menu, analógico navega no menu e anda, botões golpeiam,
+  //     pausa e opacidade (salva no navegador). Usa o mouse, que gera os mesmos eventos de ponteiro do toque.
+  await page.goto('http://localhost:8765/?touch=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.debug);
+  const frames = (n) => ev((n) => new Promise((r) => { const f0 = TT.game.frame; (function w() { if (TT.game.frame >= f0 + n) r(); else requestAnimationFrame(w); })(); }), n);
+  await frames(30);
+  const tc = {};
+  tc.menu = await ev(() => {
+    const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.endStep();
+    const press = (k) => { g.input.pressed.add(k); g.step(); };
+    const hidden = getComputedStyle(document.getElementById('tt-touch')).display === 'none';
+    const was = g.touch.level;
+    g.menuIdx = g.titleItems().indexOf('touch');
+    g.touch.level = 'off'; press('right');
+    const on = { lvl: g.touch.level, label: g.menuLabel('touch').value };
+    press('right'); press('left'); press('left');
+    const off = g.touch.level;
+    press('right'); press('right');
+    g.menuIdx = 0;
+    return { was, hidden, on, off, lvl: g.touch.level, display: getComputedStyle(document.getElementById('tt-touch')).display, css: document.getElementById('tt-touch').style.opacity, saved: TT.store.get('botoes') };
+  });
+  const box = async (sel) => { const b = await page.locator(sel).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+  const z = await box('#tt-stick-zone');
+  const flick = async (dx, dy) => { await page.mouse.move(z.x, z.y); await page.mouse.down(); await page.mouse.move(z.x + dx, z.y + dy, { steps: 4 }); await frames(3); await page.mouse.up(); await frames(3); };
+  await flick(0, 80); await flick(0, 80);
+  tc.menuMoved = await ev(() => TT.game.menuIdx);
+  await flick(0, -80); await flick(0, -80);
+  const tapBtn = async (act) => { const b = await box('[data-act=' + act + ']'); await page.mouse.click(b.x, b.y); await frames(2); };
+  await tapBtn('light'); await frames(8);
+  tc.started = await ev(() => TT.game.state === 'play' && TT.game.stageIdx === 0);
+  await ev(() => { TT.game.banner = null; for (const t of TT.game.team) t.invul = 0; });
+  const tx0 = await ev(() => TT.game.player.x);
+  await page.mouse.move(z.x, z.y); await page.mouse.down(); await page.mouse.move(z.x + 90, z.y, { steps: 4 });
+  await frames(40);
+  tc.walked = Math.round((await ev(() => TT.game.player.x)) - tx0);
+  await page.mouse.up(); await frames(5);
+  // polegar em arco: empurrando para a direita com o dedo descendo ~30° não pode virar "para baixo";
+  // a diagonal de verdade (45°) ainda vale as duas direções
+  const arc = async (pts) => {
+    await page.mouse.move(z.x, z.y); await page.mouse.down();
+    for (const [dx, dy] of pts) { await page.mouse.move(z.x + dx, z.y + dy, { steps: 3 }); await frames(2); }
+    const ty0 = await ev(() => TT.game.player.y); await frames(30);
+    const r = { dirs: await ev(() => [...TT.game.touch.dirs].sort().join('+')), dy: Math.round((await ev(() => TT.game.player.y)) - ty0) };
+    await page.mouse.up(); await frames(5);
+    return r;
+  };
+  tc.arc = await arc([[0, 8], [30, 18], [60, 30], [75, 40]]);
+  tc.diag = await arc([[40, 40], [60, 60]]);
+  tc.moves = {};
+  for (const a of ['light', 'heavy', 'special', 'jump']) { await frames(50); await ev(() => { TT.game.energy = 100; }); await tapBtn(a); tc.moves[a] = await ev(() => TT.game.player.state); }
+  await frames(60);
+  const k0 = await ev(() => TT.game.player.key);
+  await tapBtn('next'); await frames(3);
+  tc.switched = k0 !== (await ev(() => TT.game.player.key));
+  await tapBtn('pause');
+  tc.paused = await ev(() => TT.game.state);
+  await flick(0, 80); await flick(0, 80);
+  tc.pauseItem = await ev(() => TT.game.pauseItems()[TT.game.pauseIdx]);
+  await flick(-90, 0);
+  tc.opacity = await ev(() => ({ lvl: TT.game.touch.level, css: document.getElementById('tt-touch').style.opacity, saved: TT.store.get('botoes') }));
+  await tapBtn('pause');
+  tc.resumed = await ev(() => TT.game.state);
+  // volta a deixar os botões como estavam (sem nada salvo)
+  await ev(() => { localStorage.removeItem('jovensTitas.botoes'); TT.game.touch.level = 'off'; TT.game.touch.apply(); });
+  ok('botões na tela: item do menu liga, muda a opacidade, desliga e salva',
+    tc.menu.hidden && tc.menu.on.lvl === 0.25 && tc.menu.on.label === '25%' && tc.menu.off === 'off' && tc.menu.lvl === 0.4 && tc.menu.display === 'block' && tc.menu.css === '0.4' && tc.menu.saved === '0.4', tc.menu);
+  ok('botões na tela: analógico navega no menu e ATAQUE começa o jogo', tc.menuMoved === 2 && tc.started, tc);
+  ok('botões na tela: analógico anda e ATAQUE/FORTE/ESPECIAL/PULO funcionam',
+    tc.walked > 100 && tc.moves.light === 'attack' && tc.moves.heavy === 'attack' && tc.moves.special === 'attack' && tc.moves.jump === 'air', tc);
+  ok('botões na tela: analógico em arco para a direita não puxa para baixo (diagonal de verdade ainda vale)',
+    tc.arc.dirs === 'right' && tc.arc.dy === 0 && tc.diag.dirs === 'down+right' && tc.diag.dy > 0, { arc: tc.arc, diag: tc.diag });
+  ok('botões na tela: TROCAR, pausa (II) e opacidade pela pausa', tc.switched && tc.paused === 'pause' && tc.pauseItem === 'touch' && tc.opacity.lvl === 0.25 && tc.opacity.css === '0.25' && tc.opacity.saved === '0.25' && tc.resumed === 'play', tc);
+
+  // 6a2) MENU INICIAL: pela pausa (pede confirmação) e pela tela de game over (Esc)
+  const quit = await ev(() => {
+    TT.paused = true;
+    const g = TT.game, out = {};
+    const press = (...ks) => { for (const k of ks) g.input.pressed.add(k); g.step(); };
+    TT.debug.start(3); TT.debug.step(30);
+    press('pause', 'menu'); // Esc manda 'pause' e 'menu'
+    const items = g.pauseItems();
+    out.paused = g.state;
+    for (let i = 0; i < items.indexOf('quit'); i++) press('down');
+    out.item = items[g.pauseIdx];
+    press('light'); out.armed = [g.state, g.menuLabel('quit').value];
+    press('up'); press('down'); out.disarmed = !g.quitArm;
+    press('light'); press('menu');
+    out.title = [g.state, g.menuIdx, g.score];
+    // game over: Esc volta ao título; ENTER tenta de novo
+    TT.debug.start(2); TT.debug.step(5);
+    g.state = 'gameover'; g.stateT = 100;
+    press('pause', 'menu');
+    out.fromGameOver = g.state;
+    TT.debug.start(2); TT.debug.step(5);
+    g.state = 'gameover'; g.stateT = 100;
+    press('start', 'menu');
+    out.retry = [g.state, g.stageIdx];
+    return out;
+  });
+  ok('menu inicial pela pausa (com confirmação)', quit.paused === 'pause' && quit.item === 'quit' && quit.armed[0] === 'pause' && quit.armed[1] === 'CONFIRMAR' && quit.disarmed && quit.title[0] === 'title' && quit.title[1] === 0 && quit.title[2] === 0, quit);
+  ok('menu inicial pelo game over (Esc); ENTER ainda tenta de novo', quit.fromGameOver === 'title' && quit.retry[0] === 'play' && quit.retry[1] === 2, quit);
+
+  // 6a3) APP INSTALÁVEL: manifesto sem erros, service worker guarda o jogo, abre sem internet e o item
+  //      INSTALAR APP aparece no título quando o navegador oferece a instalação
+  await page.goto('http://localhost:8765/?pwa=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.game);
+  // o service worker só controla a página a partir da próxima visita: espera ele ficar ativo e recarrega
+  await page.waitForFunction(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!(r && r.active); }, null, { timeout: 15000 }).catch(() => {});
+  await page.goto('http://localhost:8765/?pwa=' + Date.now());
+  await page.waitForFunction(() => window.TT && TT.game);
+  await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+  const cdp = await page.context().newCDPSession(page);
+  const man = await cdp.send('Page.getAppManifest');
+  const inst = (await cdp.send('Page.getInstallabilityErrors')).installabilityErrors.map((e) => e.errorId).filter((id) => id !== 'in-incognito');
+  const swInfo = await ev(async () => { const keys = await caches.keys(); const c = keys.length ? await caches.open(keys[0]) : null; return { controller: !!navigator.serviceWorker.controller, files: c ? (await c.keys()).length : 0 }; });
+  await page.context().setOffline(true);
+  const offline = await page.reload().then(() => page.waitForFunction(() => window.TT && TT.game && TT.game.state === 'title', null, { timeout: 10000 }))
+    .then(() => true).catch(() => false);
+  await page.context().setOffline(false);
+  if (!offline) { await page.goto('http://localhost:8765/?pwa2=' + Date.now()); await page.waitForFunction(() => window.TT && TT.game); }
+  const installItem = await ev(() => {
+    const g = TT.game; let prompted = 0;
+    const e = new Event('beforeinstallprompt'); e.prompt = () => { prompted++; }; e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+    const items = g.titleItems();
+    g.state = 'title'; g.stateT = 50; g.showControls = false; g.menuIdx = items.indexOf('install'); g.input.endStep();
+    g.input.pressed.add('menu'); g.step();
+    return { has: items.includes('install'), label: g.menuLabel('install').text, prompted };
+  });
+  ok('app instalável: manifesto sem erros e ícones', man.errors.length === 0 && inst.length === 0 && /Jovens Tit/.test(man.url ? 'Jovens Titãs' : ''), { errors: man.errors, inst });
+  ok('app instalável: service worker guarda o jogo e ele abre sem internet', swInfo.controller && swInfo.files >= 20 && offline, { swInfo, offline });
+  ok('app instalável: item INSTALAR APP aparece e abre a instalação', installItem.has && installItem.label === 'INSTALAR APP' && installItem.prompted === 1, installItem);
+  await ev(async () => { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.unregister(); for (const k of await caches.keys()) await caches.delete(k); });
+
   // 6b) CO-OP LOCAL (2 jogadores) — recarrega a página para não herdar estado dos testes anteriores
   await page.goto('http://localhost:8765/?coop=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);
   await sleep(400);
   await ev(() => { TT.paused = false; TT.debug.bot(false); TT.debug.god(false); TT.game.state = 'title'; TT.game.stateT = 50; TT.game.menuIdx = 0; TT.game.setPlayers(1); });
-  await sleep(100);
-  await page.keyboard.press('ArrowDown'); await sleep(60);
-  await page.keyboard.press('ArrowRight'); await sleep(60);
+  // cada tecla espera o jogo processar alguns passos (o 1º quadro após recarregar monta os cenários e demora)
+  const tap = async (key) => {
+    const f0 = await ev(() => TT.game.frame);
+    await page.keyboard.press(key);
+    await page.waitForFunction((f) => TT.game.frame >= f + 3, f0, { timeout: 5000 }).catch(() => {});
+  };
+  await page.waitForFunction(() => TT.game.frame > 30, null, { timeout: 8000 }).catch(() => {});
+  await tap('ArrowDown');
+  await tap('ArrowDown');
+  await tap('ArrowDown');
+  await tap('ArrowRight');
   const coopSel = await ev(() => TT.game.numPlayers);
-  await page.keyboard.press('ArrowUp'); await sleep(60);
-  await page.keyboard.press('Enter'); await sleep(200);
+  await tap('ArrowUp');
+  await tap('ArrowUp');
+  await tap('ArrowUp');
+  await tap('Enter'); await sleep(100);
   const coopStart = await ev(() => ({ st: TT.game.state, n: TT.game.players().length, keys: TT.game.players().map((t) => t.key) }));
   ok('co-op: escolher 2 jogadores no título e começar', coopSel === 2 && coopStart.st === 'play' && coopStart.n === 2 && coopStart.keys[0] !== coopStart.keys[1], { coopSel, coopStart });
   await ev(() => { TT.game.banner = null; for (const t of TT.game.players()) t.invul = 0; });
   // controles independentes com teclado real
   const pos = () => ev(() => TT.game.players().map((t) => Math.round(t.x)));
   const a0 = await pos();
-  await page.keyboard.down('KeyD'); await sleep(400); await page.keyboard.up('KeyD');
+  // segura a tecla por 24 passos do jogo (não por tempo: independe da carga da máquina)
+  const hold = async (key) => {
+    const f0 = await ev(() => TT.game.frame);
+    await page.keyboard.down(key);
+    await page.waitForFunction((f) => TT.game.frame >= f + 24, f0, { timeout: 5000 }).catch(() => {});
+    await page.keyboard.up(key);
+  };
+  await hold('KeyD');
   const a1 = await pos();
-  await page.keyboard.down('ArrowRight'); await sleep(400); await page.keyboard.up('ArrowRight');
+  await hold('ArrowRight');
   const a2 = await pos();
   ok('co-op: P1 (WASD) e P2 (setas) andam de forma independente', a1[0] > a0[0] + 60 && Math.abs(a1[1] - a0[1]) < 5 && a2[1] > a1[1] + 60 && Math.abs(a2[0] - a1[0]) < 5, { a0, a1, a2 });
-  await page.keyboard.press('Numpad1'); await sleep(40);
+  const waitFrames = async (n) => { const f0 = await ev(() => TT.game.frame); await page.waitForFunction((a) => TT.game.frame >= a[0] + a[1], [f0, n], { timeout: 8000 }).catch(() => {}); };
+  await tap('Numpad1');
   const atk2 = await ev(() => TT.game.players().map((t) => t.state));
-  await sleep(500);
-  await page.keyboard.press('KeyJ'); await sleep(40);
+  await waitFrames(40);
+  await tap('KeyJ');
   const atk1 = await ev(() => TT.game.players().map((t) => t.state));
   ok('co-op: P2 ataca no Numpad1 e P1 no J', atk2[1] === 'attack' && atk2[0] !== 'attack' && atk1[0] === 'attack', { atk1, atk2 });
-  await sleep(500);
+  await waitFrames(40);
   // troca de Titã pula o que está com o outro jogador
-  await page.keyboard.press('Numpad6'); await sleep(450);
+  await tap('Numpad6'); await waitFrames(26);
   const sw1 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Digit2'); await sleep(450);
+  await tap('Digit2'); await waitFrames(26);
   const sw2 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Numpad4'); await sleep(450);
+  await tap('Numpad4'); await waitFrames(26);
   const sw3 = await ev(() => TT.game.players().map((t) => t.key));
-  await page.keyboard.press('Digit1'); await sleep(450);
+  await tap('Digit1'); await waitFrames(26);
   const sw4 = await ev(() => TT.game.players().map((t) => t.key));
   ok('co-op: Titãs sempre distintos (troca pula o do parceiro)',
     sw1[1] === 'cyborg' && sw2[0] === 'beastboy' && sw3[1] === 'robin' && sw4[0] === 'beastboy' && sw4[0] !== sw4[1], { sw1, sw2, sw3, sw4 });
@@ -503,22 +1454,102 @@ async page => {
   });
   ok('desempenho (>= 50 fps, render médio < 2ms)', perf.fps >= 50 && perf.avgRenderMs < 2, perf);
 
-  // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca)
+  // Animações próprias de cada Titã
+  const anims = await ev(() => {
+    TT.paused = true; const g = TT.game;
+    TT.debug.start(0); TT.debug.toSection(0); TT.debug.step(5);
+    const forms = new Set();
+    for (let i = 0; i < 40; i++) { // fim do combo do Mutano: animal aleatório
+      g.switchCool = 0; g.switchTo(1, true); const p = g.player; p.comboWindow = 10; p.combo = 2; p.setState('idle');
+      p.doCombo(); forms.add(p.atk.def.form); p.atk = null; p.setState('idle');
+    }
+    const pose = (key, setup) => { const t = g.team.find((x) => x.key === key); setup(t); return TT.computePose(t, TT.newPose()); };
+    const robinJump = pose('robin', (t) => { t.anim = 'jump'; t.jumpT = 17; t.vz = 0; });
+    const robinRoll = pose('robin', (t) => { t.anim = 'dash'; t.animT = 7; });
+    const atk = (key, i) => pose(key, (t) => { t.anim = 'attack'; t.atk = { def: t.def.light[i], t: t.def.light[i].s, hits: new Set() }; });
+    const rv = atk('raven', 0), sf = atk('starfire', 0), cy = atk('cyborg', 0);
+    const ravenIdle = pose('raven', (t) => { t.anim = 'idle'; t.animT = 0; t.atk = null; });
+    const robinCombo = g.team.find((x) => x.key === 'robin').def.light.map((d) => d.anim);
+    return { forms: [...forms], robinCombo, robinFlip: robinJump.spin, robinRoll: robinRoll.spin, ravenAura: rv.auraF, ravenCircle: rv.circleF, starAura: sf.auraF, cyPiston: cy.piston, ravenHover: ravenIdle.bob };
+  });
+  ok('Mutano vira animais aleatórios no fim do combo', anims.forms.length >= 3, anims.forms);
+  ok('Robin: combo no chão, sem piruetas (pulo e esquiva sem giro)', Math.abs(anims.robinFlip) < 0.01 && Math.abs(anims.robinRoll) < 0.01 && anims.robinCombo.length === 3 && new Set(anims.robinCombo).size === 3, anims);
+  ok('Ravena e Estelar atacam com aura nas mãos e círculo mágico', anims.ravenAura > 0.9 && anims.ravenCircle > 0.5 && anims.starAura > 0.9, anims);
+  ok('Ciborgue usa o punho-pistão e Ravena flutua', anims.cyPiston > 0.9 && anims.ravenHover < -8, anims);
+
+  // Capa do Robin com física: pendurada parada, esvoaça para trás ao correr
+  const capeT = await ev(() => {
+    TT.paused = true; const g = TT.game;
+    TT.debug.start(0); TT.debug.step(60);
+    const p = g.player, tip = () => (p.cape[p.cape.length - 1].x - p.x) * p.facing;
+    const idleTip = tip(), idleDrop = p.cape[p.cape.length - 1].y - p.cape[0].y;
+    g.input.bot = { down: new Set(['right']), pressed: new Set() }; TT.debug.step(40); g.input.bot = null;
+    return { idleTip: Math.round(idleTip), idleDrop: Math.round(idleDrop), runTip: Math.round(tip()), faces: Object.keys(TT.FACES).length };
+  });
+  ok('capa do Robin com física (pendurada parada, esvoaça correndo)', capeT.idleDrop > 40 && capeT.runTip < capeT.idleTip - 15, capeT);
+  ok('rostos vetoriais dos 5 Titãs', capeT.faces === 5, capeT);
+
+  // Regressão: renderiza CADA quadro de todos os golpes de todos os Titãs (o raio do Ciborgue deixava a tela branca),
+  // com os golpes originais (fase 1) e os golpes novos (fase 7)
   const allFrames = await ev(() => {
     TT.paused = true; const g = TT.game; const before = (TT.errors || []).length;
-    TT.debug.start(0); TT.debug.god(true); TT.debug.toSection(1); TT.debug.step(60);
-    for (let i = 0; i < 5; i++) {
-      g.switchCool = 0; g.switchTo(i, true); TT.debug.step(20);
-      for (const seq of [['light', 'light', 'light'], ['heavy'], ['special'], ['jump', 'light'], ['dash', 'light']]) {
-        g.energy = 100;
-        for (const b of seq) { g.input.pressed.add(b); for (let f = 0; f < 14; f++) { g.step(); g.render(); } }
-        for (let f = 0; f < 90; f++) { g.step(); g.render(); }
+    for (const st of [0, 6]) {
+      TT.debug.start(st); TT.debug.god(true); TT.debug.toSection(1); TT.debug.step(60);
+      for (let i = 0; i < 5; i++) {
+        g.switchCool = 0; g.switchTo(i, true); TT.debug.step(20);
+        for (const seq of [['light', 'light', 'light'], ['heavy'], ['special'], ['jump', 'light'], ['dash', 'light']]) {
+          g.energy = 100;
+          for (const b of seq) { g.input.pressed.add(b); for (let f = 0; f < 14; f++) { g.step(); g.render(); } }
+          for (let f = 0; f < 90; f++) { g.step(); g.render(); }
+        }
       }
     }
     TT.debug.god(false);
     return { errors: (TT.errors || []).length - before, comp: g.ctx.globalCompositeOperation, alpha: g.ctx.globalAlpha };
   });
   ok('todos os golpes renderizam quadro a quadro sem erro (raio do Ciborgue)', allFrames.errors === 0 && allFrames.comp === 'source-over' && allFrames.alpha === 1, allFrames);
+
+  // Menu PERSONAGENS: 36 personagens, desbloqueio ao zerar a fase, equipe salva e golpes dos extras
+  const roster = await ev(() => {
+    const g = TT.game, out = {};
+    TT.Unlocks.reset(); g.setTeam(TT.DEFAULT_TEAM.slice());
+    out.total = TT.ROSTER.length; out.start = TT.Unlocks.count();
+    out.soon = TT.ROSTER.filter((r) => !TT.Unlocks.available(r.key)).length;
+    out.lockedGizmo = !TT.Unlocks.isUnlocked('gizmo');
+    // tentar pôr um bloqueado na equipe não faz nada
+    g.openRoster(); g.stateT = 20; g.rosterIdx = TT.ROSTER.findIndex((r) => r.key === 'gizmo');
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.lockedMsg = !!(g.rosterMsg && /Fase 2/.test(g.rosterMsg.text)) && g.rosterSlot === -1;
+    // zerar a fase 2 libera o Gizmo
+    out.newly = TT.Unlocks.markCleared(2).map((r) => r.key);
+    out.again = TT.Unlocks.markCleared(2).length;
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.picking = g.rosterSlot;
+    g.updateRoster({ wasPressed: (a) => a === 'right' });
+    g.updateRoster({ wasPressed: (a) => a === 'menu' });
+    out.team = g.teamKeys.slice(); out.saved = TT.store.get('equipe', '');
+    out.loaded = TT.loadTeam();
+    // sem o desbloqueio, a equipe salva volta para o Titã padrão
+    TT.Unlocks.reset(); out.fallback = TT.loadTeam();
+    g.updateRoster({ wasPressed: (a) => a === 'heavy' });
+    out.back = g.state;
+    g.setTeam(TT.DEFAULT_TEAM.slice());
+    return out;
+  });
+  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 13 && roster.lockedGizmo, roster);
+  ok('personagens: bloqueado não entra na equipe e diz a fase', roster.lockedMsg, roster);
+  ok('personagens: zerar a fase 2 libera o Gizmo (uma vez só)', roster.newly.join() === 'gizmo' && roster.again === 0, roster);
+  ok('personagens: escolher a vaga põe na equipe e salva', roster.picking === 0 && roster.team[1] === 'gizmo' && roster.saved.split(',')[1] === 'gizmo' && roster.loaded[1] === 'gizmo', roster);
+  ok('personagens: equipe salva com bloqueado volta ao padrão; FORTE volta ao título', roster.fallback[1] === 'beastboy' && roster.back === 'title', roster);
+  const clearUnlock = await ev(() => {
+    const g = TT.game; TT.Unlocks.reset(); TT.debug.god(true);
+    TT.debug.start(0); g.clearTimer = 1; TT.debug.step(2);
+    const out = { state: g.state, unlocked: g.newUnlocks.map((r) => r.key), count: TT.Unlocks.count() };
+    TT.debug.step(80);
+    TT.Unlocks.reset(); TT.debug.god(false); g.goTitle();
+    return out;
+  });
+  ok('personagens: concluir a fase 1 libera Soldado H.I.V.E., Robô do Slade e Cinderblock', clearUnlock.state === 'clear' && clearUnlock.unlocked.join() === 'hivesoldier,minion,cinderblock' && clearUnlock.count === 8, clearUnlock);
 
   ok('nenhum erro de JavaScript', errors.length === 0 && (await ev(() => (TT.errors || []).length)) === 0, errors.slice(0, 5));
   await ev(() => { TT.paused = false; TT.debug.start(0); TT.game.state = 'title'; });

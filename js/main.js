@@ -32,7 +32,17 @@
       }
       return best;
     }
+    // Hipnotizado (controles invertidos): o bot aperta ATAQUE para acordar e inverte as direções que quer.
     update() {
+      this.plan();
+      const g = this.game, sl = g.slots[this.slot], p = g.state === 'play' && sl ? g.team[sl.ai] : null;
+      if (!p || !(p.inverted > 0)) return;
+      if (this.t % 4 === 0) this.press('light');
+      const sw = { left: 'right', right: 'left', up: 'down', down: 'up' }, out = new Set();
+      for (const k of this.down) out.add(sw[k] || k);
+      this.down = out;
+    }
+    plan() {
       const g = this.game; this.t++;
       this.down.clear();
       if (g.state !== 'play') { if (this.slot === 0 && this.t % 40 === 0) this.press('start'), this.press('menu'); return; }
@@ -79,9 +89,11 @@
         if (crate) {
           const aligned = Math.abs(crate.y - p.y) <= 10;
           if (!aligned) this.down.add(crate.y > p.y ? 'down' : 'up');
-          if (crate.x - p.x > 70) this.down.add('right');
-          else if (crate.x < p.x) this.down.add('left');
-          else if (p.facing < 0) this.down.add('right'); // vira para a caixa antes de bater
+          const cdx = crate.x - p.x;
+          if (cdx > 70) this.down.add('right');
+          else if (cdx < -20) this.down.add('left');
+          else if (cdx > 20 && p.facing < 0) this.down.add('right'); // vira para a caixa antes de bater
+          // colado na caixa o golpe acerta de qualquer lado (não fica virando para lá e para cá)
           else if (aligned && this.t % 8 === 0) this.press('light');
           return;
         }
@@ -112,6 +124,8 @@
     const canvas = document.getElementById('game');
     const game = new TT.Game(canvas);
     TT.game = game;
+    game.touch = game.input.touch = new TT.TouchControls(game);
+    game.online = new TT.Online(game);
     game.resize();
     let rt;
     window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => game.resize(), 120); });
@@ -121,6 +135,8 @@
     TT.paused = false;
     function frame(now) {
       requestAnimationFrame(frame);
+      // convidado do jogo online: não roda o jogo, só manda os botões (a imagem vem do anfitrião)
+      if (game.online.guest) { last = now; game.online.guestTick(); game.touch.update(); return; }
       if (TT.paused) { last = now; return; }
       acc += Math.min(250, now - last);
       last = now;
@@ -131,6 +147,7 @@
       }
       if (n === 5) acc = 0;
       try { game.render(); } catch (e) { reportError(e); resetCanvas(); }
+      game.touch.update();
     }
     // Após um erro de desenho a pilha save/restore fica desbalanceada: zera o contexto do canvas.
     function resetCanvas() {
@@ -144,12 +161,29 @@
       if (!errShown) { errShown = true; console.error(e); }
     }
     requestAnimationFrame(frame);
+    // App instalável: o service worker guarda o jogo para abrir sem internet (só em http/https, não em file://).
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      const reg = () => navigator.serviceWorker.register('sw.js').catch(() => {});
+      if (document.readyState === 'complete') reg(); else window.addEventListener('load', reg);
+    }
+    // O navegador avisa quando dá para instalar: aparece o item INSTALAR APP no título.
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); game.installPrompt = e; });
+    window.addEventListener('appinstalled', () => { game.installPrompt = null; game.menuIdx = 0; });
+    // retratos grandes da cutscene do avante: desenhados antes, para a cena não engasgar ao começar
+    setTimeout(() => { for (const k of TT.TITAN_ORDER) TT.portrait(k, 260); }, 800);
 
     window.addEventListener('keydown', () => TT.audio.init());
     // Começa/retoma o áudio no primeiro clique também
     canvas.addEventListener('pointerdown', () => { TT.audio.init(); game.input.anyKey = true; game.input.pressed.add('menu'); });
 
     // ---------------------------------------------------------------- API de depuração/testes
+    // Modo demonstração (index.html?demo): o jogo se joga sozinho; qualquer tecla devolve o controle.
+    if (/[?&]demo/.test(location.search)) {
+      game.bot = new Bot(game); game.input.bot = game.bot; game.godMode = true;
+      const stop = () => { game.bot = null; game.input.bot = null; game.godMode = false; window.removeEventListener('keydown', stop); };
+      window.addEventListener('keydown', stop);
+    }
+
     TT.debug = {
       game,
       step(n, renderEvery) {
