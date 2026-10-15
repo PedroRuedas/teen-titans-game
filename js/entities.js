@@ -870,6 +870,7 @@
     reset() {
       this.hp = this.maxHp; this.ko = false; this.dead = false; this.atk = null;
       this.downTime = 34; this.buffer = null; this.bufferT = 0; this.bunny = 0;
+      this.inverted = 0; this.aged = 0; this.counterT = 0; this.dmgMul = 1;
       this.z = 0; this.vx = this.vy = this.vz = 0; this.flash = 0; this.invul = 0;
       this.setState('idle'); this.setAnim('idle');
     }
@@ -877,6 +878,8 @@
     // Lê os botões para o buffer — chamado em todo passo, inclusive durante o "hit-stop".
     readInput(inp) {
       for (const a of BUFFERED) if (inp.wasPressed(a)) { this.buffer = a; this.bufferT = 9; }
+      // hipnotizado (controles invertidos): apertar os botões de golpe "sacode" o Titã e acorda mais rápido
+      if (this.inverted > 0) for (const a of ['light', 'heavy', 'special']) if (inp.wasPressed(a)) this.inverted = Math.max(1, this.inverted - 14);
     }
 
     think(inp) {
@@ -892,14 +895,21 @@
       let mx = (inp.isDown('right') ? 1 : 0) - (inp.isDown('left') ? 1 : 0);
       let my = (inp.isDown('down') ? 1 : 0) - (inp.isDown('up') ? 1 : 0);
       if (mx && my) { mx *= 0.8; my *= 0.8; }
+      // hipnose do Mad Mod: direções invertidas
+      if (this.inverted > 0) { if (--this.inverted === 0) g.popText(this.x, this.y - 170, 'ACORDOU!', '#9effa8'); mx = -mx; my = -my; }
+      // raio da juventude: velhinho anda e pula mais devagar
+      if (this.aged > 0 && --this.aged === 0) { g.poof(this.x, this.y - 60); g.popText(this.x, this.y - 170, 'JOVEM DE NOVO!', '#9effa8'); }
+      const spd = this.def.speed * (this.aged > 0 ? 0.6 : 1), jmp = this.def.jump * (this.aged > 0 ? 0.8 : 1);
+      // contra-ataque da esquiva perfeita: vale por um tempo
+      if (this.counterT > 0 && --this.counterT === 0) this.dmgMul = 1;
 
       if (this.commonStates()) return;
       switch (this.state) {
         case 'ko':
           this.vx *= 0.8; return;
         case 'idle': {
-          this.vx = mx * this.def.speed;
-          this.vy = my * this.def.speed * 0.62;
+          this.vx = mx * spd;
+          this.vy = my * spd * 0.62;
           if (mx) this.facing = mx > 0 ? 1 : -1;
           this.setAnim(mx || my ? 'walk' : 'idle');
           const b = this.buffer;
@@ -909,12 +919,12 @@
           else if (b === 'heavy') { this.vy = 0; this.startAttack(this.def.heavy); }
           else if (b === 'special') this.trySpecial();
           else if (b === 'jump') {
-            this.vz = this.def.jump; this.z = 1; this.airAttacked = false; this.jumpT = 0;
-            this.vx = mx * this.def.speed * 1.1;
+            this.vz = jmp; this.z = 1; this.airAttacked = false; this.jumpT = 0;
+            this.vx = mx * spd * 1.1;
             this.setState('air'); this.setAnim('jump'); A().play('jump');
             g.dust(this.x, this.y, 4, '#d9cbbb');
           } else if (b === 'dash') {
-            this.setState('dash'); this.setAnim('dash'); this.invul = 12;
+            this.setState('dash'); this.setAnim('dash'); this.invul = 12; this.perfectUsed = false;
             if (mx) this.facing = mx > 0 ? 1 : -1;
             this.vy = my * 3;
             A().play('whoosh');
@@ -926,8 +936,8 @@
         case 'air': {
           this.jumpT++;
           if (this.base === 'cyborg' && this.vz > 0 && this.jumpT % 2 === 0) this.jets(g);
-          this.vx += (mx * this.def.speed - this.vx) * 0.08;
-          this.vy = my * this.def.speed * 0.4;
+          this.vx += (mx * spd - this.vx) * 0.08;
+          this.vy = my * spd * 0.4;
           if (mx) this.facing = mx > 0 ? 1 : -1;
           this.setAnim('jump');
           if ((this.buffer === 'light' || this.buffer === 'heavy') && !this.airAttacked) {
@@ -1024,8 +1034,26 @@
 
     takeHit(src, d, dir) {
       if (this.game.godMode) return false;
-      if (this.state === 'dash' && this.st < 11) return false;
+      if (this.state === 'dash' && this.st < 11) {
+        // esquiva perfeita: o golpe chegou bem no começo da esquiva
+        if (this.st <= 7 && !this.perfectUsed) this.perfectDodge();
+        return false;
+      }
       return super.takeHit(src, d, dir);
+    }
+
+    // Esquiva perfeita: câmera lenta, energia e, por um tempo, os golpes dão 60% a mais (CONTRA-ATAQUE).
+    perfectDodge() {
+      const g = this.game;
+      this.perfectUsed = true; this.invul = Math.max(this.invul, 24);
+      this.counterT = 100; this.dmgMul = 1.6;
+      g.slowmo = Math.max(g.slowmo, 36);
+      g.energy = Math.min(100, g.energy + 12);
+      g.perfectDodges = (g.perfectDodges || 0) + 1;
+      g.afterimage(this, this.def.fx || this.def.color);
+      g.particles.spawn('ring', this.x, this.y - this.z - 70, { color: '#ffffff', size: 140, life: 16 });
+      g.particles.spawn('text', this.x, this.y - 190, { text: 'ESQUIVA PERFEITA!', size: 34, color: '#ffffff', color2: this.def.color, vy: -0.6, life: 50 });
+      A().play('switch');
     }
 
     physics() {
@@ -1103,6 +1131,7 @@
       } else {
         if (this.state === 'dash' && this.base === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
+        if (this.aged > 0 && this.state !== 'down') { this.pose.lean += 0.32; this.pose.bob += 5; this.pose.tilt += 0.15; } // corcunda de velhinho
         TT.drawRig(ctx, this.style, this.pose, sx, sy, this.facing, { flash: fl, t: this.animT, out: this.rigOut, cape: this.cape, camX });
       }
       ctx.globalAlpha = 1;
@@ -1122,6 +1151,27 @@
         }
       } else this.hypno = false;
       if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen, this.frozenKind); // raio congelante da Irmandade / pausa do Control Freak
+      this.drawStatus(ctx, sx, sy);
+    }
+
+    // Efeitos de estado da fase 10 e da esquiva perfeita: hipnotizado, velhinho e contra-ataque pronto.
+    drawStatus(ctx, sx, sy) {
+      const R = this.rigOut, t = this.animT, fc = this.facing;
+      const hx = R.hx != null ? R.hx : sx, hy = R.hy != null ? R.hy : sy - this.height + 20, hr = R.hr || 16;
+      if (this.aged > 0 && !this.ko) { // barba e sobrancelhas brancas, bengalinha
+        ctx.save(); ctx.fillStyle = '#f2f2f6'; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(hx - hr * 0.2 * fc, hy + hr * 0.4); ctx.quadraticCurveTo(hx + hr * 0.5 * fc, hy + hr * 1.9, hx + hr * 0.95 * fc, hy + hr * 0.45); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(hx + hr * 0.45 * fc, hy - hr * 0.5, hr * 0.45, hr * 0.14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(sx + fc * 26, sy - 60); ctx.lineTo(sx + fc * 34, sy); ctx.stroke();
+        ctx.strokeStyle = '#8a5a3a'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.restore();
+        if ((t >> 4) % 3 === 0) TT.drawText(ctx, 'VELHINHO!', sx, hy - hr * 2.4, 18, '#fff0a8', OUT, 'center', 4);
+      }
+      if (this.inverted > 0 && !this.ko) { // espirais girando sobre a cabeça e o aviso
+        for (let i = 0; i < 2; i++) { const an = t * 0.12 + i * Math.PI; TT.drawSpiral(ctx, hx + Math.cos(an) * 24, hy - hr * 1.7 + Math.sin(an) * 6, 10, -t * 0.3, '#2a0c3a', '#ff5ad0', 2); }
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'INVERTIDO! APERTE ATAQUE!', sx, hy - hr * 3, 17, '#ffc8f0', OUT, 'center', 4);
+      }
+      if (this.counterT > 0) TT.drawGlow(ctx, this.def.fx || this.def.color, sx, sy - this.height * 0.5, 60 + Math.sin(t * 0.5) * 10, 0.55);
     }
 
     // Rastro verde da Estelar voando na esquiva.
@@ -1411,6 +1461,27 @@
           }
         } },
       { pose: 'jab', s: 18, a: 6, r: 18, lunge: 6, dmg: 9, reach: [0, 74], depth: 30, kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  // Guarda Real (fase 10): robô do Mad Mod vestido de guarda do palácio; investida com a baioneta
+  // (faixa marcada) e coronhada de perto.
+  ENEMIES.guard = {
+    name: 'Guarda Real', style: 'guard', hp: 84, speed: 2.9, range: 160, score: 240, aggr: 1.15,
+    attacks: [
+      { pose: 'jab', glow: '#ffffff', s: 24, a: 10, r: 20, lunge: 10, dmg: 12, zoneHit: true, knockdown: true, launch: 5, kb: 7, sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 250, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'swing', s: 14, a: 5, r: 16, lunge: 4, dmg: 10, reach: [0, 88], kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  // Olho Hipnótico (fase 10): câmera-olho voadora; raio hipnótico em linha (marcado) que INVERTE os
+  // controles do Titã, e o flash da câmera em volta dele (círculo marcado) que deixa tonto.
+  ENEMIES.eye = {
+    name: 'Olho Hipnótico', style: 'guard', hp: 58, speed: 3.1, range: 170, score: 230, aggr: 1.1,
+    attacks: [
+      { pose: 'beam', s: 28, a: 10, r: 20, dmg: 7, zoneHit: true, invertHero: 180, stun: 18, kb: 2, sound0: 'alarm', sound: 'zap',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 340, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'jab', s: 22, a: 5, r: 22, dmg: 8, zoneHit: true, stun: 50, kb: 3, dazzle: true, sound0: 'alarm', sound: 'boom',
+        zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 115, ry: 46 }]; } },
     ],
   };
   TT.ENEMIES = ENEMIES;
@@ -1999,6 +2070,82 @@
     }
   }
   TT.PopcornMonster = PopcornMonster;
+
+  // Guarda Real (fase 10): tática de bate e recua; a baioneta brilha antes da investida.
+  class RoyalGuard extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'guard'); }
+    die(dir, d) {
+      super.die(dir, d);
+      this.game.particles.spawn('text', this.x, this.y - 160, { text: 'CLANK!', size: 30, color: '#e6ebf2', color2: '#c4162a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+    }
+    draw(ctx, camX) { Fighter.prototype.draw.call(this, ctx, camX); }
+  }
+  TT.RoyalGuard = RoyalGuard;
+
+  // Olho Hipnótico (fase 10): olho gigante numa armação de latão com hélice, flutuando. A íris é uma
+  // espiral que gira mais rápido quando ele prepara o raio.
+  class HypnoEye extends ShockTrooper {
+    constructor(game, x, y) { super(game, x, y, 'eye'); this.radius = 26; this.shadowW = 24; this.height = 150; }
+    die(dir, d) {
+      super.die(dir, d);
+      const g = this.game;
+      for (let i = 0; i < 10; i++) g.particles.spawn('debris', this.x + TT.rand(-20, 20), this.y - 110, { vx: TT.rand(-6, 6), vy: TT.rand(-8, -2), grav: 0.5, color: TT.choice(['#e6ebf2', '#c9a24a', '#ff5ad0']), size: TT.rand(5, 9), vr: 0.3, life: 30, floor: this.y });
+      g.particles.spawn('text', this.x, this.y - 170, { text: 'PLOFT!', size: 30, color: '#ffc8f0', color2: '#7a2bb5', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+    }
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk, d = a && a.def, fl = this.flash > 3;
+      const tell = a && this.state === 'attack' && a.t < d.s ? a.t / d.s : -1, blink = tell > 0.55 && (a.t >> 1) % 2 === 0;
+      const down = this.state === 'down', hurt = this.state === 'hurt';
+      const hover = down ? Math.max(8, 70 - this.st * 5) : 70 + Math.sin(t * 0.08) * 8;
+      const x = this.x - camX, y = this.y - this.z - hover - 40, W = fl || blink;
+      const col = (c) => (W ? '#ffffff' : c);
+      if (this.invul > 0 && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.6;
+      ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+      if (down) ctx.rotate(Math.min(1.6, this.st * 0.12)); else if (hurt) ctx.rotate(-0.25);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      // aleta com a bandeira atrás e hélice em cima
+      ctx.beginPath(); ctx.moveTo(-30, -6); ctx.lineTo(-58, -26); ctx.lineTo(-58, 22); ctx.lineTo(-30, 8); ctx.closePath(); ctx.fillStyle = col('#1d3a8a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!W) { ctx.save(); ctx.clip(); TT.drawUnionJack(ctx, -60, -28, 32, 52); ctx.restore(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke(); }
+      ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -34); ctx.lineTo(0, -46); ctx.stroke();
+      const pw = Math.abs(Math.cos(t * 0.9)) * 30 + 4;
+      ctx.beginPath(); ctx.ellipse(0, -48, pw, 4, 0, 0, Math.PI * 2); ctx.fillStyle = col('#c9cfd8'); ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+      // armação de latão
+      ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fillStyle = col('#c9a24a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.5; ctx.stroke();
+      if (!W) for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; ctx.fillStyle = '#8a6a2a'; ctx.beginPath(); ctx.arc(Math.cos(an) * 32, Math.sin(an) * 32, 2.5, 0, Math.PI * 2); ctx.fill(); }
+      // globo do olho
+      ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.fillStyle = col('#f6f4fa'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!W) {
+        ctx.strokeStyle = 'rgba(215,38,62,0.55)'; ctx.lineWidth = 1.5; // veias
+        for (const an of [2.4, 3.0, 3.6, -0.6, 0.7]) { ctx.beginPath(); ctx.moveTo(Math.cos(an) * 27, Math.sin(an) * 27); ctx.quadraticCurveTo(Math.cos(an + 0.2) * 20, Math.sin(an + 0.2) * 20, Math.cos(an) * 15, Math.sin(an) * 15); ctx.stroke(); }
+        // íris em espiral (gira mais rápido ao preparar o ataque) e pálpebra brava
+        const ix = down || hurt ? 0 : 7, sp = tell >= 0 ? 0.35 + tell * 0.5 : 0.08;
+        TT.drawSpiral(ctx, ix, 2, 15, -t * sp, '#ff5ad0', '#2a0c3a', 2.5);
+        ctx.beginPath(); ctx.arc(ix, 2, 15, 0, Math.PI * 2); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(ix, 2, 4.5, 0, Math.PI * 2); ctx.fillStyle = '#0c0814'; ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ix - 6, -6, 3.5, 0, Math.PI * 2); ctx.fill();
+        if (down || hurt || this.dead) { ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-10, -4); ctx.lineTo(10, 8); ctx.moveTo(10, -4); ctx.lineTo(-10, 8); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(-28, -10); ctx.quadraticCurveTo(0, -36, 28, -16); ctx.quadraticCurveTo(0, -24, -28, -10); ctx.fillStyle = '#c9a24a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ff5ad0', x + this.facing * 18, y, 22 + 34 * tell, 0.35 + 0.5 * tell);
+      if (!a || this.state !== 'attack' || this.dead) return;
+      if (d === this.def.attacks[0] && a.t >= d.s && a.t < d.s + d.a + 4) {
+        // raio hipnótico: feixe rosa com anéis em espiral correndo até o chão à frente
+        const k = Math.min(1, (a.t - d.s + 1) / 3), L = 310 * k, fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1, x0 = x + this.facing * 26, y1 = this.y - 40;
+        ctx.save(); ctx.globalAlpha = fade; ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(255,90,208,0.55)'; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + this.facing * L, y1); ctx.stroke();
+        ctx.strokeStyle = '#ffe0f6'; ctx.lineWidth = 6; ctx.stroke();
+        for (let i = 0; i < 5; i++) { const u = ((a.t * 0.08 + i / 5) % 1) * k; ctx.strokeStyle = 'rgba(255,200,240,' + (1 - u) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x0 + this.facing * L * u, TT.lerp(y, y1, u), 7, 18 + u * 10, 0, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.restore();
+      } else if (d === this.def.attacks[1] && a.t >= d.s && a.t < d.s + d.a + 6) {
+        const k = 1 - (a.t - d.s) / (d.a + 6); // flash da câmera
+        TT.drawGlow(ctx, '#ffffff', x, this.y - 60, 170 * k + 40, k);
+      }
+    }
+  }
+  TT.HypnoEye = HypnoEye;
 
   // Comando do Slade (fase 7): mesma tática de bate e recua, sempre com o bastão na mão.
   class SladeCommando extends ShockTrooper {
@@ -4186,6 +4333,193 @@
   }
   TT.ControlFreak = ControlFreak;
 
+  // ---- Mad Mod: o vilão britânico da hipnose (fase 10)
+  // Raio hipnótico (inverte os controles), bengalada, ESPIRAL GIGANTE (puxa os Titãs para o centro e
+  // explode) e, abaixo de 50%, o raio da juventude (o Titã vira velhinho e ele rejuvenesce) e Guardas Reais.
+  // Fraqueza: depois da espiral gigante ele fica tonto com a própria hipnose — parado, dano dobrado.
+  const SPIRAL_PULL = 330, MOD_PINK = '#ff5ad0';
+  class MadMod extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'MAD MOD';
+      this.style = TT.STYLES.madmod;
+      this.hp = this.maxHp = 3000;
+      this.radius = 42; this.height = 220; this.shadowW = 56;
+      this.poiseMax = 185;
+      this.def = { score: 16000 };
+      this.openT = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0; this.out = {};
+      this.taunts = ['Olá, meus patinhos!', 'Que falta de modos!', 'Sentem-se direito, alunos!', 'Isso é que é estilo, queridinhos!', 'Olhem nos meus óculos...'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      const clampY = (y) => TT.clamp(y, TT.FLOOR_TOP + 40, TT.FLOOR_BOTTOM - 26);
+      this.ATK = {
+        // bengalada em arco à frente
+        cane: { pose: 'bigSwing', glow: '#ff3b5a', s: 22, a: 6, r: 20, dmg: 14, knockdown: true, launch: 7, kb: 9, zoneHit: true, color: '#ff3b5a', sound0: 'whoosh',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 175, ry: 56, f: f.facing }]; },
+          onFrame(f, t, g) { if (t === this.s) { A().play('hitHeavy'); g.impact(f.x + f.facing * 110, f.y, 'WHACK!', '#ff3b5a', 0.8); } } },
+        // raio hipnótico da bengala em linha: quem é atingido fica com os controles invertidos
+        hypno: { pose: 'beam', glow: MOD_PINK, s: 36, a: 12, r: 14, dmg: 9, invertHero: 210, stun: 18, kb: 2, zoneHit: true, color: MOD_PINK, sound0: 'alarm', sound: 'zap',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 780, y: f.y, d: 34, arrows: true }]; },
+          onFrame(f, t, g) { if (t === 2) g.say(f, 'Olhem nos meus olhos...', '#ffc8f0'); } },
+        // ESPIRAL GIGANTE: a marca segue o Titã, trava, puxa todos para o centro e explode
+        spiral: { pose: 'castUp', glow: MOD_PINK, s: 74, a: 6, r: 28, dmg: 18, knockdown: true, launch: 10, kb: 8, zoneHit: true, color: MOD_PINK, sound0: 'alarm', sound: 'boom',
+          zone(f, g) { const p = g.targetFor(f) || f; return [{ k: 'ell', x: clampX(g, p.x, 160), y: clampY(p.y), rx: 150, ry: 63 }]; },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Olhem bem para a espiral, meus patinhos!', '#ffc8f0');
+            const z = a.zones && a.zones[0];
+            if (!z) return;
+            if (t < this.s * 0.35) { // segue o Titã até travar
+              const p = g.targetFor(f);
+              if (p) { z.x += (clampX(g, p.x, 160) - z.x) * 0.14; z.y += (clampY(p.y) - z.y) * 0.14; }
+            } else if (t < this.s) { // trava e puxa quem estiver perto para o centro
+              f.pulling = z;
+              for (const h of g.heroes()) {
+                if (h.z > 40 || h.state === 'dash') continue;
+                const dx = z.x - h.x, dy = (z.y - h.y) / 0.42, dd = Math.hypot(dx, dy);
+                if (dd > SPIRAL_PULL || dd < 6) continue;
+                h.x += dx / dd * 1.9; h.y += dy / dd * 1.9 * 0.42;
+                if (t % 4 === 0) g.particles.spawn('dust', h.x, h.y - 4, { vx: dx / dd * 2, color: 'rgba(255,200,240,0.7)', size: 7, life: 12 });
+              }
+            }
+            if (t === this.s) { f.pulling = null; g.impact(z.x, z.y, 'HIPNOSE!', MOD_PINK, 1.2); g.tintScreen(MOD_PINK, 10); }
+            if (t === this.s + this.a + this.r - 1) f.dizzy();
+          } },
+        // (fase 2) raio da juventude: suga a juventude do Titã (ele vira velhinho, lento) e o Mad Mod rejuvenesce
+        youth: { pose: 'beam', glow: '#ffe14a', s: 40, a: 12, r: 16, dmg: 10, ageHero: 300, stun: 16, kb: 2, zoneHit: true, color: '#ffe14a', sound0: 'alarm', sound: 'laser',
+          zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 640, y: f.y, d: 28, arrows: true }]; },
+          onFrame(f, t, g) { if (t === 2) g.say(f, 'Me empresta essa juventude, patinho!', '#fff0a8'); } },
+        // (fase 2) dois Guardas Reais entram marchando
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#c4162a',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Guardas! Disciplina nesses alunos!', '#ffc8f0');
+            for (const side of [-1, 1]) {
+              const e = new RoyalGuard(g, side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 60; g.addEnemy(e);
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('alarm');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    dizzy() {
+      this.atk = null; this.pulling = null;
+      this.setState('open'); this.setAnim('hurt');
+      this.openT = this.phase2() ? 120 : 150; this.vx = this.vy = 0;
+      this.game.say(this, 'Ai, minha cabeça... olhei para a minha própria espiral!', '#ffc8f0');
+      A().play('ko');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return;
+      super.onArmorHit(dmg, d);
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (--this.openT <= 0) {
+          this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25;
+          g.say(this, 'Ahem! Onde é que eu estava? Ah, sim: a aula!', '#ffc8f0');
+        }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) { this.p2Said = true; g.say(this, 'Chega de recreio! Hora da REVOLUÇÃO!', '#ffe9a0'); g.impact(this.x, this.y, 'REVOLUÇÃO!', MOD_PINK, 1.1); }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 190), p.y, p2 ? 2.6 : 2.1);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem a ESPIRAL GIGANTE (e ele fica tonto logo depois)
+        if (this.atkCount % 3 === 2) pick = 'spiral';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = ['hypno'];
+          if (adx < 230 && Math.abs(dy) < 50) opts.push('cane', 'cane');
+          if (p2) opts.push('youth', 'youth');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(38, 62) : this.nextCool(58, 92);
+        if (pick !== 'spiral' && Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ffc8f0');
+      }
+    }
+    drawGround(ctx, camX) {
+      // espiral girando no chão embaixo da marca (por baixo do aviso vermelho)
+      const a = this.atk;
+      if (a && a.def === this.ATK.spiral && a.zones && this.state === 'attack' && a.t < a.def.s + a.def.a) {
+        const z = a.zones[0], k = Math.min(1, a.t / 20), pull = !!this.pulling;
+        ctx.save(); ctx.globalAlpha = 0.5 * k;
+        TT.drawSpiral(ctx, z.x - camX, z.y, z.rx * 1.25, -a.t * (pull ? 0.22 : 0.08), '#2a0c3a', MOD_PINK, 3, z.ry / z.rx);
+        ctx.restore();
+        if (pull) { // área de sucção (anel tracejado)
+          ctx.save(); ctx.setLineDash([12, 10]); ctx.lineDashOffset = a.t * 2; ctx.strokeStyle = 'rgba(255,90,208,0.6)'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(z.x - camX, z.y, SPIRAL_PULL, SPIRAL_PULL * 0.42, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        }
+      }
+      super.drawGround(ctx, camX);
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      const open = this.state === 'open';
+      if (this.state === 'stagger') { this.pose.lean = -0.3; this.pose.tilt = -0.3; }
+      if (open) { // cambaleando tonto
+        this.pose.lean = Math.sin(t * 0.12) * 0.25; this.pose.tilt = Math.sin(t * 0.17) * 0.3; this.pose.mouth = 'open';
+        this.pose.armF = [0.5 + Math.sin(t * 0.2) * 0.4, 1.2]; this.pose.armB = [-0.4, 0.4]; this.pose.eyes = 'shut';
+      }
+      const x = this.x - camX + this.tellShake() + (open ? Math.sin(t * 0.1) * 6 : 0), y = this.y - this.z;
+      ctx.save(); ctx.globalAlpha = al;
+      if (al < 1) TT.drawSpiral(ctx, x, y - 110, 130 * (1 - al) + 20, -t * 0.2, 'rgba(42,12,58,0.5)', 'rgba(255,90,208,0.6)', 3); // surge da espiral
+      let sq = 0;
+      if (k >= 0) sq = -0.06 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.05;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      const fx = this.out.fx != null ? this.out.fx : x + this.facing * 60, fy = this.out.fy != null ? this.out.fy : y - 130;
+      if (k >= 0 && d) TT.drawGlow(ctx, d.color || MOD_PINK, fx, fy, 18 + 34 * k, 0.9);
+      // raios (hipnótico: rosa com anéis em espiral; juventude: dourado, com brilhos voltando para ele)
+      if ((d === this.ATK.hypno || d === this.ATK.youth) && a.t >= d.s && a.t < d.s + d.a + 3) {
+        const youth = d === this.ATK.youth, len = youth ? 640 : 780;
+        const u = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 3 : 1, x1 = fx + this.facing * len * u, y1 = this.y - 50;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = al * fade;
+        ctx.strokeStyle = youth ? '#c9a21a' : '#c03aa0'; ctx.lineWidth = 34; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.strokeStyle = youth ? '#fff6c0' : '#ffe0f6'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(x1, y1); ctx.stroke();
+        for (let i = 0; i < 7; i++) {
+          let v = ((a.t * 0.06 + i / 7) % 1); if (youth) v = 1 - v;
+          v *= u;
+          const px = TT.lerp(fx, x1, v), py = TT.lerp(fy, y1, v);
+          if (youth) TT.drawGlow(ctx, '#ffe14a', px, py, 18, 1);
+          else { ctx.strokeStyle = 'rgba(255,200,240,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(px, py, 8, 24, 0, 0, Math.PI * 2); ctx.stroke(); }
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 20);
+      if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height - 10);
+      if (open) {
+        // espirais girando em volta da cabeça
+        for (let i = 0; i < 3; i++) { const an = t * 0.1 + i * 2.1; TT.drawSpiral(ctx, x + Math.cos(an) * 46, y - this.height - 6 + Math.sin(an) * 12, 13, -t * 0.3, '#2a0c3a', MOD_PINK, 2); }
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'TONTO COM A PRÓPRIA ESPIRAL! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 22, '#ffc8f0', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.MadMod = MadMod;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -4343,7 +4677,7 @@
       this.exploded = true;
       this.game.blast(this.x, this.y, this.blastR, this.blastDmg || this.dmg, this.team, this.owner, this.blastColor);
     }
-    get dmgMul() { return 1; }
+    get dmgMul() { return this.owner && this.owner.counterT > 0 ? this.owner.dmgMul : 1; } // contra-ataque da esquiva perfeita
     // Rastro: linha que afina e some a partir do histórico de posições.
     drawTrail(ctx, camX, col, w) {
       const tr = this.trail;

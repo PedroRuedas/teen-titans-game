@@ -2506,7 +2506,276 @@
     });
   }
 
+  // ---------------------------------------------------------------- Fase 10 — A Academia do Mad Mod
+  // A Londres de mentira que o Mad Mod montou (rua de lojas "mod" com cabines vermelhas), o corredor
+  // op-art da escola e a sala de aula com o telão hipnótico.
+  const S10_HALL = 2700, S10_CLASS = 5850;
+  const MOD_PINK = '#ff5ad0';
+  // Alvo "mod" (o símbolo da RAF que virou marca dos mods dos anos 60).
+  function roundel(g, x, y, r) {
+    for (const [k, c] of [[1, '#1d3a8a'], [0.66, '#ffffff'], [0.33, '#d7263e']]) { g.beginPath(); g.arc(x, y, r * k, 0, Math.PI * 2); g.fillStyle = c; g.fill(); }
+    g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke();
+  }
+  // Cabine telefônica vermelha.
+  function phoneBox(g, x, base) {
+    const w = 64, h = 190;
+    g.fillStyle = '#c4162a'; g.strokeStyle = OUT; g.lineWidth = 3;
+    g.fillRect(x, base - h, w, h); g.strokeRect(x, base - h, w, h);
+    g.beginPath(); g.moveTo(x - 4, base - h); g.quadraticCurveTo(x + w / 2, base - h - 22, x + w + 4, base - h); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#1c1b26'; g.fillRect(x + 8, base - h + 8, w - 16, 14);
+    TT.drawText(g, 'TELEPHONE', x + w / 2, base - h + 15, 9, '#ffffff', null, 'center', 0);
+    g.fillStyle = 'rgba(255,240,190,0.85)';
+    for (let row = 0; row < 4; row++) for (let col = 0; col < 3; col++) g.fillRect(x + 10 + col * 15, base - h + 30 + row * 26, 12, 22);
+    g.strokeStyle = '#8a0c18'; g.lineWidth = 2; g.strokeRect(x + 8, base - h + 28, w - 16, 106);
+    glowPool(g, x + w / 2, base - h + 80, 50, 70, '#fff3c0', 0.25);
+  }
+  // Lambreta (scooter dos mods) cheia de espelhos.
+  function scooter(g, x, base, col) {
+    g.strokeStyle = OUT; g.lineWidth = 3;
+    for (const wx of [x + 14, x + 96]) { g.fillStyle = '#1c1b26'; g.beginPath(); g.arc(wx, base - 16, 16, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = '#c9cfd8'; g.beginPath(); g.arc(wx, base - 16, 6, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = col; g.beginPath(); g.moveTo(x - 6, base - 20); g.quadraticCurveTo(x, base - 62, x + 40, base - 56); g.lineTo(x + 70, base - 30); g.lineTo(x + 112, base - 32); g.quadraticCurveTo(x + 116, base - 58, x + 98, base - 66); g.lineTo(x + 92, base - 96); g.lineTo(x + 84, base - 96); g.lineTo(x + 86, base - 62); g.lineTo(x + 60, base - 60); g.lineTo(x + 30, base - 20); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#5a3a2a'; g.fillRect(x + 6, base - 70, 44, 10); g.strokeRect(x + 6, base - 70, 44, 10); // banco
+    g.strokeStyle = OUT; g.lineWidth = 3; g.beginPath(); g.moveTo(x + 76, base - 98); g.lineTo(x + 104, base - 98); g.stroke();
+    for (let i = 0; i < 4; i++) { const mx = x + 78 + i * 8, my = base - 104 - (i % 2) * 22; g.strokeStyle = '#c9cfd8'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 90, base - 98); g.lineTo(mx, my); g.stroke(); g.fillStyle = '#e6ebf2'; g.beginPath(); g.arc(mx, my, 5, 0, Math.PI * 2); g.fill(); g.strokeStyle = OUT; g.stroke(); }
+    roundel(g, x + 104, base - 50, 9);
+  }
+  // Varal de bandeirinhas do Reino Unido.
+  function bunting(g, xa, xb, y, sag) {
+    g.strokeStyle = '#2a2440'; g.lineWidth = 2; g.beginPath(); g.moveTo(xa, y); g.quadraticCurveTo((xa + xb) / 2, y + sag * 2, xb, y); g.stroke();
+    const n = Math.floor((xb - xa) / 34);
+    for (let i = 1; i < n; i++) {
+      const u = i / n, x = xa + (xb - xa) * u, yy = y + 4 * sag * u * (1 - u);
+      g.save(); g.beginPath(); g.moveTo(x - 11, yy); g.lineTo(x + 11, yy); g.lineTo(x, yy + 22); g.closePath(); g.clip();
+      TT.drawUnionJack(g, x - 11, yy, 22, 22); g.restore();
+      g.strokeStyle = OUT; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x - 11, yy); g.lineTo(x + 11, yy); g.lineTo(x, yy + 22); g.closePath(); g.stroke();
+    }
+  }
+  // Retrato do Mad Mod numa moldura dourada.
+  function modPortrait(g, x, y, w, h) {
+    g.fillStyle = '#c9a24a'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(x - 8, y - 8, w + 16, h + 16); g.strokeRect(x - 8, y - 8, w + 16, h + 16);
+    g.fillStyle = '#3a1a4a'; g.fillRect(x, y, w, h); g.lineWidth = 2; g.strokeRect(x, y, w, h);
+    const cx = x + w / 2, cy = y + h * 0.48, r = w * 0.28;
+    g.fillStyle = '#1d3a8a'; g.beginPath(); g.moveTo(cx - w * 0.42, y + h); g.quadraticCurveTo(cx, y + h * 0.66, cx + w * 0.42, y + h); g.fill();
+    g.fillStyle = '#e8682a'; g.beginPath(); g.ellipse(cx - r * 0.1, cy - r * 0.55, r * 1.2, r * 0.75, -0.2, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#f2c8a8'; g.beginPath(); g.ellipse(cx, cy, r * 0.78, r * 1.05, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#5fc8ff'; for (const ex of [-0.35, 0.35]) { g.beginPath(); g.arc(cx + ex * r, cy - r * 0.15, r * 0.28, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(cx - r * 0.4, cy + r * 0.45); g.quadraticCurveTo(cx, cy + r * 0.8, cx + r * 0.4, cy + r * 0.45); g.closePath(); g.fill(); g.stroke();
+  }
+  // Tela de TV de parede com a espiral (estática no cache; o brilho dá vida).
+  function spiralScreen(g, x, y, w, h, r) {
+    g.fillStyle = '#16171b'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
+    g.save(); g.beginPath(); g.rect(x + 6, y + 6, w - 12, h - 12); g.clip();
+    TT.drawSpiral(g, x + w / 2, y + h / 2, Math.max(w, h) * 0.75, r() * 6, '#2a0c3a', MOD_PINK, 5);
+    g.restore();
+    glowPool(g, x + w / 2, y + h / 2, w * 0.8, h * 0.8, MOD_PINK, 0.3);
+  }
+
+  function s10Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#0e0a2a'); sky.addColorStop(0.6, '#2a1c5a'); sky.addColorStop(1, '#7a3a7a');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    cells(x0, x1, 90, 1001, (cx, r) => { g.fillStyle = 'rgba(255,255,255,' + (0.3 + r() * 0.5) + ')'; g.fillRect(cx + r() * 90, r() * 200, 2, 2); });
+    // lua cheia atrás de uma torre de relógio (o "Big Ben" de mentira) e uma roda-gigante
+    cells(x0, x1, 2200, 1003, (cx) => {
+      const x = cx + 500;
+      glowPool(g, x + 90, 120, 170, 170, '#fff3c0', 0.35); g.fillStyle = '#fff6dc'; g.beginPath(); g.arc(x + 90, 120, 50, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1c1440'; g.fillRect(x - 30, 120, 60, 320); g.beginPath(); g.moveTo(x - 36, 120); g.lineTo(x, 40); g.lineTo(x + 36, 120); g.closePath(); g.fill();
+      g.fillStyle = '#ffe9a0'; g.beginPath(); g.arc(x, 160, 20, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#1c1440'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, 160); g.lineTo(x, 146); g.moveTo(x, 160); g.lineTo(x + 10, 164); g.stroke();
+      const wx = x + 900, wy = 250, R = 130; // roda-gigante
+      g.strokeStyle = '#2c2058'; g.lineWidth = 4; g.beginPath(); g.arc(wx, wy, R, 0, Math.PI * 2); g.stroke();
+      g.lineWidth = 2; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.beginPath(); g.moveTo(wx, wy); g.lineTo(wx + Math.cos(a) * R, wy + Math.sin(a) * R); g.stroke(); g.fillStyle = i % 2 ? '#ff5ad0' : '#5fc8ff'; g.fillRect(wx + Math.cos(a) * R - 6, wy + Math.sin(a) * R - 4, 12, 9); }
+      g.lineWidth = 5; g.beginPath(); g.moveTo(wx - 60, 440); g.lineTo(wx, wy); g.lineTo(wx + 60, 440); g.stroke();
+    });
+    cells(x0, x1, 130, 1005, (cx, r) => { // telhados com chaminés
+      const h = 90 + r() * 120, w = 100 + r() * 40, x = cx + r() * 30, top = 440 - h;
+      g.fillStyle = '#1a1238'; g.fillRect(x, top, w, h);
+      g.beginPath(); g.moveTo(x - 6, top); g.lineTo(x + w / 2, top - 30); g.lineTo(x + w + 6, top); g.closePath(); g.fill();
+      g.fillRect(x + w * 0.7, top - 40, 14, 30);
+      g.fillStyle = 'rgba(255,220,150,0.5)'; for (let yy = top + 14; yy < 430; yy += 24) for (let xx = x + 10; xx < x + w - 12; xx += 22) if (r() < 0.35) g.fillRect(xx, yy, 9, 12);
+    });
+    g.fillStyle = '#140c30'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s10Mid(g, x0, x1) {
+    // a escola do Mad Mod: prédio vitoriano com o letreiro e o alvo mod na torre
+    cells(x0, x1, 1700, 1011, (cx) => {
+      const x = cx + 800, base = 470;
+      g.fillStyle = '#3a2058'; g.strokeStyle = OUT; g.lineWidth = 4;
+      g.fillRect(x - 220, base - 230, 440, 230); g.strokeRect(x - 220, base - 230, 440, 230);
+      g.fillRect(x - 50, base - 330, 100, 100); g.strokeRect(x - 50, base - 330, 100, 100);
+      g.beginPath(); g.moveTo(x - 60, base - 330); g.lineTo(x, base - 400); g.lineTo(x + 60, base - 330); g.closePath(); g.fill(); g.stroke();
+      roundel(g, x, base - 282, 30);
+      sign(g, x, base - 248, 250, 30, 'MAD MOD ACADEMY', '#ffe14a');
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { const wx = x - 190 + i * 66, wy = base - 200 + j * 80; g.fillStyle = (i + j) % 3 ? '#ff9ae8' : '#5fc8ff'; g.fillRect(wx, wy, 36, 52); g.strokeRect(wx, wy, 36, 52); glowPool(g, wx + 18, wy + 26, 40, 40, MOD_PINK, 0.25); }
+    });
+    cells(x0, x1, 380, 1013, (cx, r) => { // sobrados com janelas de guilhotina
+      const x = cx + r() * 100, w = 180 + r() * 60, h = 150 + r() * 70, top = 470 - h;
+      g.fillStyle = TT.choice(['#4a2a5a', '#2a3a6a', '#5a2a3a']); g.strokeStyle = OUT; g.lineWidth = 3; g.fillRect(x, top, w, h); g.strokeRect(x, top, w, h);
+      for (let yy = top + 18; yy < 450; yy += 40) for (let xx = x + 14; xx < x + w - 24; xx += 34) { g.fillStyle = r() < 0.5 ? '#ffd98a' : '#1c1240'; g.fillRect(xx, yy, 18, 26); g.strokeRect(xx, yy, 18, 26); }
+    });
+  }
+
+  function s10Near(g, x0, x1) {
+    // --- rua de lojas "mod": boutique, loja de discos e cabines vermelhas
+    part(g, x0, x1, -1e5, S10_HALL, () => {
+      cells(x0, x1, 860, 1021, (cx, r) => {
+        const fx = cx + 30;
+        // boutique com toldo listrado e vitrine com manequins de terno
+        g.fillStyle = '#2a3a8a'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(fx, 110, 380, FT - 110); g.strokeRect(fx, 110, 380, FT - 110);
+        TT.drawText(g, 'MOD BOUTIQUE', fx + 190, 140, 32, '#ffe14a', OUT, 'center', 6);
+        for (let i = 0; i < 10; i++) { g.fillStyle = i % 2 ? '#ffffff' : '#d7263e'; g.beginPath(); g.moveTo(fx + 10 + i * 36, 170); g.lineTo(fx + 46 + i * 36, 170); g.lineTo(fx + 50 + i * 36, 206); g.lineTo(fx + 6 + i * 36, 206); g.closePath(); g.fill(); g.lineWidth = 2; g.stroke(); }
+        g.fillStyle = '#0e0a20'; g.fillRect(fx + 24, 220, 230, FT - 240); g.lineWidth = 3; g.strokeRect(fx + 24, 220, 230, FT - 240);
+        for (let i = 0; i < 3; i++) { const mx = fx + 70 + i * 70; g.fillStyle = ['#d7263e', '#1d3a8a', '#ffe14a'][i]; g.fillRect(mx - 16, 290, 32, 60); g.strokeRect(mx - 16, 290, 32, 60); g.fillStyle = '#c9cfd8'; g.beginPath(); g.arc(mx, 276, 13, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillRect(mx - 2, 350, 4, FT - 372); }
+        glowPool(g, fx + 140, 320, 140, 100, '#ffd98a', 0.25);
+        g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.moveTo(fx + 40, 220); g.lineTo(fx + 100, 220); g.lineTo(fx + 60, FT - 20); g.lineTo(fx + 30, FT - 20); g.fill();
+        g.fillStyle = '#1c1240'; g.fillRect(fx + 280, 240, 80, FT - 240); g.strokeRect(fx + 280, 240, 80, FT - 240); // porta
+        roundel(g, fx + 320, 280, 18);
+        // loja de discos com discos de vinil na vitrine
+        const sx = fx + 420;
+        g.fillStyle = '#5a1a3a'; g.fillRect(sx, 140, 380, FT - 140); g.strokeRect(sx, 140, 380, FT - 140);
+        sign(g, sx + 190, 120, 260, 40, 'DISCOS GROOVY', MOD_PINK);
+        g.fillStyle = '#0e0a20'; g.fillRect(sx + 20, 180, 340, FT - 200); g.strokeRect(sx + 20, 180, 340, FT - 200);
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
+          const dx = sx + 64 + i * 80, dy = 236 + j * 110;
+          g.fillStyle = '#16141e'; g.beginPath(); g.arc(dx, dy, 34, 0, Math.PI * 2); g.fill(); g.stroke();
+          g.strokeStyle = '#2e2a3a'; g.lineWidth = 1.5; for (const rr of [26, 20]) { g.beginPath(); g.arc(dx, dy, rr, 0, Math.PI * 2); g.stroke(); }
+          g.fillStyle = TT.choice(['#ffe14a', '#d7263e', '#5fc8ff', MOD_PINK]); g.beginPath(); g.arc(dx, dy, 11, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = OUT; g.lineWidth = 3;
+        }
+        bunting(g, fx - 10, fx + 820, 96, 14);
+      });
+      // calçada de pedras e rua
+      g.fillStyle = '#4a4660'; g.fillRect(x0, FT, x1 - x0, 50);
+      g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 2;
+      for (let row = 0; row < 3; row++) for (let x = Math.floor(x0 / 40) * 40 + (row % 2) * 20; x < x1; x += 40) { g.strokeRect(x, FT + row * 16, 40, 16); }
+      g.fillStyle = '#8a84a0'; g.fillRect(x0, FT + 48, x1 - x0, 8);
+      g.fillStyle = '#26223a'; g.fillRect(x0, FT + 56, x1 - x0, H - FT - 56);
+      g.fillStyle = '#ffffff'; for (let x = Math.floor(x0 / 160) * 160; x < x1; x += 160) g.fillRect(x, FT + 150, 80, 8);
+      g.fillStyle = 'rgba(255,255,255,0.06)'; for (let x = Math.floor(x0 / 260) * 260; x < x1; x += 260) { g.beginPath(); g.ellipse(x + 90, FT + 110, 70, 10, 0, 0, Math.PI * 2); g.fill(); } // poças refletindo
+    });
+    // --- corredor da escola: parede op-art preta e branca, armários e retratos do diretor
+    part(g, x0, x1, S10_HALL, S10_CLASS, () => {
+      g.fillStyle = '#f2eee6'; g.fillRect(x0, 0, x1 - x0, FT);
+      // listras onduladas op-art
+      g.fillStyle = '#16141e';
+      for (let k = Math.floor(x0 / 44) * 44 - 44; k < x1 + 44; k += 44) {
+        g.beginPath(); g.moveTo(k, 0);
+        for (let y = 0; y <= FT; y += 20) g.lineTo(k + Math.sin(y * 0.02 + k * 0.004) * 16, y);
+        for (let y = FT; y >= 0; y -= 20) g.lineTo(k + 18 + Math.sin(y * 0.02 + k * 0.004) * 16, y);
+        g.closePath(); g.fill();
+      }
+      g.fillStyle = '#7a2bb5'; g.fillRect(x0, FT - 70, x1 - x0, 70); g.fillStyle = '#ffe14a'; g.fillRect(x0, FT - 74, x1 - x0, 6); // rodapé
+      cells(x0, x1, 900, 1031, (cx, r) => {
+        const x = cx + 60;
+        // armários com a bandeira
+        for (let i = 0; i < 4; i++) {
+          const lx = x + i * 56;
+          g.save(); g.beginPath(); g.rect(lx, 200, 50, FT - 210); g.clip(); TT.drawUnionJack(g, lx, 200, 50, FT - 210); g.restore();
+          g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(lx, 200, 50, FT - 210);
+          g.fillStyle = '#c9cfd8'; for (let v = 0; v < 3; v++) g.fillRect(lx + 12, 214 + v * 6, 26, 3);
+          g.fillStyle = '#ffe14a'; g.fillRect(lx + 40, 300, 5, 16);
+        }
+        modPortrait(g, x + 320, 120, 110, 140);
+        spiralScreen(g, x + 500, 110, 180, 120, r);
+        sign(g, x + 590, 260, 170, 30, 'OLHE PARA A TELA', '#ffc8f0');
+        hangLamp(g, x + 440, 0, 70, '#ffd98a', '#7a2bb5');
+      });
+      // piso xadrez preto e branco
+      for (let y = FT, row = 0; y < H; y += 46, row++) for (let x = Math.floor(x0 / 92) * 92 + (row % 2) * 46; x < x1; x += 92) { g.fillStyle = '#16141e'; g.fillRect(x, y, 46, 46); }
+      g.fillStyle = '#ebe6dc'; for (let y = FT, row = 0; y < H; y += 46, row++) for (let x = Math.floor(x0 / 92) * 92 + ((row + 1) % 2) * 46; x < x1; x += 92) g.fillRect(x, y, 46, 46);
+      g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x0, FT + 4, x1 - x0, 30);
+    });
+    // --- sala de aula do Mad Mod: telão hipnótico gigante, quadro-negro e lustre
+    part(g, x0, x1, S10_CLASS, 1e5, () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#2a0c3a'); wall.addColorStop(1, '#5a1a6a');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      g.fillStyle = 'rgba(255,90,208,0.12)'; for (let x = Math.floor(x0 / 80) * 80; x < x1; x += 80) g.fillRect(x, 0, 40, FT); // papel de parede listrado
+      cells(x0, x1, 1300, 1041, (cx, r) => {
+        const mx = cx + 650;
+        // telão gigante com a espiral e o rosto do Mad Mod no meio
+        g.fillStyle = '#c9a24a'; g.strokeStyle = OUT; g.lineWidth = 6; g.fillRect(mx - 250, 40, 500, 290); g.strokeRect(mx - 250, 40, 500, 290);
+        g.save(); g.beginPath(); g.rect(mx - 234, 56, 468, 258); g.clip();
+        TT.drawSpiral(g, mx, 185, 320, 0, '#1a0628', MOD_PINK, 7);
+        g.restore();
+        g.strokeStyle = OUT; g.lineWidth = 4; g.strokeRect(mx - 234, 56, 468, 258);
+        modPortrait(g, mx - 55, 120, 110, 130);
+        glowPool(g, mx, 185, 320, 190, MOD_PINK, 0.3);
+        // quadro-negro com a "lição"
+        for (const s of [-1, 1]) {
+          const bx = mx + s * 470 - 130;
+          g.fillStyle = '#7a4a2a'; g.fillRect(bx - 8, 110, 276, 176); g.strokeRect(bx - 8, 110, 276, 176);
+          g.fillStyle = '#1e3a2a'; g.fillRect(bx, 118, 260, 160);
+          TT.drawText(g, s > 0 ? 'LIÇÃO 1:' : 'LIÇÃO 2:', bx + 130, 144, 22, '#f2f2f6', null, 'center', 0);
+          TT.drawText(g, s > 0 ? 'OBEDEÇA O' : 'A ESPIRAL', bx + 130, 184, 22, '#f2f2f6', null, 'center', 0);
+          TT.drawText(g, s > 0 ? 'MAD MOD' : 'É SUA AMIGA', bx + 130, 220, 22, '#ffe14a', null, 'center', 0);
+          g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 2; g.beginPath(); g.arc(bx + 220, 250, 16, 0, Math.PI * 1.6); g.stroke();
+        }
+        // lustre de cristal
+        g.strokeStyle = '#c9a24a'; g.lineWidth = 3; g.beginPath(); g.moveTo(mx, 0); g.lineTo(mx, 16); g.stroke();
+      });
+      // piso em xadrez rosa e preto, com o alvo mod no meio
+      for (let y = FT, row = 0; y < H; y += 46, row++) for (let x = Math.floor(x0 / 92) * 92 + (row % 2) * 46; x < x1; x += 92) { g.fillStyle = '#1a0a24'; g.fillRect(x, y, 46, 46); }
+      g.fillStyle = '#c0408a'; for (let y = FT, row = 0; y < H; y += 46, row++) for (let x = Math.floor(x0 / 92) * 92 + ((row + 1) % 2) * 46; x < x1; x += 92) g.fillRect(x, y, 46, 46);
+      cells(x0, x1, 1300, 1043, (cx) => { g.save(); g.translate(cx + 650, FT + 120); g.scale(1, 0.42); roundel(g, 0, 0, 150); g.restore(); });
+    });
+    // passagens: portão da escola e porta da sala de aula
+    for (const [px, col, txt] of [[S10_HALL, '#3a2058', 'ACADEMIA'], [S10_CLASS, '#5a1a3a', 'SALA DE AULA']]) {
+      if (x0 > px + 180 || x1 < px - 180) continue;
+      g.fillStyle = col; g.fillRect(px - 150, 50, 300, FT - 50); g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(px - 150, 50, 300, FT - 50);
+      g.fillStyle = '#0c0814'; g.beginPath(); g.moveTo(px - 100, FT); g.lineTo(px - 100, 200); g.quadraticCurveTo(px, 120, px + 100, 200); g.lineTo(px + 100, FT); g.closePath(); g.fill();
+      sign(g, px, 90, 190, 38, txt, '#ffe14a');
+      roundel(g, px, 160, 22);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  // Carteira escolar com cadeira.
+  function schoolDesk(g, x, base, r) {
+    g.fillStyle = '#8a5a3a'; g.strokeStyle = OUT; g.lineWidth = 3;
+    g.fillRect(x, base - 62, 84, 12); g.strokeRect(x, base - 62, 84, 12);
+    g.fillStyle = '#3a3d47'; for (const lx of [x + 6, x + 70]) { g.fillRect(lx, base - 50, 7, 50); g.strokeRect(lx, base - 50, 7, 50); }
+    g.fillStyle = '#7a2bb5'; g.fillRect(x + 96, base - 40, 40, 8); g.strokeRect(x + 96, base - 40, 40, 8); g.fillRect(x + 128, base - 86, 8, 46); g.strokeRect(x + 128, base - 86, 8, 46);
+    g.fillStyle = '#3a3d47'; g.fillRect(x + 98, base - 32, 5, 32); g.fillRect(x + 128, base - 32, 5, 32);
+    if (r() < 0.6) { g.fillStyle = '#f2eee6'; g.save(); g.translate(x + 40, base - 64); g.rotate(r() - 0.5); g.fillRect(-14, -4, 28, 4); g.restore(); }
+  }
+  function d10(g, x0, x1) {
+    part(g, x0, x1, -1e5, S10_HALL, () => {
+      cells(x0, x1, 860, 1051, (cx, r) => {
+        lampPost(g, cx + 6, FT + 4, 230, '#ffd98a');
+        phoneBox(g, cx + 400, FT + 10);
+        if (r() < 0.7) scooter(g, cx + 600, FT + 40, TT.choice(['#d7263e', '#5fc8ff', '#ffe14a', '#c9cfd8']));
+      });
+      cells(x0, x1, 420, 1053, (cx, r) => { if (r() < 0.4) { g.fillStyle = '#1c1b26'; g.strokeStyle = OUT; g.lineWidth = 3; const x = cx + r() * 300, y = FT + 70 + r() * 120; g.beginPath(); g.arc(x, y, 18, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = MOD_PINK; g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill(); } }); // discos caídos
+    });
+    part(g, x0, x1, S10_HALL, S10_CLASS, () => {
+      cells(x0, x1, 560, 1055, (cx, r) => {
+        if (r() < 0.6) schoolDesk(g, cx + 120, FT + 14, r);
+        else plant(g, cx + 200, FT + 6, 0.9, '#7a2bb5');
+      });
+      cells(x0, x1, 300, 1057, (cx, r) => { if (r() < 0.5) { g.fillStyle = '#f2eee6'; g.save(); g.translate(cx + r() * 220, FT + 70 + r() * 140); g.rotate(r() * 3); g.fillRect(-16, -11, 32, 22); g.strokeStyle = OUT; g.lineWidth = 1.5; g.strokeRect(-16, -11, 32, 22); g.restore(); } }); // folhas de prova no chão
+    });
+    part(g, x0, x1, S10_CLASS, 1e5, () => {
+      cells(x0, x1, 300, 1059, (cx, r) => { if (r() < 0.75) schoolDesk(g, cx + 40 + r() * 80, FT + 12, r); });
+    });
+  }
+  // Primeiro plano: estandartes com a bandeira pendurados (fora da sala de aula).
+  function s10Fg(g, x0, x1) {
+    cells(x0, x1, 1300, 1071, (cx) => {
+      const x = cx + 650;
+      if (x > S10_CLASS - 300) return;
+      g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 10, 0); g.lineTo(x + 90, 0); g.stroke();
+      g.save(); g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 80, 0); g.lineTo(x + 80, 240); g.lineTo(x + 40, 210); g.lineTo(x, 240); g.closePath(); g.clip();
+      TT.drawUnionJack(g, x, 0, 80, 240); g.restore();
+      g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 80, 0); g.lineTo(x + 80, 240); g.lineTo(x + 40, 210); g.lineTo(x, 240); g.closePath(); g.stroke();
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 10) {
+      return { layers: [new Layer(0.1, s10Far, 36), new Layer(0.38, s10Mid, 37), new Layer(1, detailed(s10Near, d10, 'rgba(40,0,50,0.3)'), 38)], fg: new Layer(1.18, s10Fg, 39), id };
+    }
     if (id === 9) {
       return { layers: [new Layer(0.1, s9Far, 32), new Layer(0.38, s9Mid, 33), new Layer(1, detailed(s9Near, d9, 'rgba(20,0,40,0.3)'), 34)], fg: new Layer(1.18, s9Fg, 35), id };
     }

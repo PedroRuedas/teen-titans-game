@@ -140,7 +140,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -257,6 +257,11 @@
         b = new TT.ControlFreak(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'tv';
+      } else if (sec.boss === 'madmod') {
+        // surge girando no meio de uma espiral hipnótica, como um disco na vitrola
+        b = new TT.MadMod(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'spiral';
       } else if (sec.boss === 'mallah') {
         b = new TT.Mallah(this, this.camX + 880, 590);
         b.facing = -1;
@@ -328,6 +333,14 @@
         if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
         if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
         if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
+      }
+      if (this.introKind === 'spiral') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 15) / 55, 0, 1);
+        b.facing = (k < 70 && (k >> 3) % 2) ? 1 : -1; // gira enquanto aparece
+        if (k < 70 && k % 14 === 0) { this.particles.spawn('ring', b.x, b.y - 100, { size: 80 + k * 2, color: '#ff5ad0', life: 18 }); A().play('zap'); }
+        if (k === 70) { b.facing = -1; this.impact(b.x, b.y, 'GROOVY!', '#ff5ad0', 1.3); this.tintScreen('#ff5ad0', 10); }
+        if (k === 95) this.say(b, 'Bem-vindos à minha escola, meus patinhos!', '#ffc8f0');
       }
       if (this.introKind === 'tv') {
         const k = 170 - this.bossIntro;
@@ -438,6 +451,24 @@
         for (let i = 0; i < 8; i++) this.particles.spawn('spark', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 30), { vx: TT.rand(-5, 5), vy: TT.rand(-4, 4), color: TT.choice(['#ffffff', '#c9d3e2', '#7bffea']), size: 3, life: 12 });
         this.particles.spawn('text', t.x, hy - 50, { text: 'CHUVISCO!', size: 30, color: '#e6fffb', color2: '#3a4a6a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
       }
+      if (d.invertHero && t.team === 'hero' && !t.ko) {
+        // hipnose do Mad Mod: controles invertidos até passar (apertar ATAQUE acorda mais rápido)
+        t.inverted = Math.max(t.inverted || 0, d.invertHero);
+        this.particles.spawn('ring', t.x, hy, { size: 80, color: '#ff5ad0', life: 18 });
+        this.particles.spawn('text', t.x, hy - 60, { text: 'HIPNOTIZADO!', size: 30, color: '#ffc8f0', color2: '#7a2bb5', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+      }
+      if (d.ageHero && t.team === 'hero' && !t.ko) {
+        // raio da juventude: o Titã vira velhinho (lento) e o Mad Mod rejuvenesce (recupera vida)
+        t.aged = Math.max(t.aged || 0, d.ageHero);
+        this.poof(t.x, t.y - 60);
+        this.particles.spawn('text', t.x, hy - 60, { text: 'VIROU VELHINHO!', size: 30, color: '#fff0a8', color2: '#8a5a1a', vy: -0.5, life: 50, rot: TT.rand(-0.1, 0.1) });
+        if (att && att.isBoss && !att.dead) { att.hp = Math.min(att.maxHp, att.hp + 90); this.popText(att.x, att.y - 260, 'REJUVENESCEU!', '#ffe14a'); }
+      }
+      if (d.dazzle && t.team === 'hero') {
+        // flash do Olho Hipnótico: estrelinhas brancas e "OFUSCADO!"
+        for (let i = 0; i < 6; i++) this.particles.spawn('star', t.x + TT.rand(-24, 24), hy + TT.rand(-30, 20), { vx: TT.rand(-4, 4), vy: TT.rand(-5, -1), color: '#ffffff', size: 8, life: 18, vr: 0.2 });
+        this.particles.spawn('text', t.x, hy - 50, { text: 'OFUSCADO!', size: 30, color: '#ffffff', color2: '#3a4a6a', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
       if (d.freezeHero && t.team === 'hero' && t.state === 'hurt' && !t.ko) {
         // raio congelante da Irmandade: o Titã fica preso num bloco de gelo
         t.frozen = d.freezeHero; t.frozenKind = null; t.hitstun = Math.max(t.hitstun, d.freezeHero); t.vx = 0;
@@ -502,9 +533,11 @@
       const n = this.team[i];
       if (n.ko || this.takenBy(i, sl)) return false;
       const p = this.team[sl.ai];
+      // troca em combo: com 3 ou mais golpes seguidos, dá para trocar no meio de um ataque
+      const tag = !forced && this.combo >= 3 && p.state === 'attack' && !p.ko;
       if (!forced) {
         if (sl.switchCool > 0 || sl.out) return false;
-        if (!(p.state === 'idle' || p.state === 'air')) return false;
+        if (!(p.state === 'idle' || p.state === 'air' || tag)) return false;
       }
       n.x = p.x; n.y = p.y; n.z = forced ? 0 : p.z; n.facing = p.facing;
       n.vx = 0; n.vy = 0; n.vz = forced ? 0 : p.vz;
@@ -515,6 +548,18 @@
       sl.switchCool = 18;
       this.poof(n.x, n.y - 60);
       A().play('switch');
+      if (tag) {
+        // quem sai fica; quem entra vira para o inimigo mais perto e já entra com a investida
+        p.atk = null; p.setState('idle'); p.setAnim('idle');
+        let near = null, bd = 1e9;
+        for (const e of this.enemies) { if (e.dead) continue; const d = Math.abs(e.x - n.x) + Math.abs(e.y - n.y) * 2; if (d < bd) { bd = d; near = e; } }
+        if (near) { n.facing = near.x > n.x ? 1 : -1; n.y += TT.clamp(near.y - n.y, -30, 30); }
+        if (n.z <= 0) { n.vy = 0; n.startAttack(n.def.dashAtk); }
+        this.tagSwitches = (this.tagSwitches || 0) + 1;
+        this.comboT = 110;
+        this.afterimage(p, p.def.fx || p.def.color);
+        this.particles.spawn('text', n.x, n.y - 200, { text: 'TROCA EM COMBO!', size: 32, color: '#ffe14a', color2: n.def.color, vy: -0.6, life: 46 });
+      }
       return true;
     }
     // Próximo/anterior: pula os caídos e o Titã em uso pelo outro jogador.
@@ -1011,7 +1056,16 @@
 
     drawAmbient(ctx, camX) {
       const f = this.frame;
-      if (this.stage.id === 1) {
+      if (this.stage.id === 10) {
+        // luzes de discoteca varrendo o chão e, na sala de aula, a tela pulsando em rosa e azul
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+          const x = W / 2 + Math.sin(f * 0.013 + i * 2.1) * 520, col = ['#ff5ad0', '#5fc8ff', '#ffe14a'][i];
+          TT.drawGlow(ctx, col, x, TT.FLOOR_TOP + 120 + i * 40, 150, 0.13);
+        }
+        if (camX > 5600) { ctx.globalAlpha = 0.05 + 0.04 * Math.sin(f * 0.06); ctx.fillStyle = (f >> 5) % 2 ? '#ff5ad0' : '#5fc8ff'; ctx.fillRect(0, 0, W, H); }
+        ctx.restore();
+      } else if (this.stage.id === 1) {
         // brilhos no mar (só visíveis na parte externa)
         if (camX < 2700) {
           ctx.globalCompositeOperation = 'lighter';

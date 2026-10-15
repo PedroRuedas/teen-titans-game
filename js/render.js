@@ -1398,6 +1398,155 @@
     },
   });
 
+  // ------------------------------------------------------------ Fase 10 — A Academia do Mad Mod
+  // Espiral hipnótica (op-art dos anos 60): disco na cor c1 com uma faixa em espiral na cor c2 girando.
+  // Também usada no cenário (em cache) e nos golpes. turns = voltas da faixa.
+  TT.drawSpiral = function (ctx, x, y, R, rot, c1, c2, turns, sy) {
+    turns = turns || 4;
+    ctx.save(); ctx.translate(x, y); if (sy) ctx.scale(1, sy);
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU2); ctx.fillStyle = c1; ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = c2; ctx.lineWidth = R / turns / 2; ctx.lineCap = 'butt';
+    ctx.beginPath();
+    const N = Math.ceil(turns * 40);
+    for (let i = 0; i <= N; i++) {
+      const k = i / N, a = rot + k * turns * TAU2, r = k * R * 1.08;
+      if (i) ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.moveTo(0, 0);
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // Bandeira do Reino Unido (fundo azul, diagonais brancas e vermelhas, cruz branca e vermelha).
+  TT.drawUnionJack = function (ctx, x, y, w, h) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.fillStyle = C('#1d3a8a'); ctx.fillRect(x, y, w, h);
+    if (!FLASH) {
+      const d = Math.min(w, h);
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = d * 0.2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.moveTo(x + w, y); ctx.lineTo(x, y + h); ctx.stroke();
+      ctx.strokeStyle = '#d7263e'; ctx.lineWidth = d * 0.07;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.moveTo(x + w, y); ctx.lineTo(x, y + h); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(x + w / 2 - d * 0.17, y, d * 0.34, h); ctx.fillRect(x, y + h / 2 - d * 0.17, w, d * 0.34);
+      ctx.fillStyle = '#d7263e'; ctx.fillRect(x + w / 2 - d * 0.1, y, d * 0.2, h); ctx.fillRect(x, y + h / 2 - d * 0.1, w, d * 0.2);
+    }
+    ctx.restore();
+  };
+
+  // Mad Mod (chefe da fase 10): o vilão britânico dos anos 60 — magro e velho, cabelo ruivo em
+  // topete, óculos redondos azuis, paletó com a bandeira do Reino Unido, gola e punhos de babado,
+  // calça preta risca de giz, botinas pontudas e a bengala com a esfera hipnótica.
+  const MOD = { skin: '#f2c8a8', hair: '#e8682a', navy: '#1d3a8a', red: '#d7263e', frill: '#f6f2e6', pants: '#1c1b26', lens: '#5fc8ff' };
+  function modCane(ctx, hF, P, glow) {
+    if (P.pose.noCane) return;
+    const dx = Math.sin(hF.a), dy = Math.cos(hF.a), L = 52;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = OUT; ctx.lineWidth = 6.5; ctx.beginPath(); ctx.moveTo(hF.ex - dx * 14, hF.ey - dy * 14); ctx.lineTo(hF.ex + dx * L, hF.ey + dy * L); ctx.stroke();
+    ctx.strokeStyle = C('#20202a'); ctx.lineWidth = 4; ctx.stroke();
+    ctx.strokeStyle = C('#c9cfd8'); ctx.beginPath(); ctx.moveTo(hF.ex + dx * (L - 8), hF.ey + dy * (L - 8)); ctx.lineTo(hF.ex + dx * L, hF.ey + dy * L); ctx.stroke(); // ponteira
+    // castão: esfera com a espiral (fica do lado de trás da mão)
+    const bx = hF.ex - dx * 18, by = hF.ey - dy * 18;
+    ctx.beginPath(); ctx.arc(bx, by, 8, 0, TAU2); ctx.fillStyle = C('#c9cfd8'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+    if (!FLASH) {
+      TT.drawSpiral(ctx, bx, by, 6, (P.t || 0) * 0.2, '#ff5ad0', '#1c1b26', 2);
+      TT.drawGlow(ctx, '#ff5ad0', bx, by, glow ? 26 : 12, glow ? 1 : 0.6);
+    }
+  }
+  S.madmod = mkStyle({
+    scale: 1.55, headR: 16, torsoH: 40, shW: 30, waistW: 19, hipW: 21, chest: 2, legL: [32, 31], armL: [22, 21], legW: 7.5, armW: 7.2, handR: 6, footR: 9, neck: 4,
+    skin: MOD.skin, torso: MOD.navy, arm: MOD.navy, glove: MOD.skin, hand: MOD.skin, leg: MOD.pants, boot: '#2a1a14',
+    armOpt: { split: 1.6, band: [{ col: MOD.frill, at: 1.8, len: 0.12 }] },
+    legOpt: { split: 1.5, sole: '#14131c' },
+    drawBack(ctx, P) { // abas do paletó (fraque curto) balançando
+      const a = P.rot(-14, -6), b = P.rot(8, -6), sw = Math.sin((P.t || 0) * 0.08) * 3;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(P.Hx - 4, P.Hy + 26); ctx.lineTo(P.Hx - 24 + sw, P.Hy + 30); ctx.closePath();
+      ctx.fillStyle = C(MOD.navy); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+    },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      TT.drawUnionJack(ctx, -22, -th - 2, 44, th + 4);
+      if (FLASH) return;
+      ctx.fillStyle = 'rgba(20,10,40,0.25)'; ctx.fillRect(-22, -12, 44, 12);
+      // babado branco no peito
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(4, -th + 4 + i * 7, 7 - i, 4, 0, 0, TAU2); ctx.fillStyle = MOD.frill; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.2; ctx.stroke(); }
+      ctx.fillStyle = '#ffd23a'; for (const y of [-th * 0.45, -th * 0.25]) { ctx.beginPath(); ctx.arc(-6, y, 2.2, 0, TAU2); ctx.fill(); }
+    },
+    drawFront(ctx, P, hF) { modCane(ctx, hF, P, P.pose.glow); },
+    drawHead(ctx, r, pose) {
+      // topete ruivo atrás da cabeça
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, r * 0.3); ctx.quadraticCurveTo(-r * 1.25, -r * 0.6, -r * 0.5, -r * 1.1);
+      ctx.quadraticCurveTo(r * 0.4, -r * 1.55, r * 1.15, -r * 0.85); ctx.quadraticCurveTo(r * 0.5, -r * 0.7, r * 0.2, -r * 0.55); ctx.lineTo(-r * 0.4, r * 0.4); ctx.closePath();
+      ctx.fillStyle = C(MOD.hair); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      // rosto magro e comprido
+      ctx.beginPath(); ctx.moveTo(-r * 0.55, -r * 0.6); ctx.quadraticCurveTo(r * 0.9, -r * 0.85, r * 0.92, -r * 0.05); ctx.quadraticCurveTo(r * 0.95, r * 0.9, r * 0.25, r * 1.05);
+      ctx.quadraticCurveTo(-r * 0.6, r * 0.95, -r * 0.7, r * 0.1); ctx.closePath();
+      ctx.fillStyle = C(MOD.skin); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      // costeleta ruiva
+      ctx.beginPath(); ctx.moveTo(-r * 0.62, -r * 0.4); ctx.lineTo(-r * 0.3, -r * 0.45); ctx.lineTo(-r * 0.35, r * 0.45); ctx.lineTo(-r * 0.6, r * 0.3); ctx.closePath(); ctx.fillStyle = C(MOD.hair); ctx.fill(); ctx.stroke();
+      if (FLASH) return;
+      // nariz grande
+      ctx.beginPath(); ctx.moveTo(r * 0.7, -r * 0.05); ctx.quadraticCurveTo(r * 1.32, r * 0.25, r * 0.98, r * 0.42); ctx.quadraticCurveTo(r * 0.85, r * 0.45, r * 0.78, r * 0.38);
+      ctx.fillStyle = MOD.skin; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      // óculos redondos azuis
+      for (const [ex, er] of [[r * 0.28, r * 0.27], [r * 0.82, r * 0.22]]) {
+        ctx.beginPath(); ctx.arc(ex, -r * 0.18, er, 0, TAU2); ctx.fillStyle = MOD.lens; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.ellipse(ex - er * 0.3, -r * 0.18 - er * 0.35, er * 0.3, er * 0.16, -0.5, 0, TAU2); ctx.fill();
+      }
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r * 0.55, -r * 0.2); ctx.lineTo(r * 0.6, -r * 0.2); ctx.moveTo(r * 0.01, -r * 0.2); ctx.lineTo(-r * 0.5, -r * 0.3); ctx.stroke();
+      // rugas e sorriso largo de dentes à mostra
+      ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(r * 0.2, r * 0.25); ctx.quadraticCurveTo(r * 0.12, r * 0.45, r * 0.2, r * 0.6); ctx.stroke();
+      if (pose.mouth === 'open' || pose.mouth === 'shout') mouth(ctx, r, pose, r * 0.55, r * 0.68);
+      else {
+        ctx.beginPath(); ctx.moveTo(r * 0.3, r * 0.6); ctx.quadraticCurveTo(r * 0.6, r * 0.85, r * 0.88, r * 0.55); ctx.closePath();
+        ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.8; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r * 0.45, r * 0.62); ctx.lineTo(r * 0.47, r * 0.72); ctx.moveTo(r * 0.62, r * 0.64); ctx.lineTo(r * 0.63, r * 0.76); ctx.moveTo(r * 0.77, r * 0.6); ctx.lineTo(r * 0.77, r * 0.7); ctx.stroke();
+      }
+    },
+  });
+
+  // Guarda Real do Mad Mod (fase 10): robô vestido de guarda do palácio — túnica vermelha com cintos
+  // brancos em X, chapéu alto de pele de urso, rosto de metal com olhos amarelos e fuzil com baioneta.
+  S.guard = mkStyle({
+    scale: 1.06, headR: 17, torsoH: 36, shW: 30, waistW: 21, hipW: 22, legL: [27, 26], armL: [20, 19], legW: 8.5, armW: 8, handR: 6.2, footR: 8,
+    skin: '#9aa3b2', torso: '#c4162a', arm: '#c4162a', glove: '#f4f4f8', hand: '#f4f4f8', leg: '#1a1a22', boot: '#0f0e14',
+    legOpt: { split: 1.45, stripe: '#c4162a', sole: '#2a2a33' },
+    armOpt: { split: 1.5, band: [{ col: '#1a1a22', at: 1.62, len: 0.1 }] },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      if (FLASH) return;
+      ctx.strokeStyle = '#f4f4f8'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-16, -th + 2); ctx.lineTo(14, -8); ctx.moveTo(14, -th + 2); ctx.lineTo(-14, -8); ctx.stroke(); // cintos em X
+      ctx.fillStyle = '#f4f4f8'; ctx.fillRect(-20, -9, 40, 6);
+      ctx.fillStyle = '#ffd23a'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(2, -th + 6 + i * 8, 1.8, 0, TAU2); ctx.fill(); }
+      ctx.fillStyle = '#1a1a22'; ctx.fillRect(-16, -th - 2, 34, 4); // gola
+    },
+    drawFront(ctx, P, hF) { // fuzil com baioneta (cano de metal, coronha de madeira)
+      const dx = Math.sin(hF.a), dy = Math.cos(hF.a), L = 46;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = OUT; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(hF.ex - dx * 26, hF.ey - dy * 26); ctx.lineTo(hF.ex + dx * L, hF.ey + dy * L); ctx.stroke();
+      ctx.strokeStyle = C('#7a4a2a'); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hF.ex - dx * 26, hF.ey - dy * 26); ctx.lineTo(hF.ex + dx * 10, hF.ey + dy * 10); ctx.stroke();
+      ctx.strokeStyle = C('#5c6169'); ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(hF.ex + dx * 10, hF.ey + dy * 10); ctx.lineTo(hF.ex + dx * L, hF.ey + dy * L); ctx.stroke();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(hF.ex + dx * L, hF.ey + dy * L); ctx.lineTo(hF.ex + dx * (L + 22), hF.ey + dy * (L + 22)); ctx.stroke();
+      ctx.strokeStyle = C('#e6ebf2'); ctx.lineWidth = 2.5; ctx.stroke(); // baioneta
+      if (!FLASH && P.pose.glow) TT.drawGlow(ctx, '#ffffff', hF.ex + dx * (L + 20), hF.ey + dy * (L + 20), 16, 0.9);
+    },
+    drawHead(ctx, r, pose) {
+      headCircle(ctx, r, '#9aa3b2');
+      if (!FLASH) {
+        ctx.fillStyle = '#5c6169'; ctx.fillRect(-r * 0.2, r * 0.25, r * 1.05, r * 0.12); // boca de grade
+        ctx.fillStyle = '#ffe14a'; for (const ex of [r * 0.25, r * 0.72]) { ctx.beginPath(); ctx.arc(ex, -r * 0.12, r * 0.13, 0, TAU2); ctx.fill(); }
+        TT.drawGlow(ctx, '#ffe14a', r * 0.5, -r * 0.12, r * 0.9, 0.45);
+        ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-r * 0.7, -r * 0.1); ctx.quadraticCurveTo(r * 0.1, r * 1.05, r * 0.85, r * 0.5); ctx.stroke(); // jugular dourada
+      }
+      // chapéu alto de pele de urso (bem preto, com tufos)
+      ctx.beginPath(); ctx.moveTo(-r * 0.95, -r * 0.35);
+      for (let i = 0; i <= 10; i++) { const k = i / 10, a = Math.PI + k * Math.PI, rx = r * 1.02, ry = r * 2.25; ctx.lineTo(Math.cos(a) * rx + (i % 2 ? 2 : -2) + r * 0.05, -r * 0.35 + Math.sin(a) * ry - (i % 2 ? 2 : 0)); }
+      ctx.lineTo(r * 1.0, -r * 0.3); ctx.closePath();
+      ctx.fillStyle = C('#14121a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      if (!FLASH) { ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(r * (0.3 + i * 0.1), -r * (1.0 + i * 0.3)); ctx.quadraticCurveTo(r * 0.6, -r * (1.3 + i * 0.3), r * (0.5 + i * 0.1), -r * (1.6 + i * 0.25)); ctx.stroke(); } }
+    },
+  });
+
   S.cinderblock = mkStyle({
     scale: 2.0, skin: '#9b958d', torso: '#8e8880', arm: '#968f86', glove: '#7d776f', hand: '#8a847c', leg: '#857f77', boot: '#6f6a63',
     shW: 62, hipW: 44, torsoH: 46, headR: 17, legL: [20, 20], armL: [22, 22], armW: 17, legW: 17, handR: 12, footR: 10, headOff: 8,
