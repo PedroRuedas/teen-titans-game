@@ -2772,7 +2772,225 @@
     });
   }
 
+  // ---------------------------------------------------------------- Fase 11 — O Fim: o Reino de Trigon
+  // Jump City virada em pedra sob o eclipse vermelho, a ponte de rocha sobre o mar de lava e o templo de
+  // obsidiana de Trigon com a Marca de Scath.
+  const S11_ABYSS = 2700, S11_THRONE = 5850;
+  // Marca de Scath: o símbolo de Trigon (círculo com as quatro "lágrimas" e o olho).
+  function scathMark(g, x, y, r, col, a) {
+    g.save(); g.globalAlpha = a == null ? 1 : a; g.translate(x, y);
+    g.strokeStyle = col; g.lineWidth = r * 0.12;
+    g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(0, 0, r * 0.62, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = col;
+    for (let i = 0; i < 4; i++) { g.save(); g.rotate(i * Math.PI / 2 + Math.PI / 4); g.beginPath(); g.moveTo(0, -r * 0.62); g.quadraticCurveTo(r * 0.16, -r * 0.85, 0, -r * 1.15); g.quadraticCurveTo(-r * 0.16, -r * 0.85, 0, -r * 0.62); g.fill(); g.restore(); }
+    g.beginPath(); g.ellipse(0, 0, r * 0.38, r * 0.2, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1a0408'; g.beginPath(); g.arc(0, 0, r * 0.12, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+  // Rachaduras de lava no chão (pintadas no cache; o brilho vem do glowPool).
+  function lavaCracks(g, x0, x1, seed) {
+    cells(x0, x1, 260, seed, (cx, r) => {
+      const x = cx + r() * 140, y = FT + 30 + r() * 190, len = 60 + r() * 90;
+      g.strokeStyle = '#1a0608'; g.lineWidth = 7; g.lineCap = 'round';
+      const pts = [[x, y]]; for (let i = 1; i < 5; i++) pts.push([x + len * i / 4, y + (r() - 0.5) * 22]);
+      const path = () => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const p of pts) g.lineTo(p[0], p[1]); };
+      path(); g.stroke();
+      g.strokeStyle = '#ff7a1a'; g.lineWidth = 3; path(); g.stroke();
+      glowPool(g, x + len / 2, y, len * 0.7, 20, '#ff5a1a', 0.35);
+    });
+  }
+  function redCrystal(g, x, base, s) {
+    g.save(); g.translate(x, base); g.scale(s, s);
+    for (const [dx, h, w, rot] of [[-14, 60, 12, -0.3], [0, 90, 16, 0], [16, 54, 11, 0.35]]) {
+      g.save(); g.rotate(rot); g.beginPath(); g.moveTo(dx - w, 0); g.lineTo(dx - w * 0.6, -h * 0.75); g.lineTo(dx, -h); g.lineTo(dx + w * 0.6, -h * 0.75); g.lineTo(dx + w, 0); g.closePath();
+      g.fillStyle = '#a8122a'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2.5; g.stroke();
+      g.fillStyle = 'rgba(255,170,190,0.45)'; g.beginPath(); g.moveTo(dx - w * 0.3, -h * 0.1); g.lineTo(dx - w * 0.2, -h * 0.8); g.lineTo(dx, -h * 0.9); g.closePath(); g.fill();
+      g.restore();
+    }
+    g.restore();
+    glowPool(g, x, base - 40 * s, 70 * s, 70 * s, '#ff2a3a', 0.4);
+  }
+  function brazier(g, x, base) {
+    g.fillStyle = '#2a2228'; g.strokeStyle = OUT; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x - 30, base - 90); g.lineTo(x + 30, base - 90); g.lineTo(x + 18, base - 60); g.lineTo(x - 18, base - 60); g.closePath(); g.fill(); g.stroke();
+    g.fillRect(x - 6, base - 60, 12, 60); g.strokeRect(x - 6, base - 60, 12, 60);
+    g.fillRect(x - 24, base - 8, 48, 8); g.strokeRect(x - 24, base - 8, 48, 8);
+    g.fillStyle = '#e2b23c'; g.fillRect(x - 30, base - 94, 60, 5);
+    TT.drawFlame(g, x, base - 90, 70, 0, x * 0.01);
+    glowPool(g, x, base - 120, 120, 120, '#ff7a1a', 0.5);
+    glowPool(g, x, base + 40, 120, 30, '#ff7a1a', 0.25);
+  }
+
+  function s11Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 440);
+    sky.addColorStop(0, '#1a0206'); sky.addColorStop(0.5, '#5a0a14'); sky.addColorStop(1, '#c4300a');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    // nuvens de fumaça
+    cells(x0, x1, 260, 1101, (cx, r) => { g.fillStyle = 'rgba(30,4,10,' + (0.35 + r() * 0.3) + ')'; g.beginPath(); g.ellipse(cx + r() * 200, 60 + r() * 160, 160 + r() * 100, 26 + r() * 20, 0, 0, Math.PI * 2); g.fill(); });
+    // o eclipse vermelho com coroa de fogo
+    cells(x0, x1, 2000, 1103, (cx) => {
+      const x = cx + 900, y = 150;
+      glowPool(g, x, y, 260, 260, '#ff5a1a', 0.55);
+      g.strokeStyle = '#ffb04a'; g.lineWidth = 6; g.beginPath(); g.arc(x, y, 92, 0, Math.PI * 2); g.stroke();
+      for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; g.strokeStyle = 'rgba(255,150,60,0.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x + Math.cos(a) * 96, y + Math.sin(a) * 96); g.lineTo(x + Math.cos(a) * (120 + (i % 3) * 16), y + Math.sin(a) * (120 + (i % 3) * 16)); g.stroke(); }
+      g.fillStyle = '#0c0204'; g.beginPath(); g.arc(x, y, 88, 0, Math.PI * 2); g.fill();
+      scathMark(g, x, y, 54, '#a8122a', 0.7);
+    });
+    // ilhas de rocha flutuando com correntes
+    cells(x0, x1, 700, 1105, (cx, r) => {
+      const x = cx + r() * 400, y = 200 + r() * 120, w = 80 + r() * 90;
+      g.fillStyle = '#2a0e12'; g.beginPath(); g.moveTo(x - w, y); g.lineTo(x + w, y); g.lineTo(x + w * 0.4, y + w * 0.7); g.lineTo(x - w * 0.2, y + w * 0.9); g.closePath(); g.fill();
+      g.fillStyle = '#3a1418'; g.fillRect(x - w, y - 6, w * 2, 8);
+      g.strokeStyle = '#2a0e12'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - w * 0.6, y); g.lineTo(x - w * 0.9, y - 120); g.stroke();
+    });
+    g.fillStyle = '#200608'; g.fillRect(x0, 440, x1 - x0, H - 440);
+  }
+
+  function s11Mid(g, x0, x1) {
+    // a Torre Titã partida ao meio, de pedra, com lava nas rachaduras
+    cells(x0, x1, 2400, 1111, (cx) => {
+      const x = cx + 1100, base = 470;
+      g.fillStyle = '#4a3a3a'; g.strokeStyle = OUT; g.lineWidth = 4;
+      g.fillRect(x - 40, base - 260, 80, 260); g.strokeRect(x - 40, base - 260, 80, 260);
+      g.save(); g.translate(x, base - 260); g.rotate(-0.12);
+      g.fillRect(-130, -70, 140, 70); g.strokeRect(-130, -70, 140, 70); // metade do "T" que sobrou
+      g.restore();
+      g.strokeStyle = '#ff5a1a'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 10, base - 260); g.lineTo(x + 8, base - 200); g.lineTo(x - 6, base - 140); g.lineTo(x + 10, base - 60); g.stroke();
+      glowPool(g, x, base - 160, 60, 160, '#ff5a1a', 0.3);
+      g.fillStyle = 'rgba(20,4,8,0.5)'; g.fillRect(x - 40, base - 260, 30, 260);
+    });
+    // prédios virados pedra, quebrados no topo
+    cells(x0, x1, 300, 1113, (cx, r) => {
+      const x = cx + r() * 80, w = 140 + r() * 70, h = 140 + r() * 120, top = 470 - h;
+      g.fillStyle = TT.choice(['#5a4a48', '#4a3c3c', '#625250']); g.strokeStyle = OUT; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(x, 470); g.lineTo(x, top + 20); g.lineTo(x + w * 0.3, top); g.lineTo(x + w * 0.45, top + 30); g.lineTo(x + w * 0.7, top + 8); g.lineTo(x + w, top + 40); g.lineTo(x + w, 470); g.closePath(); g.fill(); g.stroke();
+      for (let yy = top + 50; yy < 450; yy += 34) for (let xx = x + 14; xx < x + w - 20; xx += 30) { g.fillStyle = r() < 0.15 ? '#ff7a2a' : '#2a1c1c'; g.fillRect(xx, yy, 14, 18); }
+      if (r() < 0.6) { g.strokeStyle = '#ff5a1a'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + w * 0.5, top + 30); g.lineTo(x + w * 0.4, top + 90); g.lineTo(x + w * 0.55, top + 150); g.stroke(); }
+    });
+  }
+
+  function s11Near(g, x0, x1) {
+    // --- Jump City de pedra: lojas petrificadas, pessoas viradas estátua e o asfalto rachado com lava
+    part(g, x0, x1, -1e5, S11_ABYSS, () => {
+      cells(x0, x1, 820, 1121, (cx, r) => {
+        const fx = cx + 40;
+        g.fillStyle = '#6a5a58'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(fx, 120, 360, FT - 120); g.strokeRect(fx, 120, 360, FT - 120);
+        sign(g, fx + 180, 150, 220, 36, 'PIZZARIA', '#8a7a78', '#3a2c2c'); // a pizzaria favorita dos Titãs, em pedra
+        g.fillStyle = '#2a1c1c'; g.fillRect(fx + 30, 190, 300, FT - 210); g.strokeRect(fx + 30, 190, 300, FT - 210);
+        g.fillStyle = 'rgba(255,90,30,0.18)'; g.fillRect(fx + 30, 190, 300, FT - 210);
+        g.strokeStyle = '#ff5a1a'; g.lineWidth = 3; g.beginPath(); g.moveTo(fx + 120, 120); g.lineTo(fx + 140, 200); g.lineTo(fx + 110, 260); g.lineTo(fx + 150, 340); g.stroke();
+        // prédio do lado, com janelas apagadas
+        const bx = fx + 400;
+        g.fillStyle = '#5a4c4a'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(bx, 80, 380, FT - 80); g.strokeRect(bx, 80, 380, FT - 80);
+        for (let yy = 110; yy < FT - 60; yy += 70) for (let xx = bx + 24; xx < bx + 360; xx += 70) { g.fillStyle = '#241818'; g.fillRect(xx, yy, 40, 46); g.strokeRect(xx, yy, 40, 46); }
+        scathMark(g, bx + 190, 230, 60, 'rgba(200,20,40,0.85)'); // a marca de Trigon pichada em fogo
+        glowPool(g, bx + 190, 230, 120, 120, '#ff2a3a', 0.3);
+      });
+      // asfalto rachado
+      g.fillStyle = '#3a3030'; g.fillRect(x0, FT, x1 - x0, 46);
+      g.fillStyle = '#6a5a58'; g.fillRect(x0, FT + 46, x1 - x0, 8);
+      g.fillStyle = '#2a2224'; g.fillRect(x0, FT + 54, x1 - x0, H - FT - 54);
+      lavaCracks(g, x0, x1, 1123);
+    });
+    // --- o abismo: ponte de rocha sobre o mar de lava, cachoeiras de fogo e correntes
+    part(g, x0, x1, S11_ABYSS, S11_THRONE, () => {
+      const lava = g.createLinearGradient(0, 120, 0, FT);
+      lava.addColorStop(0, '#3a0808'); lava.addColorStop(0.55, '#a8200a'); lava.addColorStop(1, '#ff8a1a');
+      g.fillStyle = lava; g.fillRect(x0, 0, x1 - x0, FT);
+      cells(x0, x1, 600, 1131, (cx, r) => {
+        const x = cx + r() * 300;
+        // cachoeira de lava caindo de um penhasco
+        g.fillStyle = '#2a0e10'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.beginPath(); g.moveTo(x - 90, 0); g.lineTo(x + 90, 0); g.lineTo(x + 70, 150); g.lineTo(x - 80, 170); g.closePath(); g.fill(); g.stroke();
+        const fall = g.createLinearGradient(0, 160, 0, FT); fall.addColorStop(0, '#ffd23a'); fall.addColorStop(1, '#ff5a1a');
+        g.fillStyle = fall; g.fillRect(x - 20, 160, 40, FT - 160);
+        glowPool(g, x, FT - 20, 120, 50, '#ffb04a', 0.6);
+        // correntes pendendo
+        g.strokeStyle = '#1a0a0c'; g.lineWidth = 3;
+        for (let y = 0; y < 220; y += 14) { g.beginPath(); g.ellipse(x + 160, y, 5, 8, (y / 14) % 2 ? 0 : Math.PI / 2, 0, Math.PI * 2); g.stroke(); }
+      });
+      // borda da ponte (lava borbulhando atrás dela)
+      for (let x = Math.floor(x0 / 60) * 60; x < x1; x += 60) { g.fillStyle = 'rgba(255,220,120,0.6)'; g.beginPath(); g.arc(x + 20, FT - 8, 6, Math.PI, 0); g.fill(); }
+      // ponte de basalto
+      g.fillStyle = '#2a1e22'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.fillStyle = '#3a2a2e'; for (let x = Math.floor(x0 / 120) * 120; x < x1; x += 120) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x + 110, FT); g.lineTo(x + 96, FT + 26); g.lineTo(x + 8, FT + 30); g.closePath(); g.fill(); }
+      g.strokeStyle = OUT; g.lineWidth = 4; g.beginPath(); g.moveTo(x0, FT); g.lineTo(x1, FT); g.stroke();
+      lavaCracks(g, x0, x1, 1133);
+    });
+    // --- o templo de Trigon: obsidiana, pilares com runas acesas, a Marca de Scath gigante e o trono
+    part(g, x0, x1, S11_THRONE, 1e5, () => {
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#0e0408'); wall.addColorStop(1, '#2a0a12');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      cells(x0, x1, 1300, 1141, (cx) => {
+        const mx = cx + 650;
+        // a Marca de Scath gigante na parede
+        glowPool(g, mx, 200, 280, 280, '#ff1a2a', 0.45);
+        scathMark(g, mx, 200, 150, '#c8102e');
+        // trono de pedra lá no fundo
+        g.fillStyle = '#1a0a10'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.beginPath(); g.moveTo(mx - 130, FT); g.lineTo(mx - 110, 330); g.lineTo(mx - 70, 300); g.lineTo(mx + 70, 300); g.lineTo(mx + 110, 330); g.lineTo(mx + 130, FT); g.closePath(); g.fill(); g.stroke();
+        for (let i = 0; i < 4; i++) { g.fillStyle = '#2a1018'; g.fillRect(mx - 180 + i * 10, FT - 30 + i * 0, 360 - i * 20, 10); }
+        // pilares com runas
+        for (const s of [-1, 1]) for (const d of [360, 560]) {
+          const px = mx + s * d;
+          g.fillStyle = '#1a0a10'; g.strokeStyle = OUT; g.lineWidth = 4; g.fillRect(px - 38, 30, 76, FT - 30); g.strokeRect(px - 38, 30, 76, FT - 30);
+          g.fillStyle = '#2a1018'; g.fillRect(px - 50, 30, 100, 26); g.strokeRect(px - 50, 30, 100, 26); g.fillRect(px - 50, FT - 26, 100, 26); g.strokeRect(px - 50, FT - 26, 100, 26);
+          g.fillStyle = '#ff3a2a'; for (let y = 90; y < FT - 50; y += 46) { g.fillRect(px - 8, y, 16, 4); g.fillRect(px - 2, y - 8, 4, 20); g.beginPath(); g.arc(px, y + 18, 4, 0, Math.PI * 2); g.fill(); }
+          glowPool(g, px, 250, 60, 220, '#ff2a1a', 0.25);
+        }
+      });
+      // piso de obsidiana polida refletindo o fogo
+      g.fillStyle = '#120608'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      g.strokeStyle = 'rgba(255,60,40,0.18)'; g.lineWidth = 2;
+      for (let x = Math.floor(x0 / 140) * 140; x < x1; x += 140) { g.beginPath(); g.moveTo(x, FT); g.lineTo(x - 80, H); g.stroke(); }
+      for (let y = FT + 40; y < H; y += 56) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+      cells(x0, x1, 1300, 1143, (cx) => { glowPool(g, cx + 650, FT + 60, 300, 40, '#ff2a1a', 0.3); g.save(); g.translate(cx + 650, FT + 130); g.scale(1, 0.42); scathMark(g, 0, 0, 120, 'rgba(200,16,46,0.55)'); g.restore(); });
+    });
+    // passagens: a beira do abismo e o portão do templo
+    for (const [px, txt] of [[S11_ABYSS, 'O ABISMO'], [S11_THRONE, 'TEMPLO DE TRIGON']]) {
+      if (x0 > px + 180 || x1 < px - 180) continue;
+      g.fillStyle = '#1a0a10'; g.fillRect(px - 150, 40, 300, FT - 40); g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(px - 150, 40, 300, FT - 40);
+      g.fillStyle = '#ff5a1a'; g.beginPath(); g.moveTo(px - 100, FT); g.lineTo(px - 100, 190); g.quadraticCurveTo(px, 100, px + 100, 190); g.lineTo(px + 100, FT); g.closePath(); g.fill();
+      glowPool(g, px, 300, 140, 180, '#ffb04a', 0.6);
+      sign(g, px, 76, 230, 36, txt, '#c8102e', '#ffe0d0');
+    }
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0, FT, x1 - x0, 6);
+  }
+
+  function d11(g, x0, x1) {
+    part(g, x0, x1, -1e5, S11_ABYSS, () => {
+      cells(x0, x1, 520, 1151, (cx, r) => {
+        statue(g, cx + 100 + r() * 60, FT + 10, 1.1, r() < 0.5); // cidadãos virados pedra
+        if (r() < 0.6) statue(g, cx + 300 + r() * 60, FT + 14, 0.95, r() < 0.5);
+        if (r() < 0.5) rubble(g, cx + 430, FT + 6, 4, ['#5a4a48', '#6a5a58'], r);
+      });
+    });
+    part(g, x0, x1, S11_ABYSS, S11_THRONE, () => {
+      cells(x0, x1, 480, 1153, (cx, r) => { redCrystal(g, cx + 120 + r() * 200, FT + 8, 0.8 + r() * 0.5); if (r() < 0.5) rubble(g, cx + 400, FT + 4, 3, ['#2a1e22', '#3a2a2e'], r); });
+    });
+    part(g, x0, x1, S11_THRONE, 1e5, () => {
+      cells(x0, x1, 650, 1155, (cx) => { brazier(g, cx + 120, FT + 10); });
+    });
+  }
+  // Primeiro plano: correntes pesadas pendendo com pedras (fora do templo).
+  function s11Fg(g, x0, x1) {
+    cells(x0, x1, 1100, 1171, (cx, r) => {
+      const x = cx + 300 + r() * 400;
+      if (x > S11_THRONE - 300) return;
+      const len = 160 + r() * 120;
+      g.strokeStyle = '#120608'; g.lineWidth = 6;
+      for (let y = -10; y < len; y += 22) { g.beginPath(); g.ellipse(x, y, 8, 13, (y / 22) % 2 ? 0 : Math.PI / 2, 0, Math.PI * 2); g.stroke(); }
+      g.fillStyle = '#1a0a0c'; g.strokeStyle = OUT; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(x - 40, len); g.lineTo(x + 36, len - 6); g.lineTo(x + 50, len + 40); g.lineTo(x - 10, len + 70); g.lineTo(x - 50, len + 34); g.closePath(); g.fill(); g.stroke();
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 11) {
+      return { layers: [new Layer(0.1, s11Far, 40), new Layer(0.38, s11Mid, 41), new Layer(1, detailed(s11Near, d11, 'rgba(60,0,0,0.35)'), 42)], fg: new Layer(1.18, s11Fg, 43), id };
+    }
     if (id === 10) {
       return { layers: [new Layer(0.1, s10Far, 36), new Layer(0.38, s10Mid, 37), new Layer(1, detailed(s10Near, d10, 'rgba(40,0,50,0.3)'), 38)], fg: new Layer(1.18, s10Fg, 39), id };
     }

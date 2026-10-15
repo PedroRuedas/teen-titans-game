@@ -870,7 +870,7 @@
     reset() {
       this.hp = this.maxHp; this.ko = false; this.dead = false; this.atk = null;
       this.downTime = 34; this.buffer = null; this.bufferT = 0; this.bunny = 0;
-      this.inverted = 0; this.aged = 0; this.counterT = 0; this.dmgMul = 1;
+      this.inverted = 0; this.aged = 0; this.counterT = 0; this.dmgMul = 1; this.lightT = 0;
       this.z = 0; this.vx = this.vy = this.vz = 0; this.flash = 0; this.invul = 0;
       this.setState('idle'); this.setAnim('idle');
     }
@@ -885,6 +885,7 @@
     think(inp) {
       const g = this.game;
       if (this.bufferT > 0) this.bufferT--; else this.buffer = null;
+      if (this.lightT > 0) { this.lightT--; if (this.lightT % 5 === 0) g.particles.spawn('star', this.x + TT.rand(-26, 26), this.y - this.z - TT.rand(20, this.height), { color: '#ffffff', size: 7, life: 16, vy: -1, rot: Math.random() }); }
       if (this.comboWindow > 0) this.comboWindow--; else this.combo = 0;
       // virou coelho (feitiço do Mumbo): só anda e pula até o feitiço acabar
       if (this.bunny > 0) {
@@ -1172,6 +1173,10 @@
         if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'INVERTIDO! APERTE ATAQUE!', sx, hy - hr * 3, 17, '#ffc8f0', OUT, 'center', 4);
       }
       if (this.counterT > 0) TT.drawGlow(ctx, this.def.fx || this.def.color, sx, sy - this.height * 0.5, 60 + Math.sin(t * 0.5) * 10, 0.55);
+      if (this.lightT > 0) { // luz de Azarath
+        TT.drawGlow(ctx, '#ffffff', sx, sy - this.height * 0.5, 80 + Math.sin(t * 0.3) * 10, this.lightT < 90 && (t >> 3) % 2 ? 0.25 : 0.6);
+        TT.drawGlow(ctx, '#9a7aff', sx, sy - this.height * 0.5, 50, 0.35);
+      }
     }
 
     // Rastro verde da Estelar voando na esquiva.
@@ -1484,6 +1489,8 @@
         zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 115, ry: 46 }]; } },
     ],
   };
+  // Clone Sombrio (fase 11): os ataques vêm do Titã copiado (CLONE_ATK).
+  ENEMIES.clone = { name: 'Clone Sombrio', style: 'robin', hp: 92, speed: 3.2, range: 170, score: 300, aggr: 1.2, attacks: [] };
   TT.ENEMIES = ENEMIES;
 
   class Enemy extends Fighter {
@@ -2146,6 +2153,161 @@
     }
   }
   TT.HypnoEye = HypnoEye;
+
+  // Clone Sombrio (fase 11): cópia dos Titãs feita da sombra de Trigon (como em "O Fim"). Cada um usa
+  // os poderes do Titã de origem — de longe o golpe marcado no chão, de perto o golpe corpo a corpo.
+  const CLONE_ATK = {
+    robin: [
+      { pose: 'throw', s: 24, a: 6, r: 20, dmg: 11, zoneHit: true, knockdown: true, launch: 5, kb: 6, sound0: 'birdarang',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 20, x1: f.x + f.facing * 360, y: f.y, d: 26, arrows: true }]; },
+        onFrame(f, t, g) { if (t === this.s) for (const dy of [-1, 1]) g.addProjectile(new Projectile(g, { kind: 'birdarang', team: 'enemy', owner: f, x: f.x + f.facing * 40, y: f.y + dy * 8, z: 80, vx: f.facing * 15, vy: 0, r: 12, dmg: 0, life: 24, trailN: 6 })); } },
+      { pose: 'swing', weapon: 'staff', s: 14, a: 5, r: 16, lunge: 5, dmg: 10, reach: [0, 104], kb: 5, sound0: 'whoosh' },
+    ],
+    beastboy: [
+      { pose: 'flyKick', s: 22, a: 10, r: 20, lunge: 11, dmg: 12, zoneHit: true, knockdown: true, launch: 6, kb: 8, sound0: 'roar',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 260, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'claw', s: 14, a: 5, r: 16, lunge: 4, dmg: 10, reach: [0, 92], kb: 5, sound0: 'whoosh' },
+    ],
+    cyborg: [
+      { pose: 'beam', form: 'cannon', s: 30, a: 12, r: 20, dmg: 12, zoneHit: true, knockdown: true, launch: 6, kb: 8, sound0: 'alarm', sound: 'sonic',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 420, y: f.y, d: 28, arrows: true }]; } },
+      { pose: 'jab', s: 14, a: 5, r: 16, lunge: 4, dmg: 11, reach: [0, 96], kb: 5, sound0: 'whoosh' },
+    ],
+    raven: [
+      { pose: 'castUp', hands: 'open', s: 30, a: 6, r: 22, dmg: 12, zoneHit: true, knockdown: true, launch: 11, kb: 3, sound0: 'dark', sound: 'dark',
+        zone(f, g) { const p = g.targetFor(f) || f; return [{ k: 'ell', x: p.x, y: TT.clamp(p.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: 82, ry: 34 }]; },
+        onFrame(f, t, g, a) {
+          if (t !== this.s || !a.zones) return;
+          const z = a.zones[0];
+          for (let i = 0; i < 10; i++) g.particles.spawn('dust', z.x + TT.rand(-60, 60), z.y - TT.rand(0, 90), { vy: -TT.rand(2, 5), color: TT.choice(['rgba(120,0,20,0.9)', 'rgba(20,0,10,0.9)']), size: TT.rand(10, 18), life: 22 });
+          g.particles.spawn('text', z.x, z.y - 140, { text: 'AZARATH!', size: 30, color: '#ff8a9a', color2: '#3a0010', vy: -0.6, life: 28 });
+        } },
+      { pose: 'cast', hands: 'open', s: 14, a: 5, r: 16, lunge: 3, dmg: 10, reach: [0, 100], kb: 5, sound0: 'dark' },
+    ],
+    starfire: [
+      { pose: 'cast', hands: 'open', s: 26, a: 8, r: 20, dmg: 11, zoneHit: true, knockdown: true, launch: 5, kb: 6, sound0: 'alarm', sound: 'starbolt',
+        zone(f) { return [{ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 380, y: f.y, d: 26, arrows: true }]; },
+        onFrame(f, t, g) { if (t === this.s || t === this.s + 4) g.addProjectile(new Projectile(g, { kind: 'darkbolt', team: 'enemy', owner: f, x: f.x + f.facing * 46, y: f.y, z: 80, vx: f.facing * 16, r: 14, dmg: 0, life: 22, trailN: 6 })); } },
+      { pose: 'jab', s: 13, a: 5, r: 16, lunge: 4, dmg: 10, reach: [0, 84], kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  TT.CLONE_ATK = CLONE_ATK;
+  class ShadowClone extends ShockTrooper {
+    constructor(game, x, y, tkey) {
+      super(game, x, y, 'clone');
+      this.key = tkey || TT.choice(TT.TITAN_ORDER);
+      this.def = Object.assign({}, ENEMIES.clone, { attacks: CLONE_ATK[this.key] });
+      this.style = TT.STYLES[this.key];
+      this.height = 130; this.rigOut = {};
+    }
+    // a luz de Azarath queima as sombras: dano dobrado
+    takeHit(src, d, dir) {
+      if (src && (src.lightT > 0 || (src.owner && src.owner.lightT > 0))) d = Object.assign({}, d, { dmg: d.dmg * 2 });
+      return super.takeHit(src, d, dir);
+    }
+    die(dir, d) {
+      super.die(dir, d);
+      const g = this.game;
+      for (let i = 0; i < 14; i++) g.particles.spawn('dust', this.x + TT.rand(-30, 30), this.y - TT.rand(20, 130), { vy: -TT.rand(1, 3), color: TT.choice(['rgba(120,0,20,0.85)', 'rgba(20,0,10,0.85)']), size: TT.rand(12, 22), life: 30 });
+      g.particles.spawn('text', this.x, this.y - 170, { text: 'SUMIU NA SOMBRA!', size: 24, color: '#ff8a9a', color2: '#3a0010', vy: -0.6, life: 32 });
+    }
+    // Desenha o Titã de origem numa camada à parte e pinta de sombra vermelha por cima (olhos acesos).
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const s = TT.renderScale || 1, BW = 300, BH = 330, FY = 300;
+      let c = this.buf;
+      if (!c || c.width !== Math.ceil(BW * s)) c = this.buf = TT.makeCanvas(BW * s, BH * s);
+      const g2 = c.getContext('2d');
+      g2.setTransform(1, 0, 0, 1, 0, 0); g2.clearRect(0, 0, c.width, c.height); g2.setTransform(s, 0, 0, s, 0, 0);
+      TT.computePose(this, this.pose);
+      const a = this.atk, tell = this.team === 'enemy' && a && this.state === 'attack' && a.t < a.def.s ? a.t / a.def.s : -1;
+      const flash = this.flash > 3 || (tell > 0.55 && (a.t >> 1) % 2 === 0);
+      TT.drawRig(g2, this.style, this.pose, BW / 2, FY, this.facing, { flash, t: this.animT, out: this.rigOut });
+      if (!flash) {
+        g2.globalCompositeOperation = 'source-atop';
+        const gr = g2.createLinearGradient(0, 0, 0, FY);
+        gr.addColorStop(0, 'rgba(110,0,20,0.8)'); gr.addColorStop(1, 'rgba(20,0,8,0.86)');
+        g2.fillStyle = gr; g2.fillRect(0, 0, BW, BH);
+        g2.globalCompositeOperation = 'source-over';
+        const R = this.rigOut;
+        if (R.hx != null) { // olhos vermelhos acesos
+          const ex = R.hx + this.facing * R.hr * 0.42, ey = R.hy - R.hr * 0.12;
+          TT.drawGlow(g2, '#ff2a2a', ex, ey, R.hr * 1.6, 0.9);
+          g2.fillStyle = '#ffe0e0'; for (const dx of [-0.24, 0.2]) { g2.beginPath(); g2.ellipse(ex + this.facing * dx * R.hr, ey, R.hr * 0.12, R.hr * 0.08, 0, 0, Math.PI * 2); g2.fill(); }
+        }
+      }
+      const sx = this.x - camX, sy = this.y - this.z;
+      if (this.invul > 0 && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.6;
+      TT.drawGlow(ctx, '#ff2a3a', sx, sy - 70, 70 + Math.sin(this.animT * 0.15) * 8, 0.35); // aura vermelha
+      ctx.drawImage(c, sx - BW / 2, sy - FY, BW, BH);
+      ctx.globalAlpha = 1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ff2a2a', sx + this.facing * 26, sy - 78, 16 + 22 * tell, 0.35 + 0.5 * tell);
+      if (this.frozen > 0) drawIce(ctx, sx, sy, this.height, this.frozen, this.frozenKind);
+      // raio sônico do clone do Ciborgue
+      if (a && this.state === 'attack' && a.def === CLONE_ATK.cyborg[0] && a.t >= a.def.s && a.t < a.def.s + a.def.a + 3) {
+        const k = Math.min(1, (a.t - a.def.s + 1) / 3), fade = a.t >= a.def.s + a.def.a ? 1 - (a.t - a.def.s - a.def.a) / 3 : 1, x0 = sx + this.facing * 60, y0 = sy - 96, L = 390 * k;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fade; ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(255,40,60,0.7)'; ctx.lineWidth = 30; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + this.facing * L, this.y - 40); ctx.stroke();
+        ctx.strokeStyle = '#ffd0d8'; ctx.lineWidth = 8; ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+  TT.ShadowClone = ShadowClone;
+
+  // Fissura de fogo (fase 11): rachadura no chão que entra em erupção em ciclos — fica calma, avisa
+  // (marca vermelha que vai enchendo) e solta uma coluna de fogo que queima QUALQUER UM em cima,
+  // Titã ou inimigo. Dá para atrair os inimigos para dentro dela.
+  const VENT_P = 230, VENT_W = 70, VENT_E = 24;
+  class FireVent {
+    constructor(game, x, y, phase) {
+      Object.assign(this, { game, x, y, t: -(phase || 0), remove: false, sec: game.secIdx, zones: null, hits: new Set(), R: 80 });
+      this.zone = { k: 'ell', x, y, rx: this.R, ry: this.R * 0.42 };
+    }
+    get k() { return ((this.t % VENT_P) + VENT_P) % VENT_P; }
+    get warning() { const k = this.k; return this.t > 0 && k >= VENT_P - VENT_W - VENT_E && k < VENT_P - VENT_E; }
+    get erupting() { return this.t > 0 && this.k >= VENT_P - VENT_E; }
+    update() {
+      const g = this.game;
+      if (g.secIdx !== this.sec || !g.secActive) { this.remove = true; return; }
+      this.t++;
+      const k = this.k, erupt = this.erupting;
+      this.zones = this.warning || erupt ? [this.zone] : null;
+      if (this.t > 0 && k === VENT_P - VENT_E) {
+        this.hits.clear(); A().play('boom'); g.shake = Math.max(g.shake, 6);
+        for (let i = 0; i < 10; i++) g.particles.spawn('spark', this.x + TT.rand(-40, 40), this.y - TT.rand(20, 200), { vx: TT.rand(-3, 3), vy: -TT.rand(3, 9), color: TT.choice(['#ff7a1a', '#ffd23a', '#ffffff']), size: 4, life: 22, grav: 0.15 });
+      }
+      if (!erupt) return;
+      for (const t of g.heroes().concat(g.enemies)) {
+        if (!t || t.dead || t.ko || t.isBoss || this.hits.has(t) || t.z > 120 || !TT.zoneHas(this.zone, t.x, t.y)) continue;
+        this.hits.add(t);
+        const d = { dmg: 14, kb: 6, knockdown: true, launch: 9, fire: true, big: true };
+        if (t.takeHit({ x: this.x, dmgMul: 1 }, d, TT.sign(t.x - this.x) || 1)) {
+          g.onHit(null, t, d);
+          if (t.team === 'enemy') { g.particles.spawn('text', t.x, t.y - 160, { text: 'QUEIMOU!', size: 30, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 30 }); g.ventKills = (g.ventKills || 0) + (t.dead ? 1 : 0); }
+        }
+      }
+    }
+    drawGround(ctx, camX) {
+      const x = this.x - camX, y = this.y, warn = this.warning, er = this.erupting;
+      const hot = er ? 1 : warn ? 0.5 + 0.5 * Math.sin(this.t * 0.6) : 0.25 + 0.1 * Math.sin(this.t * 0.08);
+      // rachadura brilhando
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1a0608'; ctx.lineWidth = 10;
+      const crack = () => { ctx.beginPath(); ctx.moveTo(x - 62, y - 4); ctx.lineTo(x - 30, y + 6); ctx.lineTo(x - 8, y - 8); ctx.lineTo(x + 18, y + 7); ctx.lineTo(x + 44, y - 5); ctx.lineTo(x + 64, y + 3); ctx.moveTo(x - 8, y - 8); ctx.lineTo(x - 2, y - 22); ctx.moveTo(x + 18, y + 7); ctx.lineTo(x + 26, y + 20); };
+      crack(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,' + Math.round(120 + 100 * hot) + ',40,' + (0.5 + 0.5 * hot) + ')'; ctx.lineWidth = 4; crack(); ctx.stroke();
+      ctx.restore();
+      TT.drawGlow(ctx, '#ff5a1a', x, y, 70 + 40 * hot, 0.35 + 0.5 * hot);
+      if (warn) TT.drawZone(ctx, this.zone, camX, (this.k - (VENT_P - VENT_W - VENT_E)) / VENT_W, this.t);
+    }
+    draw(ctx, camX) {
+      if (!this.erupting) return;
+      const x = this.x - camX, k = (this.k - (VENT_P - VENT_E)) / VENT_E, h = 260 * Math.sin(Math.min(1, k * 1.6) * Math.PI * 0.5) * (1 - Math.max(0, k - 0.7) / 0.3);
+      for (let i = -1; i <= 1; i++) TT.drawFlame(ctx, x + i * 28, this.y + 4, h * (i ? 0.7 : 1), this.t + i * 7, i * 3);
+    }
+  }
+  TT.FireVent = FireVent;
 
   // Comando do Slade (fase 7): mesma tática de bate e recua, sempre com o bastão na mão.
   class SladeCommando extends ShockTrooper {
@@ -4520,6 +4682,254 @@
   }
   TT.MadMod = MadMod;
 
+  // ---- Trigon: o demônio gigante (fase 11)
+  // Pisão, PUNHO DUPLO, raios dos quatro olhos e, abaixo de 50%, chuva de meteoros e Clones Sombrios.
+  // Na fase 2 a luz da Ravena manda Esferas de Luz de Azarath: quem pega bate 75% mais forte nele.
+  // Fraqueza: depois do punho duplo os punhos ficam presos no chão — ajoelhado, cabeça ao alcance, dano dobrado.
+  class Trigon extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'TRIGON';
+      this.style = TT.STYLES.trigon;
+      this.hp = this.maxHp = 3400;
+      this.radius = 96; this.height = 380; this.shadowW = 140;
+      this.poiseMax = 420;
+      this.def = { score: 20000 };
+      this.openT = 0; this.alpha = 1; this.rise = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0; this.orbCool = 60; this.out = {};
+      this.taunts = ['Ajoelhem-se diante de Trigon!', 'Vocês são insetos.', 'Este mundo agora é MEU.', 'A luz de vocês vai se apagar!'];
+      const clampX = (g, x, m) => TT.clamp(x, g.camX + m, g.camX + TT.W - m);
+      const circles = (f, g, n, R, spread) => {
+        const zs = [], hs = g.heroes();
+        for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM), rx: R, ry: R * 0.42 });
+        let guard = 0;
+        while (zs.length < n && guard++ < 40) {
+          const tp = groundTarget(g, TT.choice(hs) || f, spread, 110);
+          if (zs.every((z) => Math.abs(z.x - tp.x) > 2 * R || Math.abs(z.y - tp.y) > R)) zs.push({ k: 'ell', x: tp.x, y: tp.y, rx: R, ry: R * 0.42 });
+        }
+        return zs;
+      };
+      this.ATK = {
+        // pisão: meia-lua enorme à frente
+        stomp: { pose: 'bigSlam', s: 30, a: 6, r: 26, dmg: 18, knockdown: true, launch: 9, kb: 11, zoneHit: true, color: '#ff7a1a', sound0: 'roar',
+          zone(f) { return [{ k: 'half', x: f.x, y: f.y, rx: 270, ry: 84, f: f.facing }]; },
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.impact(f.x + f.facing * 170, f.y, 'KRA-BOOM!', '#ff7a1a', 1.3);
+            g.debrisBurst(f.x + f.facing * 170, f.y - 10, 12, '#5a4a48'); A().play('shockwave');
+          } },
+        // punho duplo: os dois punhos esmagam o chão à frente; depois ficam presos (fraqueza)
+        fists: { pose: 'bigSlam', s: 46, a: 6, r: 12, dmg: 20, knockdown: true, launch: 10, kb: 9, zoneHit: true, color: '#ff3b30', sound0: 'roar', sound: 'boom',
+          zone(f) { return [{ k: 'ell', x: f.x + f.facing * 230, y: f.y, rx: 150, ry: 62 }]; },
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'SINTAM O PESO DE TRIGON!', '#ffb070');
+            if (t === this.s) { g.impact(f.x + f.facing * 230, f.y, 'KRAKOOM!', '#ff3b30', 1.5); g.debrisBurst(f.x + f.facing * 230, f.y - 10, 16, '#5a4a48'); g.tintScreen('#ff2a1a', 8); }
+            if (t === this.s + this.a + this.r - 1) f.kneel();
+          } },
+        // raios dos quatro olhos: uma faixa na altura de cada Titã, a tela inteira
+        eyes: { pose: 'beam', s: 40, a: 16, r: 16, dmg: 16, knockdown: true, launch: 6, kb: 8, zoneHit: true, color: '#ffe14a', sound0: 'alarm', sound: 'laser',
+          zone(f, g) {
+            const zs = [];
+            for (const h of g.heroes()) {
+              const y = TT.clamp(h.y, TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM);
+              if (zs.some((z) => Math.abs(z.y - y) < 50)) continue;
+              zs.push({ k: 'rect', x0: f.x + f.facing * 60, x1: f.x + f.facing * 1300, y, d: 30, arrows: true });
+            }
+            if (!zs.length) zs.push({ k: 'rect', x0: f.x + f.facing * 60, x1: f.x + f.facing * 1300, y: f.y, d: 30, arrows: true });
+            return zs;
+          },
+          onFrame(f, t, g) { if (t === 2) g.say(f, 'Olhem nos olhos de Trigon!', '#ffe9a0'); if (t === this.s) g.shake = Math.max(g.shake, 10); } },
+        // (fase 2) chuva de meteoros nos círculos marcados
+        meteors: { pose: 'castUp', s: 34, a: 1, r: 26, color: '#ff7a1a',
+          zone(f, g) { return circles(f, g, 5, 84, 420); },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Que o céu caia sobre vocês!', '#ffb070');
+            if (t !== this.s) return;
+            a.zones.forEach((z, i) => {
+              const T = 30 + i * 5, z0 = 640;
+              g.addProjectile(new Projectile(g, {
+                kind: 'meteor', team: 'enemy', owner: f, x: z.x, y: z.y, z: z0, vx: 0, vy: 0, vz: (0.5 * 0.6 * T * T - z0) / T, grav: 0.6,
+                r: 26, dmg: 0, blastDmg: 14, life: 140, explodeOnGround: z.rx, zone: z, flight: T, impactWord: 'FWOOSH!',
+              }));
+            });
+            a.zones = null; // cada meteoro desenha o seu alvo
+            A().play('roar');
+          } },
+        // (fase 2) dois Clones Sombrios saem da sombra dele
+        summon: { pose: 'castUp', s: 30, a: 1, r: 24, color: '#ff2a3a',
+          onFrame(f, t, g) {
+            if (t !== this.s) return;
+            g.say(f, 'Sombras, destruam-nos!', '#ffb070');
+            for (const side of [-1, 1]) {
+              const e = new ShadowClone(g, side < 0 ? g.camX + 90 : g.camX + TT.W - 90, TT.clamp(f.y + side * 60, TT.FLOOR_TOP + 20, TT.FLOOR_BOTTOM - 10));
+              e.entering = false; e.cool = 60; g.addEnemy(e);
+              g.poof(e.x, e.y - 60);
+            }
+            A().play('dark');
+          } },
+      };
+      this.applyDifficulty();
+    }
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    // Esferas de Luz de Azarath: golpes de quem pegou uma (inclusive os tiros) dão 75% a mais
+    takeHit(src, d, dir) {
+      if (src && (src.lightT > 0 || (src.owner && src.owner.lightT > 0))) {
+        d = Object.assign({}, d, { dmg: d.dmg * 1.75 });
+        this.game.particles.spawn('star', this.x + TT.rand(-60, 60), this.y - TT.rand(80, 300), { color: '#ffffff', size: 14, life: 14, rot: Math.random() });
+      }
+      return super.takeHit(src, d, dir);
+    }
+    kneel() {
+      this.atk = null;
+      this.setState('open'); this.setAnim('hurt');
+      this.openT = this.phase2() ? 120 : 150; this.vx = this.vy = 0;
+      this.game.say(this, 'GRRR... meus punhos estão presos!', '#ffb070');
+      A().play('ko');
+    }
+    // Quase vencido: começa o final da luz da Ravena (TT.LightFinale, js/story.js). Um golpe que zeraria a
+    // vida também cai aqui; só o final da luz derrota Trigon de verdade.
+    startFinale() {
+      if (this.finaleStarted) return;
+      this.finaleStarted = true;
+      this.hp = Math.max(1, this.hp); this.dead = false;
+      this.atk = null; this.setState('open'); this.setAnim('hurt'); this.openT = 99999; this.vx = this.vy = 0;
+      const g = this.game;
+      for (const e of g.enemies) if (e !== this && !e.dead) e.takeHit({ x: e.x - 1, dmgMul: 1 }, { dmg: 999, kb: 6, knockdown: true, launch: 8 });
+      g.projectiles.length = 0; g.bubbles.length = 0; g.pickups.length = 0;
+      if (g.comms) { g.comms.queue.length = 0; g.comms.cur = null; }
+      g.finale = new TT.LightFinale(g, this);
+    }
+    die(dir, d) {
+      if (!this.finaleStarted && TT.LightFinale) { this.startFinale(); return; }
+      super.die(dir, d);
+      const g = this.game;
+      g.whiteFlash = 14; g.tintScreen('#ffffff', 30);
+      g.particles.spawn('text', this.x, this.y - 420, { text: 'A LUZ VENCEU!', size: 64, color: '#ffffff', color2: '#7a4aff', vy: -0.4, life: 120 });
+      g.say(this, 'NÃÃÃÃÃO! Isto não é o FIM!', '#ffb070');
+    }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return;
+      super.onArmorHit(dmg, d);
+    }
+    // Fase 2: a luz da Ravena manda uma Esfera de Luz de Azarath de tempos em tempos.
+    spawnOrb() {
+      const g = this.game;
+      if (g.pickups.some((k) => k.kind === 'light')) return;
+      const p = g.targetFor(this) || this;
+      const x = TT.clamp(p.x + TT.rand(-260, 260), g.camX + 80, g.camX + TT.W - 80), y = TT.rand(TT.FLOOR_TOP + 40, TT.FLOOR_BOTTOM - 20);
+      const o = new Pickup(g, Math.abs(x - this.x) < 160 ? this.x + (x > this.x ? 200 : -200) : x, y, 'light');
+      o.x = TT.clamp(o.x, g.camX + 80, g.camX + TT.W - 80); o.life = 600; o.z = 160; o.vz = 0;
+      g.addPickup(o);
+      g.particles.spawn('ring', o.x, o.y - 120, { color: '#ffffff', size: 120, life: 20 });
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.active && !this.finaleStarted && this.hp <= this.maxHp * 0.1 && TT.LightFinale) { this.startFinale(); return; }
+      if (this.phase2() && this.active && --this.orbCool <= 0) { this.orbCool = 420; this.spawnOrb(); }
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (this.animT % 10 === 0) g.dust(this.x + this.facing * 150, this.y, 2, '#5a4a48');
+        if (--this.openT <= 0) {
+          this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25;
+          g.say(this, 'Vocês não podem vencer um DEUS!', '#ffb070');
+          g.debrisBurst(this.x + this.facing * 200, this.y - 10, 8, '#5a4a48');
+        }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true; this.orbCool = 40;
+        g.say(this, 'CHEGA! Conheçam o verdadeiro poder de Trigon!', '#ffe9a0');
+        g.impact(this.x, this.y, 'TRIGON ENFURECIDO!', '#ff2a1a', 1.4); g.tintScreen('#ff0000', 30);
+        g.banner = { text: 'A LUZ DE AZARATH!', sub: 'A Ravena manda esferas de luz: peguem e batam mais forte em Trigon!', t: 0, dur: 210, power: true };
+        if (g.comms) g.comms.say([{ key: 'raven', text: 'Pai, você não vai machucar os meus amigos! Titãs, peguem a minha luz!' }, { key: 'robin', text: 'Vocês ouviram! Peguem as esferas brancas e batam com tudo!' }], 'trigonP2');
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 250), p.y, p2 ? 1.7 : 1.3);
+      if (this.anim === 'walk' && this.animT % 20 === 0) { g.shake = Math.max(g.shake, 3); A().play('land'); }
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        // a cada 3 ataques vem o PUNHO DUPLO (e ele fica preso logo depois)
+        if (this.atkCount % 3 === 2) pick = 'fists';
+        else if (p2 && this.summonCool <= 0 && g.enemies.length < 3) { pick = 'summon'; this.summonCool = 900; }
+        else {
+          const opts = ['eyes'];
+          if (adx < 340 && Math.abs(dy) < 70) opts.push('stomp', 'stomp');
+          if (p2) opts.push('meteors', 'meteors');
+          pick = TT.choice(opts);
+        }
+        if (pick !== 'summon') this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(40, 64) : this.nextCool(60, 92);
+        if (pick !== 'fists' && Math.random() < 0.3) g.say(this, TT.choice(this.taunts), '#ffb070');
+      }
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      TT.computePose(this, this.pose);
+      const open = this.state === 'open';
+      if (this.state === 'stagger') { this.pose.lean = -0.25; this.pose.tilt = -0.25; }
+      if (open) { // ajoelhado com os punhos presos no chão
+        this.pose.lean = 0.75; this.pose.bob = 26; this.pose.tilt = 0.2; this.pose.mouth = 'open';
+        this.pose.armF = [0.75, 0.55]; this.pose.armB = [0.6, 0.4];
+        this.pose.legF = [1.2, -0.2]; this.pose.legB = [-0.6, -1.5];
+      }
+      const x = this.x - camX + this.tellShake() + (open ? Math.sin(t * 0.5) * 2 : 0), y = this.y - this.z;
+      ctx.save(); ctx.globalAlpha = al;
+      // fogo em volta dos pés (mais forte na fase 2)
+      const p2 = this.phase2();
+      for (let i = 0; i < (p2 ? 5 : 3); i++) TT.drawFlame(ctx, x + (i - (p2 ? 2 : 1)) * 50, y + 4, 60 + (p2 ? 40 : 0) + Math.sin(t * 0.2 + i) * 12, t + i * 9, i);
+      if (this.rise < 1) { // surgindo do chão: recorta o que ainda está embaixo da terra
+        ctx.save(); ctx.beginPath(); ctx.rect(x - 400, 0, 800, y); ctx.clip(); ctx.translate(0, (1 - this.rise) * this.height);
+      }
+      let sq = 0;
+      if (k >= 0) sq = -0.05 * TT.easeOut(k);
+      else if (a && a.t < d.s + d.a + 6) sq = 0.04;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1 - sq, 1 + sq); ctx.translate(-x, -y);
+      TT.drawRig(ctx, this.style, this.pose, x, y, this.facing, { flash: this.flash > 3 || this.tellFlash(), t, out: this.out });
+      ctx.restore();
+      if (this.rise < 1) ctx.restore();
+      // olhos carregando / raios dos quatro olhos
+      const hx = this.out.hx != null ? this.out.hx : x + this.facing * 20, hy = this.out.hy != null ? this.out.hy : y - this.height + 40, hr = this.out.hr || 45;
+      const ex = hx + this.facing * hr * 0.48, ey = hy - hr * 0.16;
+      if (k >= 0 && d === this.ATK.eyes) TT.drawGlow(ctx, '#ffe14a', ex, ey, 30 + 60 * k, 1);
+      if (d === this.ATK.eyes && a.zones && a.t >= d.s && a.t < d.s + d.a + 3) {
+        const u = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 3 : 1;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = al * fade;
+        for (const z of a.zones) {
+          const x1 = TT.lerp(ex, z.x1 - camX, u), y1 = TT.lerp(ey, z.y - 50, u);
+          for (const off of [-hr * 0.17, hr * 0.17]) {
+            ctx.strokeStyle = '#ff9a1a'; ctx.lineWidth = 22; ctx.beginPath(); ctx.moveTo(ex, ey + off); ctx.lineTo(x1, y1 + off * 0.4); ctx.stroke();
+            ctx.strokeStyle = '#fff6c0'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(ex, ey + off); ctx.lineTo(x1, y1 + off * 0.4); ctx.stroke();
+          }
+        }
+        ctx.restore();
+        TT.drawGlow(ctx, '#ffe14a', ex, ey, 90, al);
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 30);
+      if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height - 10);
+      if (open && !this.finaleStarted) {
+        // rachaduras em volta dos punhos presos e o aviso
+        const fx = x + this.facing * 170;
+        TT.drawGlow(ctx, '#ff5a1a', fx, y, 90, 0.6);
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'PUNHOS PRESOS! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 26, '#ffd0a0', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.Trigon = Trigon;
+
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {
     constructor(game) {
@@ -4633,6 +5043,8 @@
         if (this.t % 3 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 34, life: 12 });
       } else if (this.kind === 'tvDrop') {
         if (this.t % 3 === 0) g.particles.spawn('star', this.x + TT.rand(-20, 20), this.y - this.z + 30, { color: '#e6fffb', size: 5, life: 10, rot: Math.random() });
+      } else if (this.kind === 'meteor') {
+        if (this.t % 2 === 0) g.particles.spawn('spark', this.x + TT.rand(-14, 14), this.y - this.z - 20, { vx: TT.rand(-1, 1), vy: -TT.rand(1, 3), color: TT.choice(['#ff7a1a', '#ffd23a']), size: 4, life: 14 });
       } else if (this.kind === 'sladeBomb') {
         if (this.t % 3 === 0) g.particles.spawn('dust', this.x, this.y - this.z, { color: 'rgba(90,90,100,0.7)', size: 7, life: 14 });
       }
@@ -4783,6 +5195,22 @@
           ctx.strokeStyle = '#8a909a'; ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(-14, -42); ctx.moveTo(0, -24); ctx.lineTo(14, -44); ctx.stroke();
           ctx.restore();
           TT.drawGlow(ctx, '#7bffea', x, y, 30, 0.5);
+          break;
+        }
+        case 'meteor': { // meteoro de Trigon: rocha em chamas caindo
+          TT.drawFlame(ctx, x, y + 26, 90, this.t, 1);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(this.spin * 0.2);
+          ctx.beginPath(); ctx.moveTo(-22, -6); ctx.lineTo(-10, -22); ctx.lineTo(14, -20); ctx.lineTo(24, 2); ctx.lineTo(10, 22); ctx.lineTo(-16, 18); ctx.closePath();
+          ctx.fillStyle = '#4a2a24'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+          ctx.strokeStyle = '#ff9a3a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-12, -2); ctx.lineTo(0, 6); ctx.lineTo(12, -6); ctx.stroke();
+          ctx.restore();
+          TT.drawGlow(ctx, FIRE, x, y, 44, 0.9);
+          break;
+        }
+        case 'darkbolt': { // starbolt do clone sombrio da Estelar
+          this.drawTrail(ctx, camX, '#ff2a3a', 10);
+          TT.drawGlow(ctx, '#ff2a3a', x, y, 30, 1);
+          ctx.fillStyle = '#ffd0d8'; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
           break;
         }
         case 'sladeBomb': { // bomba de disco do Slade (luz laranja piscando)
@@ -5260,6 +5688,12 @@
         A().play('pickup');
         if (this.kind === 'pizza') { p.hp = Math.min(p.maxHp, p.hp + 40); g.popText(p.x, p.y - 150, '+VIDA', '#ffe14a'); }
         else if (this.kind === 'energy') { g.energy = Math.min(100, g.energy + 35); g.popText(p.x, p.y - 150, '+ENERGIA', '#6fe3ff'); }
+        else if (this.kind === 'light') { // Esfera de Luz de Azarath (fase 11): golpes mais fortes contra Trigon e as sombras
+          p.lightT = 540; g.lightOrbs = (g.lightOrbs || 0) + 1;
+          g.whiteFlash = Math.max(g.whiteFlash, 5);
+          g.particles.spawn('ring', p.x, p.y - 70, { color: '#ffffff', size: 160, life: 20 });
+          g.particles.spawn('text', p.x, p.y - 190, { text: 'LUZ DE AZARATH!', size: 34, color: '#ffffff', color2: '#7a4aff', vy: -0.6, life: 50 });
+        }
         g.score += 50;
       }
     }
@@ -5278,6 +5712,13 @@
         ctx.fillStyle = '#c9772a'; ctx.beginPath(); ctx.moveTo(-18, -12); ctx.quadraticCurveTo(0, -20, 18, -12); ctx.lineTo(16, -8); ctx.quadraticCurveTo(0, -15, -16, -8); ctx.fill();
         ctx.fillStyle = '#d6322e'; for (const [px, py] of [[-6, -4], [5, -2], [0, 8]]) { ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
+      } else if (this.kind === 'light') {
+        // esfera branca com um corvo de luz dentro e brilhos girando
+        TT.drawGlow(ctx, '#ffffff', x, y, 70 + Math.sin(this.t * 0.2) * 10, 0.9);
+        TT.drawGlow(ctx, '#9a7aff', x, y, 40, 0.6);
+        ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+        ctx.fillStyle = '#c8b8ff'; ctx.beginPath(); ctx.moveTo(x - 12, y - 2); ctx.quadraticCurveTo(x, y - 12, x + 12, y - 2); ctx.lineTo(x + 4, y + 2); ctx.lineTo(x, y + 9); ctx.lineTo(x - 4, y + 2); ctx.closePath(); ctx.fill();
+        for (let i = 0; i < 4; i++) { const an = this.t * 0.08 + i * Math.PI / 2; TT.drawBurst(ctx, x + Math.cos(an) * 30, y + Math.sin(an) * 12, 5, 4, '#ffffff', null, an); }
       } else {
         TT.drawGlow(ctx, '#6fe3ff', x, y, 36, 0.9);
         TT.drawBurst(ctx, x, y, 14, 5, '#bff4ff', OUT, this.t * 0.05);

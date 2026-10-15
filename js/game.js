@@ -127,6 +127,9 @@
       this.secIdx = 0; this.secActive = false; this.waveIdx = 0; this.waveDelay = 0;
       this.state = 'play'; this.stateT = 0;
       this.banner = { text: this.stage.name, sub: this.stage.subtitle, t: 0, dur: 200 };
+      // história: cena de abertura (o jogo para) e o rádio dos Titãs durante a fase
+      this.comms = new TT.Comms(this); this.finale = null; this.storySeen = {};
+      this.story = this.stage.story && TT.storyOn() ? new TT.Story(this, this.stage.story) : null;
       // depois do título da fase: "GOLPES NOVOS!" / "COMBOS NOVOS!" — só na fase que estreia o poder
       const before = TT.STAGES.slice(0, i);
       if ((this.stage.combos && !before.some((s) => s.combos)) || (this.stage.powerUp && !before.some((s) => s.powerUp))) this.powerBanner = 1;
@@ -140,7 +143,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone') e.z = 120;
       this.addEnemy(e);
@@ -156,7 +159,13 @@
           this.camX = trigger;
           this.secActive = true; this.waveIdx = 0; this.waveDelay = 20; this.goArrow = 0;
           if (sec.type === 'chase') this.startChase(sec);
-          if (sec.type === 'boss') this.startBoss(sec);
+          if (sec.talk && this.comms) this.comms.say(sec.talk);
+          if (sec.vents) for (const v of sec.vents) this.addEffect(new TT.FireVent(this, sec.camX + v[0], v[1], v[2] || 0));
+          if (sec.type === 'boss') {
+            if (this.comms) { this.comms.queue.length = 0; this.comms.cur = null; } // falas antigas não atrasam a luta
+            if (this.stage.bossStory && TT.storyOn() && !this.storySeen.boss) { this.storySeen.boss = 1; this.story = new TT.Story(this, this.stage.bossStory, () => this.startBoss(sec)); }
+            else this.startBoss(sec);
+          }
         }
         return;
       }
@@ -257,6 +266,11 @@
         b = new TT.ControlFreak(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'tv';
+      } else if (sec.boss === 'trigon') {
+        // sobe do chão rachado, gigante, com o céu ficando vermelho
+        b = new TT.Trigon(this, this.camX + 860, 590);
+        b.facing = -1; b.rise = 0;
+        this.introKind = 'trigon';
       } else if (sec.boss === 'madmod') {
         // surge girando no meio de uma espiral hipnótica, como um disco na vitrola
         b = new TT.MadMod(this, this.camX + 880, 590);
@@ -333,6 +347,14 @@
         if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
         if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
         if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
+      }
+      if (this.introKind === 'trigon') {
+        const k = 170 - this.bossIntro;
+        b.rise = TT.clamp((k - 20) / 100, 0, 1);
+        if (k < 120) { this.shake = Math.max(this.shake, 6); if (k % 6 === 0) this.debrisBurst(b.x + TT.rand(-120, 120), b.y - 10, 3, '#5a4a48'); }
+        if (k === 20) { A().play('roar'); this.tintScreen('#ff0000', 40); }
+        if (k === 120) { this.impact(b.x, b.y, 'TRIGON!', '#ff2a1a', 1.6); this.whiteFlash = 6; A().play('boom'); }
+        if (k === 145) this.say(b, 'Eu sou Trigon, o Terrível. E este mundo... é MEU.', '#ffb070');
       }
       if (this.introKind === 'spiral') {
         const k = 170 - this.bossIntro;
@@ -817,7 +839,10 @@
     }
 
     updatePlay(inp) {
+      if (this.story) { this.story.update(inp); this.particles.update(); return; }
+      if (this.finale) { this.finale.update(inp); return; }
       if (inp.wasPressed('pause')) { this.state = 'pause'; this.pauseIdx = 0; return; }
+      if (this.comms) this.comms.update();
       if (this.banner) { this.banner.t++; if (this.banner.t > this.banner.dur) this.banner = null; }
       else if (this.powerBanner) {
         // fase 7: anuncia os golpes novos logo depois do título da fase
@@ -910,10 +935,14 @@
         this.state = 'gameover'; this.stateT = 0; A().stopSong(); A().play('ko');
       }
       if (this.clearTimer > 0 && --this.clearTimer === 0) {
-        this.state = 'clear'; this.stateT = 0;
-        A().playSong('victory');
-        // zerou a fase: libera os personagens dela (menu PERSONAGENS)
-        this.newUnlocks = TT.Unlocks.markCleared(this.stage.id);
+        const clear = () => {
+          this.state = 'clear'; this.stateT = 0;
+          A().playSong('victory');
+          // zerou a fase: libera os personagens dela (menu PERSONAGENS)
+          this.newUnlocks = TT.Unlocks.markCleared(this.stage.id);
+        };
+        if (this.stage.epilogue && TT.storyOn()) { this.story = new TT.Story(this, this.stage.epilogue, clear); A().playSong('victory'); }
+        else clear();
       }
     }
 
@@ -1007,6 +1036,9 @@
           this.drawHUD(ctx);
           if (this.comboTag) this.drawComboTag(ctx);
           if (this.cut) this.cut.draw(ctx);
+          if (this.comms && !this.story && !this.finale && !this.cut) this.comms.draw(ctx);
+          if (this.finale) this.finale.draw(ctx);
+          if (this.story) this.story.draw(ctx);
           if (this.state === 'pause') this.drawPause(ctx);
           if (this.state === 'gameover') this.drawGameOver(ctx);
           break;
@@ -1056,7 +1088,15 @@
 
     drawAmbient(ctx, camX) {
       const f = this.frame;
-      if (this.stage.id === 10) {
+      if (this.stage.id === 11) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 34; i++) {
+          const x = (i * 173 + Math.sin(f * 0.02 + i) * 30) % W, y = H - ((f * (1.2 + (i % 5) * 0.4) + i * 97) % (H + 40));
+          ctx.fillStyle = i % 3 ? 'rgba(255,140,40,0.75)' : 'rgba(255,220,120,0.85)'; ctx.fillRect(x, y, 3, 3);
+        }
+        ctx.globalAlpha = 0.06 + 0.04 * Math.sin(f * 0.05); ctx.fillStyle = '#ff2a1a'; ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      } else if (this.stage.id === 10) {
         // luzes de discoteca varrendo o chão e, na sala de aula, a tela pulsando em rosa e azul
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 3; i++) {
