@@ -1,9 +1,9 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): dez fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): onze fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
-**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak** e **A Academia do
-Mad Mod**), os 5 Titãs jogáveis com troca
+**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak**, **A Academia do
+Mad Mod** e **O Fim: o Reino de Trigon**), os 5 Titãs jogáveis com troca
 em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
 36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
 **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
@@ -206,6 +206,9 @@ Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, espe
 | **Aprendiz** | Fase 7 | golpes do Robin, já com os combos da fase 8 | | |
 | **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
 | **Mad Mod** | Fase 10 | raio hipnótico | espiral que puxa os inimigos e explode | REVOLUÇÃO BRITÂNICA (Guardas Reais marcham pela tela) |
+| **Trigon** | Fase 11 | raios dos quatro olhos | chuva de fogo embaixo de cada inimigo | O FIM (onda vermelha e colunas de fogo) |
+| **Ravena Vermelha** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (manto vermelho e quatro olhos) | | |
+| **Ravena Branca** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (o manto branco do fim de "O Fim") | | |
 
 ### Personagens que entram nas próximas fases
 
@@ -214,10 +217,10 @@ Estes estão no menu como **EM BREVE**; a lista com o plano de cada um fica em `
 golpes (como os outros em `js/roster.js`):
 
 - **Bloqueador** (fase do Mestre dos Jogos), **Tempest/Aqualad** (fase no mar ou dos Titãs Leste)
-- **Ciclone**, **Ravena Vermelha** e **Ravena Branca** (fase de Trigon), **Blackfire**, **Mutano Funcionário**,
+- **Ciclone**, **Blackfire**, **Mutano Funcionário**,
   **Red X** — versões alternativas com os poderes de um dos Titãs
-- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)**, **Dr. Luz**
-  e **Trigon**
+- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)** e **Dr. Luz**
+
 
 ## Fases
 
@@ -300,6 +303,29 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    Zerar a fase libera o **Mad Mod** no menu PERSONAGENS.
    - **Hipnotizado:** com os controles invertidos aparecem espirais sobre a cabeça do Titã; **aperte ATAQUE**
      várias vezes para acordar mais rápido.
+11. **O Fim: o Reino de Trigon** — a fase contada como o episódio *O Fim*, para jogar **na pele dos Titãs**:
+   - **História:** cena de abertura em estilo HQ (o jogo para; ATAQUE avança, Esc pula), com os cinco Titãs
+     falando antes da batalha; cena antes de Trigon; e epílogo antes da tela de fase concluída. Durante a
+     fase, o **rádio dos Titãs** traz as falas dos amigos na parte de baixo da tela (sem parar o jogo) — eles
+     comentam o que está acontecendo e avisam das ameaças.
+   - **Cenário:** Jump City virada em pedra sob o eclipse vermelho (a pizzaria dos Titãs e os cidadãos viraram
+     estátuas, a Torre Titã partida ao fundo), a ponte de basalto sobre o mar de lava com cachoeiras de fogo e
+     correntes, e o templo de obsidiana com pilares de runas, braseiros e a **Marca de Scath** gigante. Brasas
+     sobem pela tela e o céu pulsa em vermelho.
+   - **Inimigos:** **Clones Sombrios** — cópias de sombra dos próprios Titãs, que usam os poderes deles
+     (birdarangues do Robin, bote do Mutano, canhão sônico do Ciborgue, garras de sombra da Ravena, starbolts da
+     Estelar, todos com aviso no chão) — e os **Demônios de Fogo**.
+   - **Fissuras de fogo:** rachaduras no chão que avisam e entram em erupção em ciclos, queimando **qualquer
+     um** em cima — Titã ou inimigo. Dá para atrair os inimigos para dentro delas.
+   - **Chefe: Trigon**, gigante (quase a altura da tela), sobe do chão: pisão em meia-lua, **PUNHO DUPLO** e
+     **raios dos quatro olhos** (uma faixa na altura de cada Titã). Abaixo de 50% fica enfurecido: **chuva de
+     meteoros** e **Clones Sombrios**; e a Ravena manda **Esferas de Luz de Azarath** — quem pega brilha e bate
+     **75% mais forte** nele (e o dobro nas sombras). **Fraqueza:** depois do punho duplo os punhos ficam presos no
+     chão — ele fica de joelhos, dano dobrado!
+   - **O final da luz:** com Trigon quase vencido a luta para e a Ravena pede ajuda: **aperte ATAQUE várias
+     vezes** para dar a força dos amigos a ela. Robin, Estelar, Ciborgue e Mutano acendem um por um, torcendo;
+     com a barra cheia a **Ravena Branca** derrota o pai com a luz — *"Azarath Metrion Zinthos!"*.
+   - Zerar a fase libera **Trigon**, a **Ravena Vermelha** e a **Ravena Branca** no menu PERSONAGENS.
 
 ## Música e vozes
 
@@ -346,6 +372,7 @@ js/stages.js      roteiro das fases (ondas, perseguição, chefes)
 js/cutscene.js    cutscene do "Titãs, avante!" (os cinco Titãs em combo)
 js/game.js        laço do jogo, câmera, HUD e telas (inclui o menu PERSONAGENS)
 js/roster.js      os 36 personagens: lista, desbloqueio, modelos e golpes dos extras, equipe salva
+js/story.js       história: cenas em estilo HQ, rádio dos Titãs e o final da luz da fase 11
 js/touch.js       botões na tela para celular (analógico, golpes, opacidade)
 js/online.js      jogar online com um amigo (sala com código, WebRTC via PeerJS)
 js/main.js        inicialização, bot de teste e API de depuração
@@ -361,7 +388,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 233 verificações e todas passam:
+página e chame a função serve.) A suíte tem 258 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -383,8 +410,8 @@ página e chame a função serve.) A suíte tem 233 verificações e todas passa
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
   golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
-- 3 partidas completas (10 fases) do início ao fim com um bot.
-- Os dez chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (11 fases) do início ao fim com um bot.
+- Os onze chefes vencidos pelo bot **sem trapaça** no NORMAL (Trigon inclusive, com o final da luz).
 - Fase 8: raio congelante, chute e giro da Madame Rouge com aviso no chão; cúpula do Mallah abre depois do
   laser (dano dobrado), ele chama congeladores e o raio do Cérebro congela o Titã.
 - Fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca com aviso no chão; pilha do Control
@@ -393,6 +420,10 @@ página e chame a função serve.) A suíte tem 233 verificações e todas passa
 - Fase 10: investida do Guarda Real, raio e flash do Olho Hipnótico com aviso no chão (o raio inverte os
   controles); o Mad Mod fica tonto depois da espiral (dano dobrado), a espiral puxa o Titã, o raio hipnótico
   inverte os controles, o raio da juventude deixa o Titã velhinho e cura o Mad Mod, e ele chama Guardas Reais.
+- Fase 11: o Clone Sombrio de cada Titã usa o poder dele com aviso no chão; fissura de fogo avisa antes e queima
+  Titãs e inimigos; Trigon fica de joelhos depois do punho duplo (dano dobrado), chama clones, solta Esferas de
+  Luz (75% a mais) e só cai pelo final da luz; cena de abertura (para o jogo, avança e pula), rádio, cena antes do
+  chefe e epílogo.
 - Esquiva perfeita (sem dano, energia, contra-ataque com 60% a mais; esquivar à toa não conta), troca em
   combo (só com 3+ golpes; quem entra já ataca), controles invertidos (ATAQUE acorda) e velhinho mais lento.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
@@ -401,8 +432,8 @@ página e chame a função serve.) A suíte tem 233 verificações e todas passa
   escolhida é salva e volta ao padrão se o personagem não estiver liberado.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
 
-`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 15 personagens extras: cada golpe nos três
-níveis de poder (fases 1, 7 e 8), 240 verificações, todas acertando o inimigo e sem erro de JavaScript.
+`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 18 personagens extras: cada golpe nos três
+níveis de poder (fases 1, 7 e 8), 288 verificações, todas acertando o inimigo e sem erro de JavaScript.
 
 ## Publicar na web (GitHub Pages)
 
@@ -436,6 +467,7 @@ Ravena recortada da dublagem.
 
 ## Próximos passos sugeridos
 
-- Mais fases (Trigon…), cada uma liberando os personagens **EM BREVE** dela.
+- Mais fases (Terra, Titãs Leste, Blackfire, Red X, Mestre dos Jogos…), cada uma liberando os personagens
+  **EM BREVE** dela — e com cenas de história como a fase 11.
 - Ataques em equipe no co-op.
 - Remapeamento de teclas.

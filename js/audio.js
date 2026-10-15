@@ -113,6 +113,17 @@
              79, 0, 79, 81, 0, 83, 0, 0, 86, 0, 83, 0, 79, 0, 74, 0],
       drums: 'punk',
     },
+    // Chefe Trigon: épico e pesado em Dó menor — coral de órgão (i - bVI - bVII - V), tema descendo como
+    // um sino de catedral e a escalada final de "batalha de verdade"
+    trigon: {
+      bpm: 150,
+      chords: [[48, 51, 55], [44, 48, 51], [46, 50, 53], [43, 47, 50]],
+      lead: [72, 0, 0, 71, 72, 0, 75, 0, 74, 0, 72, 0, 70, 0, 67, 0,
+             68, 0, 0, 67, 68, 0, 72, 0, 70, 0, 68, 0, 67, 0, 63, 0,
+             70, 0, 0, 68, 70, 0, 74, 0, 75, 0, 77, 0, 79, 0, 0, 0,
+             79, 0, 78, 79, 0, 83, 0, 0, 86, 0, 84, 0, 83, 0, 79, 0],
+      drums: 'metal',
+    },
     victory: {
       bpm: 120,
       chords: [[60, 64, 67], [65, 69, 72], [67, 71, 74], [60, 64, 67]],

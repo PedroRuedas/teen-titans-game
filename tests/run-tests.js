@@ -11,6 +11,8 @@ async page => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   await page.setViewportSize({ width: 1280, height: 720 });
+  // cenas de história desligadas (os testes vão direto à ação); o teste da história liga de novo
+  await page.addInitScript(() => { window.TT_NOSTORY = true; });
   await page.goto('http://localhost:8765/?t=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);
   await sleep(400);
@@ -67,7 +69,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a última fase (10) no título e começar nela', pick.sel === 9 && /MAD MOD/.test(pick.label) && pick.st === 'play' && pick.stage === 9, pick);
+  ok('menu: escolher a última fase (11) no título e começar nela', pick.sel === 10 && /TRIGON/.test(pick.label) && pick.st === 'play' && pick.stage === 10, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -814,6 +816,124 @@ async page => {
   ok('hipnose: controles invertidos e apertar ATAQUE acorda mais rápido', mech.walk.normal > 50 && mech.walk.inverted === -mech.walk.normal && mech.shake < 200 - 24 - 60, mech);
   ok('raio da juventude: o velhinho anda mais devagar', mech.walk.aged > 0 && mech.walk.aged < mech.walk.normal * 0.7, mech);
 
+  // 4b4f9) Fase 11: cada Clone Sombrio usa o poder do Titã copiado (marcado no chão, acerta só depois do aviso)
+  const s11 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const key of TT.TITAN_ORDER) {
+      TT.debug.start(10); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] }); g.effects.length = 0;
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = new TT.ShadowClone(g, p.x + 180, p.y, key); e.entering = false; e.facing = -1; g.addEnemy(e);
+      e.startAttack(e.def.attacks[0]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      g.render();
+      out[key] = { zone, inside, hitT, s: e.def.attacks[0].s, style: e.style === TT.STYLES[key] };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s11) ok('fase 11: o Clone Sombrio do(a) ' + k + ' usa o poder dele e acerta após o aviso', s11[k].zone && s11[k].inside && s11[k].hitT >= s11[k].s && s11[k].style, s11[k]);
+
+  // 4b4f10) Fissuras de fogo: avisam antes, queimam o Titã e também os inimigos que estiverem em cima
+  const vent = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(10); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+    g.stage = Object.assign({}, g.stage, { sections: [] }); g.effects.length = 0; g.enemies.length = 0; g.secActive = true;
+    const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 600; p.x = g.camX + 400;
+    const v = new TT.FireVent(g, p.x, p.y, 0); g.addEffect(v);
+    const e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 30; e.y = p.y; e.entering = false; e.cool = 1e9; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+    const h0 = p.hp, eh0 = e.hp; let warnT = -1, hitT = -1;
+    for (let t = 1; t < 260; t++) { p.vx = p.vy = 0; p.x = v.x; p.y = v.y; e.x = v.x + 30; e.y = v.y; g.step(); if (warnT < 0 && g.dangerZones().length) warnT = t; if (hitT < 0 && p.hp < h0) hitT = t; }
+    out.warnT = warnT; out.hitT = hitT; out.enemyHurt = Math.round(eh0 - e.hp);
+    g.secIdx++; g.step(); out.removed = !g.effects.includes(v);
+    g.enemies.length = 0;
+    return out;
+  });
+  ok('fase 11: a fissura de fogo avisa antes e queima o Titã', vent.warnT > 0 && vent.hitT > vent.warnT + 40, vent);
+  ok('fase 11: a fissura de fogo também queima os inimigos (e some quando a área termina)', vent.enemyHurt > 0 && vent.removed, vent);
+
+  // 4b4f11) Trigon: punhos presos depois do punho duplo (parado, dano dobrado), Clones Sombrios e Esferas de
+  //         Luz na fase 2 (quem pega bate 75% mais forte) e o final da luz (só ele derrota Trigon)
+  const tri = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(10); TT.debug.toSection(4); TT.debug.god(true);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name; out.big = b.height;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1, lightT: 100 }, d0); out.lit = Math.round(h - b.hp);
+    b.startAttack(b.ATK.fists);
+    for (let t = 0; t < 200 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 220 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.clones = g.enemies.filter((e) => e.kind === 'clone' && !e.dead).length;
+    g.enemies.length = 0; g.enemies.push(b); b.cool = 1e9; b.setState('idle'); b.atk = null;
+    // esfera de luz aparece e quem pega fica iluminado
+    let orb = null; for (let t = 0; t < 500 && !orb; t++) { g.step(); b.cool = 1e9; orb = g.pickups.find((k) => k.kind === 'light'); }
+    out.orb = !!orb;
+    if (orb) { const p = g.player; p.x = orb.x; p.y = orb.y; for (let t = 0; t < 40; t++) { p.x = orb.x; p.y = orb.y; g.step(); } out.lightT = p.lightT; }
+    // golpe "fatal" antes do final: não derrota; o final da luz começa
+    b.hp = b.maxHp * 0.3; b.takeHit({ x: b.x - 10, dmgMul: 1 }, { dmg: 99999 });
+    out.finale = !!g.finale; out.deadEarly = b.dead;
+    // aperta ATAQUE: a barra enche e a luz derrota Trigon
+    let t = 0; while (g.finale && t++ < 2000) { if (t % 4 === 0) g.input.pressed.add('light'); g.step(); if (t % 20 === 0) g.render(); }
+    out.finaleFrames = t; out.dead = b.dead;
+    let k = 0; while (g.state === 'play' && k++ < 1500) g.step();
+    out.state = g.state;
+    TT.debug.god(false);
+    return out;
+  });
+  ok('Trigon: gigante, fica de joelhos com os punhos presos (parado, dano dobrado) e depois volta', tri.name === 'TRIGON' && tri.big >= 300 && tri.st === 'open' && tri.openDmg === tri.normal * 2 && tri.moved < 1 && tri.after !== 'open', tri);
+  ok('Trigon: chama Clones Sombrios na fase 2', tri.clones === 2, tri);
+  ok('Trigon: Esfera de Luz aparece na fase 2 e quem pega bate 75% mais forte', tri.orb && tri.lightT > 0 && tri.lit === Math.round(tri.normal * 1.75), tri);
+  ok('Trigon: o final da luz começa antes de ele cair e, com ATAQUE, a Ravena vence (fase concluída)', tri.finale && !tri.deadEarly && tri.dead && tri.finaleFrames < 700 && tri.state === 'clear', tri);
+
+  // 4b4f12) História: cena de abertura (para o jogo, ATAQUE avança, Esc pula), cena antes do chefe, rádio dos
+  //         Titãs nas áreas e epílogo antes da tela de fase concluída
+  const story = await ev(() => {
+    const g = TT.game, out = {};
+    window.TT_NOSTORY = false;
+    TT.debug.start(10);
+    out.opening = !!g.story; out.lines = g.story ? g.story.lines.length : 0;
+    const x0 = g.player.x; g.input.pl[0].bot = { down: new Set(['right']), pressed: new Set(), update() {} };
+    for (let t = 0; t < 30; t++) g.step();
+    g.input.pl[0].bot = null; out.frozen = Math.abs(g.player.x - x0) < 1;
+    g.input.pressed.add('light'); g.step(); g.input.pressed.add('light'); g.step(); out.advanced = g.story && g.story.i;
+    g.input.pressed.add('pause'); g.step(); out.skipped = !g.story && g.state === 'play';
+    TT.debug.toSection(0); for (let t = 0; t < 30; t++) g.step();
+    out.radio = !!(g.comms && g.comms.cur && g.comms.cur.key);
+    TT.debug.toSection(4); for (let t = 0; t < 10; t++) g.step();
+    out.bossStory = !!g.story && !g.boss;
+    for (let t = 0; t < 14; t++) g.step(); // a cena ignora o botão nos primeiros quadros (não pula sem querer)
+    g.input.pressed.add('pause'); g.step();
+    let n = 0; while (!g.boss && n++ < 20) g.step();
+    out.bossAfter = !!g.boss;
+    // epílogo: aparece antes da tela de FASE CONCLUÍDA
+    g.boss = null; g.enemies.length = 0; g.clearTimer = 1; g.step();
+    out.epilogue = !!g.story && g.state === 'play';
+    for (let t = 0; t < 14; t++) g.step();
+    g.input.pressed.add('pause'); g.step();
+    out.clearAfter = g.state;
+    window.TT_NOSTORY = true;
+    g.render();
+    return out;
+  });
+  ok('história: cena de abertura para o jogo, ATAQUE avança e Esc pula', story.opening && story.lines >= 5 && story.frozen && story.advanced >= 1 && story.skipped, story);
+  ok('história: rádio dos Titãs fala durante as áreas', story.radio, story);
+  ok('história: cena antes de Trigon e o chefe entra depois', story.bossStory && story.bossAfter, story);
+  ok('história: epílogo antes da tela de fase concluída', story.epilogue && story.clearAfter === 'clear', story);
+
   // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
   //       na fase 2 chama comandos
   const slade = await ev(() => {
@@ -858,7 +978,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 10 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 11 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -985,6 +1105,15 @@ async page => {
     // espiral: a marca segue o Titã e trava; fora = longe o bastante para a espiral não puxar
     C(9, 'spiral', (b) => ({ x: b.x - 400, y: b.y + 20 }),
       (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + 345, y: z.y }) }));
+    // Trigon (fase 11)
+    C(10, 'stomp', (b) => ({ x: b.x - 180, y: b.y + 10 }), (b) => ({ x: b.x - 330, y: b.y }));
+    C(10, 'fists', (b) => ({ x: b.x - 230, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y }));
+    C(10, 'eyes', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 70 }));
+    C(10, 'meteors', (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb, z) => ({ x: z.x + 20, y: z.y + 6 }) }), (b) => ({ x: b.x - 380, y: b.y, afterT: 2, after: (bb) => {
+      const zs = bb.atk.zones;
+      for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 150) return { x, y, lockX: x };
+      return { x: bb.x, y: bb.y };
+    } }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -1005,7 +1134,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 300000) {
+      while (g.state !== 'victory' && steps < 340000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -1024,17 +1153,17 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (10 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:9') && full.seen.includes('clear:9'), full);
+    ok('jogo completo (11 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:10') && full.seen.includes('clear:10'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);
       TT.debug.start(stage); TT.debug.toSection(4); TT.debug.bot(true);
       let steps = 0;
-      while (g.state === 'play' && steps < 20000) { g.step(); steps++; }
+      while (g.state === 'play' && steps < 26000) { g.step(); steps++; }
       TT.debug.bot(false);
       return { stage, result: g.state, steps, koTitans: g.team.filter((t) => t.ko).length, bossHp: g.boss ? Math.round(g.boss.hp) : 0 };
     }, st);
@@ -1407,7 +1536,7 @@ async page => {
     g.setTeam(TT.DEFAULT_TEAM.slice());
     return out;
   });
-  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 16 && roster.lockedGizmo, roster);
+  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 13 && roster.lockedGizmo, roster);
   ok('personagens: bloqueado não entra na equipe e diz a fase', roster.lockedMsg, roster);
   ok('personagens: zerar a fase 2 libera o Gizmo (uma vez só)', roster.newly.join() === 'gizmo' && roster.again === 0, roster);
   ok('personagens: escolher a vaga põe na equipe e salva', roster.picking === 0 && roster.team[1] === 'gizmo' && roster.saved.split(',')[1] === 'gizmo' && roster.loaded[1] === 'gizmo', roster);

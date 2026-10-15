@@ -652,9 +652,9 @@
         ctx.quadraticCurveTo(sx + 28, sy + 44, sx + 18 - fl * 8, -2 + wv);
         ctx.quadraticCurveTo(sx - 12 - fl * 20, 6 - fl * 10 + wv, sx - 40 - fl * 42, -2 - fl * 22 + wv);
         ctx.quadraticCurveTo(sx - 30 - fl * 12, sy + 20, sx - 10, sy - 8); ctx.closePath();
-      }, '#2a3a9e', sx - 40, 0, sx + 20, sy);
+      }, P.st.cloak || '#2a3a9e', sx - 40, 0, sx + 20, sy);
       if (!FLASH) {
-        ctx.strokeStyle = '#17206a'; ctx.lineWidth = 1.6; // dobras
+        ctx.strokeStyle = P.st.cloakFold || '#17206a'; ctx.lineWidth = 1.6; // dobras
         ctx.beginPath(); ctx.moveTo(sx - 6, sy + 8); ctx.quadraticCurveTo(sx - 18 - fl * 10, sy + 32, sx - 24 - fl * 30, -2 + wv);
         ctx.moveTo(sx + 8, sy + 10); ctx.quadraticCurveTo(sx + 12, sy + 40, sx + 4, -2 + wv); ctx.stroke();
       }
@@ -668,11 +668,11 @@
     drawMid(ctx, P) { // manto sobre os ombros e broche
       const [sx, sy] = P.S;
       ctx.beginPath(); ctx.moveTo(sx - 13, sy + 2); ctx.quadraticCurveTo(sx, sy - 8, sx + 13, sy + 2); ctx.quadraticCurveTo(sx + 12, sy + 9, sx + 6, sy + 8); ctx.quadraticCurveTo(sx, sy + 3, sx - 6, sy + 8); ctx.quadraticCurveTo(sx - 12, sy + 9, sx - 13, sy + 2); ctx.closePath();
-      ink(ctx, '#2a3a9e', 1.8);
+      ink(ctx, P.st.cloak || '#2a3a9e', 1.8);
       ctx.beginPath(); ctx.arc(sx + 3, sy + 3, 3.4, 0, TAU2); ink(ctx, '#e2b23c', 1.1);
       if (!FLASH) { ctx.beginPath(); ctx.arc(sx + 3, sy + 3, 1.6, 0, TAU2); ctx.fillStyle = '#d61f3a'; ctx.fill(); }
     },
-    drawHead(ctx, r, pose) { TT.drawFace(ctx, 'raven', r, pose, FLASH); },
+    drawHead(ctx, r, pose) { TT.drawFace(ctx, 'raven', r, pose, FLASH, this.faceOpt); },
   }));
 
   // ---- Inimigos
@@ -1544,6 +1544,81 @@
       ctx.lineTo(r * 1.0, -r * 0.3); ctx.closePath();
       ctx.fillStyle = C('#14121a'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
       if (!FLASH) { ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(r * (0.3 + i * 0.1), -r * (1.0 + i * 0.3)); ctx.quadraticCurveTo(r * 0.6, -r * (1.3 + i * 0.3), r * (0.5 + i * 0.1), -r * (1.6 + i * 0.25)); ctx.stroke(); } }
+    },
+  });
+
+  // ------------------------------------------------------------ Fase 11 — O Reino de Trigon
+  // Trigon (chefe da fase 11): o demônio gigante, pai da Ravena — pele vermelha, musculoso, quatro olhos
+  // amarelos brilhando, chifres enormes como galhadas, cavanhaque preto, colar e braceletes de ouro e
+  // tanga escura com cinto de ouro e a Marca de Scath.
+  const TRI = { skin: '#c8102e', dark: '#8a0a1e', horn: '#2a2228', gold: '#e2b23c', cloth: '#2a1a24' };
+  function trigonHorn(ctx, s) {
+    ctx.save(); ctx.scale(s, 1);
+    ctx.beginPath();
+    ctx.moveTo(-4, 0); ctx.quadraticCurveTo(-8, -22, -2, -44); ctx.lineTo(-14, -60); ctx.lineTo(-4, -58); ctx.quadraticCurveTo(4, -66, 0, -84);
+    ctx.quadraticCurveTo(14, -62, 10, -46); ctx.lineTo(24, -54); ctx.lineTo(14, -38); ctx.quadraticCurveTo(10, -18, 8, 0); ctx.closePath();
+    ctx.fillStyle = C(TRI.horn); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+    if (!FLASH) { ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(2, -6); ctx.quadraticCurveTo(-2, -30, 4, -50); ctx.stroke(); }
+    ctx.restore();
+  }
+  S.trigon = mkStyle({
+    scale: 3.0, headR: 15, torsoH: 42, shW: 46, waistW: 28, hipW: 30, chest: 6, legL: [24, 22], armL: [24, 23], legW: 12, armW: 11.5, handR: 8.5, footR: 9.5, neck: 3,
+    skin: TRI.skin, torso: TRI.skin, arm: TRI.skin, glove: TRI.skin, hand: TRI.skin, leg: TRI.cloth, boot: '#1a0e14',
+    armOpt: { band: [{ col: TRI.gold, at: 1.62, len: 0.2 }] }, // braceletes de ouro
+    legOpt: { split: 1.4, sole: '#0e080c' },
+    torsoDetail(ctx, P) {
+      const th = P.st.torsoH;
+      if (FLASH) return;
+      ctx.strokeStyle = TRI.dark; ctx.lineWidth = 2; // músculos: peitoral e abdômen
+      ctx.beginPath(); ctx.moveTo(-18, -th + 16); ctx.quadraticCurveTo(-4, -th + 24, 2, -th + 16); ctx.quadraticCurveTo(10, -th + 24, 22, -th + 14); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2, -th + 22); ctx.lineTo(2, -10);
+      for (const y of [-th * 0.42, -th * 0.27]) { ctx.moveTo(-8, y); ctx.quadraticCurveTo(2, y + 3, 12, y); }
+      ctx.stroke();
+      // colar de ouro com gemas
+      ctx.fillStyle = TRI.gold; ctx.beginPath(); ctx.moveTo(-20, -th); ctx.quadraticCurveTo(2, -th + 16, 24, -th); ctx.lineTo(20, -th - 3); ctx.quadraticCurveTo(2, -th + 9, -16, -th - 3); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = '#ff3b30'; for (const x of [-10, 2, 14]) { ctx.beginPath(); ctx.arc(x, -th + 4 + (x === 2 ? 3 : 0), 2.2, 0, TAU2); ctx.fill(); }
+      // cinto de ouro com a Marca de Scath
+      ctx.fillStyle = TRI.gold; ctx.fillRect(-22, -9, 46, 7);
+      ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(2, -5.5, 3.5, 0, TAU2); ctx.fill();
+    },
+    drawMid(ctx, P) { // tanga escura caindo entre as pernas
+      ctx.save(); ctx.translate(P.Hx, P.Hy); ctx.rotate(P.lean * 0.5);
+      ctx.beginPath(); ctx.moveTo(-12, -4); ctx.lineTo(14, -4); ctx.lineTo(10, 30); ctx.lineTo(1, 36); ctx.lineTo(-8, 30); ctx.closePath();
+      ctx.fillStyle = C(TRI.cloth); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.stroke();
+      if (!FLASH) { ctx.strokeStyle = TRI.gold; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-9, 26); ctx.lineTo(9, 26); ctx.stroke(); }
+      ctx.restore();
+    },
+    drawHead(ctx, r, pose) {
+      // chifres (galhadas) atrás e acima da cabeça
+      ctx.save(); ctx.translate(-r * 0.45, -r * 0.7); ctx.rotate(-0.35); trigonHorn(ctx, -0.75); ctx.restore();
+      ctx.save(); ctx.translate(r * 0.3, -r * 0.8); ctx.rotate(0.15); trigonHorn(ctx, 0.85); ctx.restore();
+      // cabeça larga de queixo quadrado
+      ctx.beginPath(); ctx.moveTo(-r * 0.85, -r * 0.55); ctx.quadraticCurveTo(r * 0.2, -r * 1.15, r * 0.95, -r * 0.45);
+      ctx.lineTo(r * 1.02, r * 0.5); ctx.quadraticCurveTo(r * 0.7, r * 1.08, r * 0.1, r * 1.05); ctx.quadraticCurveTo(-r * 0.75, r * 0.95, -r * 0.9, r * 0.2); ctx.closePath();
+      ctx.fillStyle = C(TRI.skin); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      // cabelo preto curto atrás
+      ctx.beginPath(); ctx.moveTo(-r * 0.88, r * 0.1); ctx.quadraticCurveTo(-r * 1.05, -r * 0.7, -r * 0.2, -r * 0.92); ctx.quadraticCurveTo(-r * 0.55, -r * 0.4, -r * 0.5, r * 0.3); ctx.closePath();
+      ctx.fillStyle = C('#1a1218'); ctx.fill(); ctx.stroke();
+      // cavanhaque preto pontudo
+      ctx.beginPath(); ctx.moveTo(r * 0.1, r * 0.72); ctx.quadraticCurveTo(r * 0.55, r * 0.95, r * 0.9, r * 0.66); ctx.lineTo(r * 0.55, r * 1.55); ctx.closePath();
+      ctx.fillStyle = C('#1a1218'); ctx.fill(); ctx.stroke();
+      if (FLASH) return;
+      // sobrancelhas pesadas e os QUATRO olhos amarelos (duas fileiras)
+      ctx.fillStyle = TRI.dark;
+      ctx.beginPath(); ctx.moveTo(-r * 0.05, -r * 0.62); ctx.lineTo(r * 1.0, -r * 0.48); ctx.lineTo(r * 0.95, -r * 0.36); ctx.lineTo(-r * 0.02, -r * 0.48); ctx.closePath(); ctx.fill();
+      const eyes4 = [[r * 0.24, -r * 0.34, 0.2], [r * 0.74, -r * 0.3, 0.17], [r * 0.2, -r * 0.02, 0.2], [r * 0.72, r * 0.02, 0.17]];
+      for (const [ex, ey, k] of eyes4) {
+        ctx.beginPath(); ctx.moveTo(ex - r * k, ey + r * 0.04); ctx.quadraticCurveTo(ex, ey - r * k * 0.7, ex + r * k, ey - r * 0.03); ctx.quadraticCurveTo(ex, ey + r * k * 0.5, ex - r * k, ey + r * 0.04); ctx.closePath();
+        ctx.fillStyle = '#ffe14a'; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.4; ctx.stroke();
+      }
+      TT.drawGlow(ctx, '#ffd23a', r * 0.48, -r * 0.16, r * 1.1, 0.7);
+      // nariz e boca rosnando com presas
+      ctx.strokeStyle = OUT; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(r * 0.92, r * 0.06); ctx.lineTo(r * 1.1, r * 0.3); ctx.lineTo(r * 0.9, r * 0.36); ctx.stroke();
+      const open = pose.mouth === 'open' || pose.mouth === 'shout';
+      ctx.beginPath(); ctx.moveTo(r * 0.25, r * 0.55); ctx.quadraticCurveTo(r * 0.6, r * (open ? 0.95 : 0.66), r * 0.98, r * 0.52); ctx.quadraticCurveTo(r * 0.6, r * 0.6, r * 0.25, r * 0.55); ctx.closePath();
+      ctx.fillStyle = '#3a0610'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff6dc'; for (const x of [0.38, 0.82]) { ctx.beginPath(); ctx.moveTo(r * (x - 0.06), r * 0.56); ctx.lineTo(r * x, r * 0.74); ctx.lineTo(r * (x + 0.06), r * 0.55); ctx.closePath(); ctx.fill(); }
     },
   });
 

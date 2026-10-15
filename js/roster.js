@@ -30,8 +30,8 @@
     { key: 'slade', name: 'Slade', stage: 7 },
     { key: 'apprentice', name: 'Aprendiz', stage: 7, base: 'robin', alt: true },
     { key: 'cyclone', name: 'Ciclone', stage: null, alt: true, plan: 'Versão alternativa de um dos Titãs (no jogo de PS2 tem os mesmos poderes, com os combos dos golpes novos).' },
-    { key: 'redraven', name: 'Ravena Vermelha', stage: null, base: 'raven', alt: true, plan: 'Ravena tomada pelo lado de Trigon (poderes da Ravena). Entra com a fase de Trigon.' },
-    { key: 'whiteraven', name: 'Ravena Branca', stage: null, base: 'raven', alt: true, plan: 'Ravena de manto branco, do fim de "O Fim" (poderes da Ravena). Entra com a fase de Trigon.' },
+    { key: 'redraven', name: 'Ravena Vermelha', stage: 11, base: 'raven', alt: true },
+    { key: 'whiteraven', name: 'Ravena Branca', stage: 11, base: 'raven', alt: true },
     { key: 'blackfire', name: 'Blackfire', stage: null, base: 'starfire', alt: true, plan: 'Irmã da Estelar (poderes da Estelar, starbolts roxos). Entra com uma fase da Blackfire.' },
     { key: 'mmm', name: 'Mutano Funcionário', stage: null, base: 'beastboy', alt: true, plan: 'Mutano de uniforme de funcionário (poderes do Mutano). Entra com uma fase futura.' },
     { key: 'clownbb', name: 'Mutano Palhaço', stage: 6, base: 'beastboy', alt: true },
@@ -45,7 +45,7 @@
     { key: 'drlight', name: 'Dr. Luz', stage: null, plan: 'Vilão da luz (rajadas e clarões). Entra com a fase do Dr. Luz.' },
     { key: 'madmod', name: 'Mad Mod', stage: 10 },
     { key: 'freak', name: 'Control Freak', stage: 9 },
-    { key: 'trigon', name: 'Trigon', stage: null, plan: 'O demônio pai da Ravena (gigante). Entra com a fase de Trigon.' },
+    { key: 'trigon', name: 'Trigon', stage: 11 },
   ];
   TT.ROSTER_BY = {};
   for (const r of TT.ROSTER) TT.ROSTER_BY[r.key] = r;
@@ -106,6 +106,12 @@
   S.sladeP = mk({ scale: 1.1 }, S.sladeBoss);
   S.freakP = mk({ scale: 1.1 }, S.freak);
   S.madmodP = mk({ scale: 1.12 }, S.madmod);
+  S.trigonP = mk({ scale: 1.3 }, S.trigon);
+  // Ravena Vermelha (tomada por Trigon: manto vermelho e quatro olhos) e Ravena Branca (o manto branco do fim de "O Fim")
+  S.redraven = mk({ cloak: '#a8122a', cloakFold: '#6a0816', torso: '#1a0a10', arm: '#1a0a10', glove: '#1a0a10', boot: '#6a0816',
+    faceOpt: { hood: ['#2a0608', '#a8122a', '#6a0816', '#d03a4a'], demon: true } }, S.raven);
+  S.whiteraven = mk({ cloak: '#f4f4fa', cloakFold: '#b8bccc', torso: '#ecebf3', arm: '#ecebf3', glove: '#ecebf3', boot: '#d8dce8',
+    faceOpt: { hood: ['#bfc4d4', '#f6f6fa', '#c9cdd8', '#ffffff'] } }, S.raven);
 
   // ---- Gizmo: baixinho careca de óculos verdes, macacão verde e mochila com patas de aranha mecânicas
   const GZ = { suit: '#3c8f3a', dark: '#2c2c34', metal: '#7c8798', lens: '#7dff6a' };
@@ -1209,6 +1215,55 @@
       } },
   };
 
+  // ---- Trigon: o demônio gigante
+  // Raios dos quatro olhos saindo da cabeça (até onde o golpe alcança).
+  function eyeBeams(ctx, f, sx, sy, a) {
+    const d = a.def, k = a.t - d.s;
+    if (k < 0 || k >= d.a) return;
+    const R = f.rigOut, hr = R.hr || 20, ex = (R.hx != null ? R.hx : sx) + f.facing * hr * 0.5, ey = (R.hy != null ? R.hy : sy - 160) - hr * 0.16;
+    const L = d.reach[1] * Math.min(1, (k + 1) / 3), fade = TT.clamp((d.a - k) / 5, 0, 1), y1 = sy - 60;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha = fade;
+    for (const off of [-hr * 0.2, -hr * 0.05, hr * 0.1, hr * 0.25]) {
+      ctx.strokeStyle = '#ff9a1a'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(ex, ey + off); ctx.lineTo(ex + f.facing * L, y1 + off); ctx.stroke();
+      ctx.strokeStyle = '#fff6c0'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.restore();
+    TT.drawGlow(ctx, '#ffe14a', ex, ey, 40, fade);
+  }
+  DEFS.trigon = {
+    name: 'Trigon', style: 'trigonP', hp: 175, speed: 3.6, jump: 13, color: '#c8102e', fx: '#ff7a1a',
+    blurb: 'O demônio pai da Ravena: socos gigantes, raios dos quatro olhos e chuva de fogo.',
+    dashFx(f, g, t) { if (t % 2 === 0) g.particles.spawn('spark', f.x - f.facing * 30, f.y - TT.rand(10, 120), { vx: -f.facing * 2, vy: -TT.rand(1, 3), color: TT.choice(['#ff7a1a', '#ffd23a']), size: 4, life: 16 }); },
+    dashAtk: M('jab', { s: 4, a: 14, r: 14, dmg: 15, reach: [0, 120], depth: 46, lunge: 12, knockdown: true, launch: 7, kb: 12, big: true }),
+    light: [
+      M('jab', { s: 6, dmg: 9, reach: [0, 116], depth: 40, kb: 3 }),
+      M('cross', { s: 6, dmg: 10, reach: [0, 120], depth: 40, kb: 3 }),
+      M('bigSlam', { s: 11, a: 5, r: 18, dmg: 17, reach: [0, 150], depth: 52, kb: 10, knockdown: true, launch: 9, big: true,
+        onFrame(f, t, g) { if (t === this.s) { g.groundRing(f.x + f.facing * 100, f.y, '#ff7a1a'); g.shake = Math.max(g.shake, 9); for (let i = 0; i < 6; i++) g.particles.spawn('spark', f.x + f.facing * 100 + TT.rand(-40, 40), f.y - 10, { vy: -TT.rand(3, 8), vx: TT.rand(-2, 2), color: '#ff7a1a', size: 4, life: 18, grav: 0.2 }); } } }),
+    ],
+    heavy: M('beam', { s: 12, a: 16, r: 14, dmg: 5, rehit: 4, reach: [20, 640], depth: 34, kb: 2, sound: 'laser', name: 'Raios dos quatro olhos', drawFx: eyeBeams,
+      onFrame(f, t, g) { if (t === this.s) g.particles.spawn('text', f.x + f.facing * 260, f.y - 170, { text: 'ZZRAAA!', size: 38, color: '#ffe14a', color2: '#c4300a', vy: -0.6, life: 28 }); } }),
+    air: M('dive', { s: 3, a: 16, r: 10, dmg: 13, reach: [-30, 84], depth: 46, kb: 5, knockdown: true, launch: 6, zr: 140, big: true }),
+    special: { cost: 40, pose: 'castUp', s: 16, a: 1, r: 22, shout: 'Chuva de fogo!', shoutColor: '#ff9a3a',
+      onFrame(f, t, g) {
+        if (t < this.s && t % 2 === 0) handBurst(f, g, '#ff7a1a', 2);
+        if (t === this.s) { erupt(g, f, underEnemies(g, f, false, 4), { kind: 'fire', col: 'rgba(255,90,20,0.75)', dmg: 22 * pw(f), rx: 75, h: 150, word: 'FWOOSH!', sound: 'boom' }); g.tintScreen('#ff3a1a', 10); }
+      } },
+    mid: [
+      M('uppercut', { s: 7, dmg: 11, reach: [0, 112], depth: 40 }),
+      M('swipe', { s: 7, dmg: 11, reach: [0, 132], depth: 44, kb: 3 }),
+    ],
+    ender: { pose: 'castUp', s: 16, a: 1, r: 40, name: 'O FIM',
+      onFrame(f, t, g) {
+        if (t === 1) { comboName(f, g, 'O FIM'); A().play('roar'); g.tintScreen('#ff0000', 30); }
+        if (t === this.s) {
+          g.shake = 18;
+          g.addEffect(new TT.Nova(g, f, { x: f.x, y: f.y, r: 300, dmg: 16 * pw(f), col: '#ff3a1a', word: 'O FIM!' }));
+          erupt(g, f, underEnemies(g, f, false, 3), { kind: 'fire', col: 'rgba(255,40,20,0.8)', dmg: 22 * pw(f), rx: 85, h: 190, launch: 13, sound: 'boom' });
+        }
+      } },
+  };
+
   // ================================================================ Montagem dos três níveis de poder
   const boost = (d, k) => Object.assign({}, d, { dmg: d.dmg ? Math.round(d.dmg * k) : d.dmg });
   function build(key, o) {
@@ -1230,6 +1285,8 @@
     TT.TITANS[key] = TT.TITANS_PLUS[key] = TT.TITANS_COMBO[key] = d;
   }
   alt('apprentice', 'robin', { name: 'Aprendiz', color: '#ff7a1a', fx: '#ff9a3a', blurb: 'O Robin como aprendiz do Slade: golpes do Robin, já com os combos da fase 8.' });
+  alt('redraven', 'raven', { name: 'Ravena Vermelha', color: '#c8102e', fx: '#ff3b5a', blurb: 'A Ravena tomada pelo lado de Trigon: poderes da Ravena, já com os combos da fase 8.' });
+  alt('whiteraven', 'raven', { name: 'Ravena Branca', color: '#e6e6f2', fx: '#ffffff', blurb: 'A Ravena de manto branco que venceu Trigon com a luz: poderes da Ravena, já com os combos da fase 8.' });
   alt('clownbb', 'beastboy', { name: 'Mutano Palhaço', color: '#ffd23a', fx: '#ff5a5a', blurb: 'O Mutano de palhaço no circo do Mumbo: animais do Mutano, já com os combos da fase 8.' });
 
   // Resumo dos golpes para o menu (nome do forte/especial/combo final de cada um).
@@ -1252,6 +1309,9 @@
     slade: ['Bastão', 'Bomba de disco', 'Fogo de Trigon', 'Xeque-Mate'],
     freak: ['Controle remoto', 'ZAP!', 'Botão de PAUSA', 'Maratona de TV'],
     madmod: ['Bengala', 'Raio hipnótico', 'Espiral que puxa', 'Revolução Britânica'],
+    trigon: ['Socos gigantes', 'Raios dos quatro olhos', 'Chuva de fogo', 'O Fim'],
+    redraven: ['Energia negra (combo de 5)', 'Telecinese', 'Tentáculos de sombra', 'Esferas de Azarath'],
+    whiteraven: ['Energia negra (combo de 5)', 'Telecinese', 'Tentáculos de sombra', 'Esferas de Azarath'],
     apprentice: ['Bastão (combo de 5)', 'Disco congelante', 'Discos explosivos', 'Golpe Relâmpago'],
     clownbb: ['Animais (combo de 5)', 'Elefante', 'A Fera', 'Estouro da Manada'],
   };

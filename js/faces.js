@@ -212,7 +212,8 @@
     'L -6 -40 C -26 -16 -28 30 -26 84 Z';
   F.raven = function (ctx, pose, opt) {
     const skin = '#c9c3d7', hair = '#46307a', hood = !opt || !opt.noHood;
-    if (hood) fill(ctx, HOOD, '#10153f');
+    const hc = (opt && opt.hood) || ['#10153f', '#2a3a9e', '#1d2878', '#4256c0']; // capuz: fundo, frente, sombra, brilho
+    if (hood) fill(ctx, HOOD, hc[0]);
     baseHead(ctx, skin);
     // cabelo violeta liso (chanel) com franja reta repartida no meio, deixando o chakra à mostra
     fill(ctx, RV_HAIR, hair);
@@ -226,10 +227,17 @@
       brow: 'M 74 -24 Q 86 -30 98 -24', browCol: '#2e1d5c', browW: 4 });
     if (!FL && pose.eyes !== 'shut' && pose.eyes !== 'x') line(ctx, 'M 14 18 Q 32 26 52 16 M 76 16 Q 84 20 94 15', 3, '#7b6f92'); // linha de baixo
     mouth(ctx, 60, 64, pose);
+    if (opt && opt.demon && !FL) { // Ravena tomada por Trigon: quatro olhos vermelhos brilhando
+      for (const [ex, ey, rr] of [[32, 4, 15], [84, 2, 11], [36, -40, 11], [82, -40, 8]]) {
+        TT.drawGlow(ctx, '#ff2a2a', ex, ey, rr * 3, 0.9);
+        ctx.fillStyle = '#ff2a3a'; ctx.beginPath(); ctx.ellipse(ex, ey, rr, rr * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffe0e0'; ctx.beginPath(); ctx.ellipse(ex, ey, rr * 0.35, rr * 0.25, 0, 0, TAU); ctx.fill();
+      }
+    }
     if (hood) {
-      fill(ctx, HOOD_FRONT, '#2a3a9e', 7);
-      shadow(ctx, HOOD_FRONT, 'M -160 -40 L -70 -40 C -80 20 -60 80 -20 140 L -160 140 Z', '#1d2878');
-      shine(ctx, [HOOD_FRONT], 'M 70 -116 Q 0 -132 -70 -102', '#4256c0');
+      fill(ctx, HOOD_FRONT, hc[1], 7);
+      shadow(ctx, HOOD_FRONT, 'M -160 -40 L -70 -40 C -80 20 -60 80 -20 140 L -160 140 Z', hc[2]);
+      shine(ctx, [HOOD_FRONT], 'M 70 -116 Q 0 -132 -70 -102', hc[3]);
     }
   };
 
