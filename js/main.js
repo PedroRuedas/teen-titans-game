@@ -32,7 +32,17 @@
       }
       return best;
     }
+    // Hipnotizado (controles invertidos): o bot aperta ATAQUE para acordar e inverte as direções que quer.
     update() {
+      this.plan();
+      const g = this.game, sl = g.slots[this.slot], p = g.state === 'play' && sl ? g.team[sl.ai] : null;
+      if (!p || !(p.inverted > 0)) return;
+      if (this.t % 4 === 0) this.press('light');
+      const sw = { left: 'right', right: 'left', up: 'down', down: 'up' }, out = new Set();
+      for (const k of this.down) out.add(sw[k] || k);
+      this.down = out;
+    }
+    plan() {
       const g = this.game; this.t++;
       this.down.clear();
       if (g.state !== 'play') { if (this.slot === 0 && this.t % 40 === 0) this.press('start'), this.press('menu'); return; }

@@ -1,8 +1,9 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): nove fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): dez fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
-**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade** e **O Canal do Control Freak**), os 5 Titãs jogáveis com troca
+**O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak** e **A Academia do
+Mad Mod**), os 5 Titãs jogáveis com troca
 em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
 36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
 **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
@@ -166,6 +167,15 @@ rostos de queixo fino, contorno preto e sombra chapada em dois tons. Os rostos s
 - Todo ataque de chefe tem aviso: pose exagerada, brilho na cor do golpe, um **"!"** sobre a cabeça e
   a **área exata** marcada em vermelho no chão, que vai se preenchendo até o impacto.
 
+### Esquiva perfeita e troca em combo
+
+- **Esquiva perfeita:** esquive (Shift / RT) **bem na hora** em que um golpe ia acertar. O jogo entra em câmera
+  lenta, aparece **ESQUIVA PERFEITA!**, a energia sobe e o Titã fica brilhando: por um tempo, **todos os golpes
+  dele dão 60% a mais** (o contra-ataque), inclusive os tiros. Esquivar cedo demais não conta.
+- **Troca em combo:** com **3 ou mais golpes seguidos** na tela, dá para trocar de Titã **no meio de um ataque**
+  (1-5 ou Q / E). Quem sai deixa uma imagem residual e quem entra já chega com a investida, virado para o
+  inimigo mais perto — dá para emendar combos de vários Titãs sem parar.
+
 ## Personagens (menu PERSONAGENS)
 
 O menu **PERSONAGENS** do título mostra os **36 personagens jogáveis** do modo *Master of Games* do jogo de
@@ -195,6 +205,7 @@ Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, espe
 | **Slade** | Fase 7 | bomba de disco | fogo de Trigon (anéis de chamas) | XEQUE-MATE (teleporta e golpeia cada um) |
 | **Aprendiz** | Fase 7 | golpes do Robin, já com os combos da fase 8 | | |
 | **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
+| **Mad Mod** | Fase 10 | raio hipnótico | espiral que puxa os inimigos e explode | REVOLUÇÃO BRITÂNICA (Guardas Reais marcham pela tela) |
 
 ### Personagens que entram nas próximas fases
 
@@ -205,8 +216,8 @@ golpes (como os outros em `js/roster.js`):
 - **Bloqueador** (fase do Mestre dos Jogos), **Tempest/Aqualad** (fase no mar ou dos Titãs Leste)
 - **Ciclone**, **Ravena Vermelha** e **Ravena Branca** (fase de Trigon), **Blackfire**, **Mutano Funcionário**,
   **Red X** — versões alternativas com os poderes de um dos Titãs
-- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)**, **Dr. Luz**,
-  **Mad Mod** e **Trigon**
+- **Fang**, **Hot Spot**, **Wildebeest**, **Terra**, **Ricochete (Speedy)**, **Abelha (Bumblebee)**, **Dr. Luz**
+  e **Trigon**
 
 ## Fases
 
@@ -275,6 +286,20 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
    círculo fica pausado como numa fita) e troca de canal para chamar TV-Robôs.
    **Fraqueza:** depois do ZAP MÁXIMO a **pilha do controle acaba** — ele fica sacudindo o controle,
    parado, e leva dano dobrado!
+10. **A Academia do Mad Mod**: a Londres de mentira que o Mad Mod montou (a "Mod Boutique", a loja de discos,
+   cabines telefônicas vermelhas, lambretas e bandeirinhas, com a torre do relógio e a roda-gigante ao fundo),
+   o corredor da escola com paredes op-art preto e branco, armários com a bandeira e telas com a espiral, e a
+   sala de aula com o telão hipnótico gigante, quadros-negros ("Lição 1: obedeça o Mad Mod") e piso xadrez
+   rosa com o alvo mod. Luzes de discoteca varrem o chão. Inimigos: **Guardas Reais** (robôs de guarda do
+   palácio; investida com a baioneta em linha e coronhada) e **Olhos Hipnóticos** (olhos voadores de latão:
+   raio hipnótico em linha que **inverte os controles** e flash da câmera em volta). O chefe é o **Mad Mod**:
+   bengalada, raio hipnótico (controles invertidos) e a **ESPIRAL GIGANTE** (a marca segue você, trava, **puxa
+   os Titãs para o centro** e explode — esquive para não ser puxado). Abaixo de 50%, o **raio da juventude**
+   deixa o Titã **velhinho** (mais lento) e o Mad Mod recupera vida, e ele chama Guardas Reais.
+   **Fraqueza:** depois da espiral gigante ele **fica tonto com a própria hipnose** — parado, dano dobrado!
+   Zerar a fase libera o **Mad Mod** no menu PERSONAGENS.
+   - **Hipnotizado:** com os controles invertidos aparecem espirais sobre a cabeça do Titã; **aperte ATAQUE**
+     várias vezes para acordar mais rápido.
 
 ## Música e vozes
 
@@ -336,7 +361,7 @@ playwright-cli run-code --filename=tests/run-tests.js
 ```
 
 (`tests/run-tests.js` é uma função `async page => {...}`; qualquer runner do Playwright que abra a
-página e chame a função serve.) A suíte tem 207 verificações e todas passam:
+página e chame a função serve.) A suíte tem 233 verificações e todas passam:
 
 - Teclado real: iniciar, andar, atacar, trocar de Titã, pular e pausar.
 - Dificuldade: troca no título e na pausa, persistência, storage bloqueado, multiplicadores e
@@ -358,21 +383,26 @@ página e chame a função serve.) A suíte tem 207 verificações e todas passa
 - Só a Ravena fala nos golpes; a abertura toca em todas as fases; escolha de fase no título.
 - Titãs, avante!: a cutscene mostra os cinco Titãs fazendo o combo em cada um dos 7 chefes (com os
   golpes novos na fase 7), o mundo fica congelado, ENTER/ATAQUE pula para o final e o dano sai; regressões.
-- 3 partidas completas (9 fases) do início ao fim com um bot.
-- Os nove chefes vencidos pelo bot **sem trapaça** no NORMAL.
+- 3 partidas completas (10 fases) do início ao fim com um bot.
+- Os dez chefes vencidos pelo bot **sem trapaça** no NORMAL.
 - Fase 8: raio congelante, chute e giro da Madame Rouge com aviso no chão; cúpula do Mallah abre depois do
   laser (dano dobrado), ele chama congeladores e o raio do Cérebro congela o Titã.
 - Fase 9: raio de chuvisco do TV-Robô e pipocas do Monstro de Pipoca com aviso no chão; pilha do Control
   Freak acaba depois do ZAP MÁXIMO (dano dobrado), ele chama TV-Robôs, o botão de PAUSA pausa o Titã e o
   aviso de COMBOS NOVOS não se repete na fase 9.
+- Fase 10: investida do Guarda Real, raio e flash do Olho Hipnótico com aviso no chão (o raio inverte os
+  controles); o Mad Mod fica tonto depois da espiral (dano dobrado), a espiral puxa o Titã, o raio hipnótico
+  inverte os controles, o raio da juventude deixa o Titã velhinho e cura o Mad Mod, e ele chama Guardas Reais.
+- Esquiva perfeita (sem dano, energia, contra-ataque com 60% a mais; esquivar à toa não conta), troca em
+  combo (só com 3+ golpes; quem entra já ataca), controles invertidos (ATAQUE acorda) e velhinho mais lento.
 - Co-op: seleção no título, controles independentes, Titãs distintos, inimigos atacando os dois,
   câmera, game over e uma fase inteira jogada por dois bots.
 - Menu PERSONAGENS: 36 na lista, bloqueado não entra na equipe, zerar a fase libera (uma vez só), a equipe
   escolhida é salva e volta ao padrão se o personagem não estiver liberado.
 - Desempenho (render médio < 2 ms) e zero erros de JavaScript.
 
-`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 14 personagens extras: cada golpe nos três
-níveis de poder (fases 1, 7 e 8), 224 verificações, todas acertando o inimigo e sem erro de JavaScript.
+`tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 15 personagens extras: cada golpe nos três
+níveis de poder (fases 1, 7 e 8), 240 verificações, todas acertando o inimigo e sem erro de JavaScript.
 
 ## Publicar na web (GitHub Pages)
 

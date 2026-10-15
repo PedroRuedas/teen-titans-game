@@ -43,7 +43,7 @@
     { key: 'speedy', name: 'Ricochete (Speedy)', stage: null, plan: 'O arqueiro dos Titãs Leste (flechas especiais). Entra com uma fase dos Titãs Leste.' },
     { key: 'bumblebee', name: 'Abelha (Bumblebee)', stage: null, plan: 'Líder dos Titãs Leste (encolhe e dá choques). Entra com uma fase dos Titãs Leste.' },
     { key: 'drlight', name: 'Dr. Luz', stage: null, plan: 'Vilão da luz (rajadas e clarões). Entra com a fase do Dr. Luz.' },
-    { key: 'madmod', name: 'Mad Mod', stage: null, plan: 'Vilão britânico da hipnose. Entra com a fase da Mansão do Mad Mod.' },
+    { key: 'madmod', name: 'Mad Mod', stage: 10 },
     { key: 'freak', name: 'Control Freak', stage: 9 },
     { key: 'trigon', name: 'Trigon', stage: null, plan: 'O demônio pai da Ravena (gigante). Entra com a fase de Trigon.' },
   ];
@@ -105,6 +105,7 @@
   S.mumboP = mk({ scale: 1.14 }, S.mumbo);
   S.sladeP = mk({ scale: 1.1 }, S.sladeBoss);
   S.freakP = mk({ scale: 1.1 }, S.freak);
+  S.madmodP = mk({ scale: 1.12 }, S.madmod);
 
   // ---- Gizmo: baixinho careca de óculos verdes, macacão verde e mochila com patas de aranha mecânicas
   const GZ = { suit: '#3c8f3a', dark: '#2c2c34', metal: '#7c8798', lens: '#7dff6a' };
@@ -513,8 +514,8 @@
           fake.animT = this.t * 1.6 + r.ph * 10;
           TT.computePose(fake, fake.pose);
           fake.pose.lean = 0.45;
-          TT.drawGlow(ctx, '#ff7a1a', x, r.y - 70, 60, 0.4);
-          TT.drawRig(ctx, S.slade, fake.pose, x, r.y, this.dir, { t: fake.animT });
+          TT.drawGlow(ctx, this.o.kind === 'guard' ? '#d7263e' : '#ff7a1a', x, r.y - 70, 60, 0.4);
+          TT.drawRig(ctx, this.o.kind === 'guard' ? S.guard : S.slade, fake.pose, x, r.y, this.dir, { t: fake.animT });
         }
       }
       ctx.restore();
@@ -1140,6 +1141,74 @@
       } },
   };
 
+  // ---- Mad Mod: o mestre britânico da hipnose
+  // Espiral no chão à frente que puxa os inimigos para o centro e explode (especial do Mad Mod jogável).
+  class PullSpiral {
+    constructor(game, owner, o) {
+      Object.assign(this, { game, owner, o, t: 0, remove: false, x: owner.x + owner.facing * (o.dist || 230), y: owner.y + 1, hits: new Set() });
+    }
+    update() {
+      const g = this.game, o = this.o, T = o.T || 50;
+      this.t++;
+      if (this.t < T) {
+        for (const e of g.enemies) {
+          if (e.dead || e.isBoss || e.z > 60) continue;
+          const dx = this.x - e.x, dy = (this.y - e.y) / 0.42, d = Math.hypot(dx, dy);
+          if (d > o.R || d < 8) continue;
+          e.x += dx / d * 3.2; e.y += dy / d * 3.2 * 0.42;
+          if (e.state === 'attack') { e.atk = null; e.setState('idle'); e.releaseToken && e.releaseToken(); }
+        }
+      } else if (this.t === T) {
+        g.blast(this.x, this.y, o.R * 0.6, o.dmg, 'hero', this.owner, MOD_PINK);
+        g.particles.spawn('text', this.x, this.y - 200, { text: o.word || 'HIPNOSE!', size: 48, color: '#ffe14a', color2: '#7a2bb5', vy: -0.5, life: 38 });
+        g.tintScreen(MOD_PINK, 10);
+      }
+      if (this.t > T + 14) this.remove = true;
+    }
+    drawGround(ctx, camX) {
+      const T = this.o.T || 50, k = Math.min(1, this.t / 10) * (this.t > T ? 1 - (this.t - T) / 14 : 1);
+      if (k <= 0) return;
+      ctx.save(); ctx.globalAlpha = 0.6 * k;
+      TT.drawSpiral(ctx, this.x - camX, this.y, this.o.R * 0.7, -this.t * 0.25, '#2a0c3a', MOD_PINK, 3, 0.42);
+      ctx.restore();
+    }
+  }
+  const MOD_PINK = '#ff5ad0';
+  const hypnoFx = (g, att, t) => { // inimigo hipnotizado: fica tonto e vê espirais
+    const hy = t.y - t.z - (t.height || 90) * 0.6;
+    g.particles.spawn('ring', t.x, hy, { size: 60, color: MOD_PINK, life: 16 });
+    if (Math.random() < 0.5) g.particles.spawn('text', t.x, hy - 50, { text: 'HIPNOTIZADO!', size: 26, color: '#ffc8f0', color2: '#7a2bb5', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+  };
+  DEFS.madmod = {
+    name: 'Mad Mod', style: 'madmodP', hp: 115, speed: 4.5, jump: 15, color: '#1d3a8a', fx: MOD_PINK,
+    blurb: 'O vilão britânico: bengala, raio hipnótico, espiral que puxa e a Revolução dos Guardas Reais.',
+    dashFx(f, g, t) { if (t % 3 === 0) g.particles.spawn('ring', f.x - f.facing * 20, f.y - 90, { color: MOD_PINK, size: 30, life: 10 }); },
+    dashAtk: M('jab', { glow: MOD_PINK, s: 3, a: 12, r: 12, dmg: 11, reach: [0, 100], lunge: 11, knockdown: true, launch: 6, kb: 8, big: true }),
+    light: [
+      M('jab', { dmg: 7, reach: [0, 104] }),
+      M('swipe', { dmg: 8, reach: [0, 110] }),
+      M('castUp', { glow: MOD_PINK, s: 9, r: 14, dmg: 13, reach: [0, 112], kb: 5, knockdown: true, launch: 11, big: true, onHitFx: hypnoFx,
+        onFrame(f, t, g) { if (t === this.s) { handBurst(f, g, MOD_PINK, 8); A().play('zap'); } } }),
+    ],
+    heavy: M('beam', { glow: MOD_PINK, s: 12, a: 16, r: 14, dmg: 5, rehit: 5, reach: [20, 500], depth: 32, kb: 1, stun: 45, sound: 'zap', name: 'Raio hipnótico',
+      drawFx: handBeam(MOD_PINK, 18, false), onHitFx: hypnoFx }),
+    air: M('dive', { s: 3, a: 14, r: 6, dmg: 10, reach: [-10, 84], kb: 3, lunge: 5, zr: 130 }),
+    special: { cost: 35, pose: 'castUp', glow: MOD_PINK, s: 14, a: 1, r: 20, shout: 'Olhem a espiral, patinhos!', shoutColor: '#ffc8f0',
+      onFrame(f, t, g) {
+        if (t < this.s && t % 2 === 0) handBurst(f, g, MOD_PINK, 2);
+        if (t === this.s) { g.addEffect(new PullSpiral(g, f, { R: 330, dmg: 22 * pw(f), T: 46 })); A().play('super'); }
+      } },
+    mid: [
+      M('spin', { s: 6, a: 8, dmg: 4, rehit: 4, reach: [-60, 110], depth: 40, kb: 1 }),
+      M('uppercut', { glow: MOD_PINK, s: 5, dmg: 9, reach: [0, 100], onHitFx: hypnoFx }),
+    ],
+    ender: { pose: 'castUp', glow: MOD_PINK, s: 10, a: 1, r: 40, name: 'REVOLUÇÃO BRITÂNICA',
+      onFrame(f, t, g) {
+        if (t === 1) { comboName(f, g, 'REVOLUÇÃO BRITÂNICA'); A().play('alarm'); }
+        if (t === this.s) { g.addEffect(new Stampede(g, f, { n: 6, speed: 13, dmg: 15 * pw(f), life: 90, kind: 'guard', word: 'GOD SAVE!' })); g.tintScreen('#d7263e', 12); A().play('super'); }
+      } },
+  };
+
   // ================================================================ Montagem dos três níveis de poder
   const boost = (d, k) => Object.assign({}, d, { dmg: d.dmg ? Math.round(d.dmg * k) : d.dmg });
   function build(key, o) {
@@ -1182,6 +1251,7 @@
     bunnyguard: ['Patadas', 'Cenoura', 'Estouro de coelhos', 'Cenoura Explosiva'],
     slade: ['Bastão', 'Bomba de disco', 'Fogo de Trigon', 'Xeque-Mate'],
     freak: ['Controle remoto', 'ZAP!', 'Botão de PAUSA', 'Maratona de TV'],
+    madmod: ['Bengala', 'Raio hipnótico', 'Espiral que puxa', 'Revolução Britânica'],
     apprentice: ['Bastão (combo de 5)', 'Disco congelante', 'Discos explosivos', 'Golpe Relâmpago'],
     clownbb: ['Animais (combo de 5)', 'Elefante', 'A Fera', 'Estouro da Manada'],
   };

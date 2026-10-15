@@ -152,5 +152,23 @@
         { type: 'boss', camX: 6000, boss: 'freak', intro: 'O nerd do controle remoto' },
       ],
     },
+    {
+      id: 10,
+      name: 'FASE 10 — A ACADEMIA DO MAD MOD',
+      subtitle: 'Mad Mod quer hipnotizar os Titãs na escola mais "groovy" do mundo!',
+      length: 7400,
+      song: 'theme',
+      bossSong: 'madmod',
+      powerUp: true,
+      combos: true,
+      crates: [[1150, 620, 'pizza'], [2350, 560, 'energy'], [3650, 640, 'pizza'], [4950, 560, 'energy'], [5500, 620, 'pizza']],
+      sections: [
+        { type: 'arena', camX: 380, waves: [['guard', 'guard', 'eye'], ['eye', 'guard', 'guard']] },
+        { type: 'arena', camX: 1500, waves: [['eye', 'eye', 'guard'], ['guard', 'guard', 'eye', 'eye']] },
+        { type: 'arena', camX: 2950, waves: [['guard', 'guard', 'guard', 'eye'], ['eye', 'eye', 'guard', 'guard']] },
+        { type: 'arena', camX: 4300, waves: [['guard', 'eye', 'eye', 'guard'], ['guard', 'guard', 'eye', 'eye', 'guard']] },
+        { type: 'boss', camX: 6000, boss: 'madmod', intro: 'O mestre britânico da hipnose' },
+      ],
+    },
   ];
 })();

@@ -67,7 +67,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a fase 9 no título e começar nela', pick.sel === 8 && /CONTROL FREAK/.test(pick.label) && pick.st === 'play' && pick.stage === 8, pick);
+  ok('menu: escolher a última fase (10) no título e começar nela', pick.sel === 9 && /MAD MOD/.test(pick.label) && pick.st === 'play' && pick.stage === 9, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -688,6 +688,132 @@ async page => {
   ok('Control Freak: o botão de PAUSA pausa o Titã', freak.pausedFrames >= 40 && freak.kind === 'pause', freak);
   ok('fase 9 já começa com os combos (sem repetir o aviso de COMBOS NOVOS das fases 7 e 8)', freak.banner9 === 0 && freak.banner8 === 1 && freak.banner7 === 1, freak);
 
+  // 4b4f6) Inimigos da fase 10: investida do Guarda Real, raio e flash do Olho Hipnótico acertam só depois do aviso
+  const s10 = await ev(() => {
+    const g = TT.game, out = {};
+    for (const [kind, i, dist, dy] of [['guard', 0, 180, 0], ['eye', 0, 200, 0], ['eye', 1, 60, 10]]) {
+      TT.debug.start(9); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(false);
+      g.stage = Object.assign({}, g.stage, { sections: [] });
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+      g.enemies.length = 0;
+      const e = g.spawnEnemy(kind, 0, 1); e.x = p.x + dist; e.y = p.y - dy; e.entering = false; e.facing = -1;
+      e.startAttack(e.def.attacks[i]);
+      const zone = !!(e.atk.zones && e.atk.zones.length), inside = zone && e.atk.zones.some((z) => TT.zoneHas(z, p.x, p.y));
+      const h0 = p.hp; let hitT = -1;
+      for (let t = 1; t < 70; t++) { p.vx = p.vy = 0; g.step(); if (hitT < 0 && p.hp < h0) hitT = t; }
+      out[kind + ':' + i + '@' + dist] = { zone, inside, hitT, s: e.def.attacks[i].s, inverted: p.inverted };
+    }
+    g.enemies.length = 0;
+    return out;
+  });
+  for (const k in s10) ok('fase 10: golpe ' + k + ' acerta após o aviso', s10[k].zone && s10[k].inside && s10[k].hitT >= s10[k].s, s10[k]);
+  ok('fase 10: o raio do Olho Hipnótico inverte os controles', s10['eye:0@200'].inverted > 0, s10['eye:0@200']);
+
+  // 4b4f7) Mad Mod (fase 10): fica tonto depois da espiral gigante (parado, dano dobrado), a espiral puxa o
+  //        Titã para o centro, o raio hipnótico inverte os controles, o raio da juventude deixa o Titã velhinho
+  //        e o Mad Mod recupera vida, e na fase 2 ele chama Guardas Reais
+  const mod = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(9); TT.debug.toSection(4); TT.debug.god(true);
+    out.banner10 = g.powerBanner;
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.name = b.name;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normal = h - b.hp;
+    b.startAttack(b.ATK.spiral);
+    for (let t = 0; t < 200 && b.state !== 'open'; t++) g.step();
+    out.st = b.state; const x0 = b.x;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+    for (let t = 0; t < 60; t++) g.step();
+    out.moved = Math.abs(b.x - x0);
+    for (let t = 0; t < 220 && b.state === 'open'; t++) g.step();
+    out.after = b.state;
+    b.cool = 1e9; b.hp = b.maxHp * 0.4; g.enemies.length = 0; g.enemies.push(b); b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.summon);
+    for (let t = 0; t < 80; t++) g.step();
+    out.guards = g.enemies.filter((e) => e.kind === 'guard' && !e.dead).length;
+    TT.debug.god(false); g.enemies.length = 0; g.enemies.push(b);
+    const p = g.player, reset = () => { p.hp = p.maxHp = 99999; p.invul = 0; p.setState('idle'); p.atk = null; p.z = 0; p.inverted = 0; p.aged = 0; b.setState('idle'); b.atk = null; b.cool = 1e9; b.x = g.camX + 900; b.y = 590; b.facing = -1; };
+    // espiral: o Titã parado perto da marca é puxado para o centro
+    reset(); p.x = b.x - 420; p.y = 600;
+    b.startAttack(b.ATK.spiral);
+    const lockT = Math.ceil(b.ATK.spiral.s * 0.4);
+    for (let t = 0; t < lockT; t++) g.step();
+    const z = b.atk.zones[0]; p.x = z.x + 220; p.y = z.y; const d0p = Math.abs(p.x - z.x);
+    for (let t = 0; t < 20; t++) { p.vx = p.vy = 0; g.step(); }
+    out.pulled = Math.round(d0p - Math.abs(p.x - z.x));
+    // raio hipnótico
+    reset(); p.x = b.x - 420; p.y = 590;
+    b.startAttack(b.ATK.hypno);
+    for (let t = 0; t < 80; t++) { p.vx = p.vy = 0; g.step(); }
+    out.inverted = p.inverted;
+    // raio da juventude
+    reset(); p.x = b.x - 420; p.y = 590; b.hp = b.maxHp * 0.4; const bh = b.hp;
+    b.startAttack(b.ATK.youth);
+    for (let t = 0; t < 80; t++) { p.vx = p.vy = 0; g.step(); }
+    out.aged = p.aged; out.healed = Math.round(b.hp - bh);
+    g.enemies.length = 0; p.inverted = 0; p.aged = 0;
+    return out;
+  });
+  ok('Mad Mod: fica tonto depois da espiral gigante (parado, dano dobrado) e depois volta', mod.name === 'MAD MOD' && mod.st === 'open' && mod.openDmg === mod.normal * 2 && mod.moved < 1 && mod.after !== 'open', mod);
+  ok('Mad Mod: a espiral gigante puxa o Titã para o centro', mod.pulled > 20, mod);
+  ok('Mad Mod: o raio hipnótico inverte os controles', mod.inverted > 0, mod);
+  ok('Mad Mod: o raio da juventude deixa o Titã velhinho e ele recupera vida', mod.aged > 0 && mod.healed > 0, mod);
+  ok('Mad Mod: chama Guardas Reais na fase 2', mod.guards === 2, mod);
+  ok('fase 10 já começa com os combos (sem repetir o aviso)', mod.banner10 === 0, mod);
+
+  // 4b4f8) Mecânicas novas: esquiva perfeita (câmera lenta + contra-ataque), troca em combo, controles
+  //        invertidos (apertar ATAQUE acorda) e velhinho mais lento
+  const mech = await ev(() => {
+    const g = TT.game, out = {}; TT.debug.god(false);
+    const fresh = (stage) => {
+      TT.debug.start(stage); TT.debug.toSection(0); TT.debug.step(5);
+      g.stage = Object.assign({}, g.stage, { sections: [] }); g.enemies.length = 0; g.banner = null; g.powerBanner = 0;
+      const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590; p.setState('idle'); p.atk = null; p.x = g.camX + 600;
+      return p;
+    };
+    let p = fresh(0);
+    let e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 70; e.y = p.y; e.entering = false; e.facing = -1;
+    e.startAttack(e.def.attacks[0]);
+    const s0 = e.atk.def.s; let dodged = false;
+    for (let t = 0; t < 60; t++) { if (!dodged && e.atk && e.atk.t >= s0 - 3) { g.input.pressed.add('dash'); dodged = true; } g.step(); }
+    out.perfect = { count: g.perfectDodges || 0, mul: p.dmgMul, full: p.hp === p.maxHp, energy: Math.round(g.energy) };
+    e.hp = e.maxHp = 9999; e.cool = 9999; p.counterT = 50; p.dmgMul = 1.6;
+    let h = e.hp; e.takeHit(p, { dmg: 10 }, 1); out.counterDmg = Math.round(h - e.hp);
+    p.counterT = 0; p.dmgMul = 1; h = e.hp; e.takeHit(p, { dmg: 10 }, 1); out.plainDmg = Math.round(h - e.hp);
+    // esquiva cedo demais (sem golpe chegando) não conta
+    p = fresh(0); g.perfectDodges = 0; g.input.pressed.add('dash'); for (let t = 0; t < 20; t++) g.step();
+    out.noFalse = g.perfectDodges;
+    // troca em combo
+    p = fresh(0);
+    e = g.spawnEnemy('hive', 0, 1); e.x = p.x + 60; e.y = p.y; e.entering = false; e.cool = 9999; e.hp = e.maxHp = 9999; e.def = Object.assign({}, e.def, { speed: 0 });
+    g.combo = 4; p.startAttack(p.def.light[0]); g.step();
+    g.input.pressed.add('t2'); g.step();
+    out.tag = { key: g.player.key, dash: !!(g.player.atk && g.player.atk.def === g.player.def.dashAtk) };
+    p = fresh(0); g.combo = 0; p.startAttack(p.def.light[0]); g.step(); g.input.pressed.add('t2'); g.step();
+    out.noTag = g.player.key;
+    // andar: normal, invertido e velhinho
+    const walk = (setup) => {
+      const q = fresh(9); setup(q); const x0 = q.x;
+      g.input.pl[0].bot = { down: new Set(['right']), pressed: new Set(), update() {} };
+      for (let t = 0; t < 20; t++) g.step();
+      g.input.pl[0].bot = null;
+      return Math.round(q.x - x0);
+    };
+    out.walk = { normal: walk(() => {}), inverted: walk((q) => { q.inverted = 200; }), aged: walk((q) => { q.aged = 200; }) };
+    p = fresh(9); p.inverted = 200;
+    for (let t = 0; t < 6; t++) { g.input.pressed.add('light'); for (let k = 0; k < 4; k++) g.step(); }
+    out.shake = p.inverted; p.inverted = 0;
+    return out;
+  });
+  ok('esquiva perfeita: esquivar bem na hora não leva dano e dá energia e contra-ataque', mech.perfect.count === 1 && mech.perfect.mul > 1 && mech.perfect.full, mech);
+  ok('esquiva perfeita: o contra-ataque dá 60% a mais de dano', mech.counterDmg === Math.round(mech.plainDmg * 1.6), mech);
+  ok('esquiva perfeita: esquivar sem golpe chegando não conta', mech.noFalse === 0, mech);
+  ok('troca em combo: com 3+ golpes troca no meio do ataque e quem entra já ataca', mech.tag.key === 'cyborg' && mech.tag.dash && mech.noTag === 'robin', mech);
+  ok('hipnose: controles invertidos e apertar ATAQUE acorda mais rápido', mech.walk.normal > 50 && mech.walk.inverted === -mech.walk.normal && mech.shake < 200 - 24 - 60, mech);
+  ok('raio da juventude: o velhinho anda mais devagar', mech.walk.aged > 0 && mech.walk.aged < mech.walk.normal * 0.7, mech);
+
   // 4b4g) Slade (fase 7): depois do salto com o bastão fica de joelho (guarda aberta: parado, dano dobrado);
   //       na fase 2 chama comandos
   const slade = await ev(() => {
@@ -732,7 +858,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 9 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 10 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
@@ -852,6 +978,13 @@ async page => {
       for (let x = bb.game.camX + 60; x < bb.game.camX + 1220; x += 20) for (let y = 480; y < 690; y += 15) if (!zs.some((z) => TT.zoneHas(z, x, y)) && Math.abs(x - bb.x) > 120) return { x, y, lockX: x };
       return { x: bb.x, y: bb.y };
     } }));
+    // Mad Mod (fase 10)
+    C(9, 'cane', (b) => ({ x: b.x - 150, y: b.y + 10 }), (b) => ({ x: b.x - 260, y: b.y }));
+    C(9, 'hypno', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    C(9, 'youth', (b) => ({ x: b.x - 420, y: b.y + 10 }), (b) => ({ x: b.x - 420, y: b.y + 60 }));
+    // espiral: a marca segue o Titã e trava; fora = longe o bastante para a espiral não puxar
+    C(9, 'spiral', (b) => ({ x: b.x - 400, y: b.y + 20 }),
+      (b) => ({ x: b.x - 400, y: b.y + 20, afterT: Math.ceil(b.atk.def.s * 0.6), after: (bb, z) => ({ x: z.x + 345, y: z.y }) }));
     // mísseis caem em pontos aleatórios: confere que acerto == estar dentro de algum círculo
     for (let i = 0; i < 4; i++) R['missiles#' + i] = runAtk(1, 'missiles', (b) => ({ x: b.x - 350, y: 590 }));
     TT.debug.god(false);
@@ -872,7 +1005,7 @@ async page => {
       TT.debug.start(0); TT.debug.god(true); TT.debug.bot(true);
       const seen = new Set();
       let steps = 0, lastCam = -1, still = 0, stall = null;
-      while (g.state !== 'victory' && steps < 270000) {
+      while (g.state !== 'victory' && steps < 300000) {
         g.step(); steps++;
         if (steps % 20 === 0) g.render();
         seen.add(g.state + ':' + g.stageIdx);
@@ -891,11 +1024,11 @@ async page => {
       TT.debug.bot(false); TT.debug.god(false);
       return { state: g.state, steps, seen: [...seen], score: g.score, stall };
     });
-    ok('jogo completo (9 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:8') && full.seen.includes('clear:8'), full);
+    ok('jogo completo (10 fases) até a vitória #' + run + ' (bot, modo deus)', full.state === 'victory' && !full.stall && full.seen.includes('play:9') && full.seen.includes('clear:9'), full);
   }
 
   // 6) Bot sem modo deus vence cada chefe no NORMAL
-  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+  for (const st of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     const r = await ev((stage) => {
       const g = TT.game;
       TT.game.setDifficulty('normal'); TT.debug.god(false);
@@ -1274,7 +1407,7 @@ async page => {
     g.setTeam(TT.DEFAULT_TEAM.slice());
     return out;
   });
-  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 17 && roster.lockedGizmo, roster);
+  ok('personagens: 36 na lista, 5 liberados no início, os sem fase ficam "em breve"', roster.total === 36 && roster.start === 5 && roster.soon === 16 && roster.lockedGizmo, roster);
   ok('personagens: bloqueado não entra na equipe e diz a fase', roster.lockedMsg, roster);
   ok('personagens: zerar a fase 2 libera o Gizmo (uma vez só)', roster.newly.join() === 'gizmo' && roster.again === 0, roster);
   ok('personagens: escolher a vaga põe na equipe e salva', roster.picking === 0 && roster.team[1] === 'gizmo' && roster.saved.split(',')[1] === 'gizmo' && roster.loaded[1] === 'gizmo', roster);
