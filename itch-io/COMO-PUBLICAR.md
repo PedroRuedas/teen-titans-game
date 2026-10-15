@@ -114,7 +114,7 @@ formulário oferecer para código, gráficos e textos.
 ## Bom saber
 
 - **Jogo online:** dentro do itch.io, o botão "COPIAR LINK" da sala gera o link do site
-  (jovens-titas-jump-city.netlify.app). O amigo pode entrar por esse link ou digitando o
+  (pedroruedas.github.io/teen-titans-game). O amigo pode entrar por esse link ou digitando o
   código da sala no itch.io: os dois funcionam juntos.
 - **Fala da Ravena:** a versão do itch.io não leva o trecho de "Azarath Metrion Zinthos" recortado
   da dublagem, porque esse áudio é da série. Lá a fala usa o som gerado pelo próprio jogo. O site

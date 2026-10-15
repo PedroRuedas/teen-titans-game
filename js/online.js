@@ -10,7 +10,7 @@
   const TT = window.TT;
   const PEERJS = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
   const PREFIX = 'jovens-titas-';
-  const SITE = 'https://jovens-titas-jump-city.netlify.app/';
+  const SITE = 'https://pedroruedas.github.io/teen-titans-game/';
   const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O e 1/I, que se confundem
   const A = () => TT.audio;
 

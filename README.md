@@ -7,7 +7,7 @@ em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a part
 36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
 **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
 
-**Jogue online:** https://jovens-titas-jump-city.netlify.app
+**Jogue online:** https://pedroruedas.github.io/teen-titans-game/
 
 ## Como jogar
 
@@ -374,17 +374,22 @@ página e chame a função serve.) A suíte tem 207 verificações e todas passa
 `tests/roster-moves.js` (mesmo jeito de rodar) testa os golpes dos 14 personagens extras: cada golpe nos três
 níveis de poder (fases 1, 7 e 8), 224 verificações, todas acertando o inimigo e sem erro de JavaScript.
 
-## Publicar na web (Netlify)
+## Publicar na web (GitHub Pages)
 
-O jogo fica em https://jovens-titas-jump-city.netlify.app. Para publicar uma versão nova, copie
-`index.html`, `manifest.webmanifest`, `sw.js`, `_headers`, `icons/`, `js/` e `audio/` para uma pasta (ex.: `site/`) e rode, na pasta do projeto:
+O jogo fica em https://pedroruedas.github.io/teen-titans-game/ (GitHub Pages: grátis e sem limite mensal de publicações,
+porque o repositório é público). O site é o conteúdo do ramo `gh-pages`. Para publicar uma versão nova, rode
+na pasta do projeto:
 
 ```
-npx netlify-cli deploy --prod --no-build --dir site
+python publicar.py
 ```
 
-A pasta `.netlify/` (fora do git) guarda o vínculo com o site; sem ela, use `--site jovens-titas-jump-city`.
-Na primeira vez em outro computador, rode antes `npx netlify-cli login`.
+Ele copia `index.html`, `manifest.webmanifest`, `sw.js`, `icons/`, `js/` e `audio/` para o ramo `gh-pages` (com um
+`.nojekyll`, para o GitHub servir os arquivos como estão) e envia para o GitHub. O site atualiza sozinho em
+um ou dois minutos. Precisa só do `git` com acesso de escrita ao repositório.
+
+O endereço antigo (jovens-titas-jump-city.netlify.app) parou de receber versões novas: o plano grátis do
+Netlify bloqueou os deploys quando os créditos da conta acabaram.
 
 ### Teste do jogo online
 

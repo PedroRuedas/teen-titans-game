@@ -2,7 +2,7 @@
 // Rede primeiro (sempre pega a versão nova quando há conexão); sem conexão, usa o que foi guardado.
 // Não assume a página que já está aberta (sem skipWaiting/clients.claim): passa a valer na próxima visita,
 // para nunca trocar de controle no meio de uma partida.
-const CACHE = 'jovens-titas-v6';
+const CACHE = 'jovens-titas-v7';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest',
   'js/util.js', 'audio/arquivos.js', 'js/audio.js', 'js/render.js', 'js/faces.js', 'js/anim.js', 'js/backgrounds.js',
