@@ -69,7 +69,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a última fase (11) no título e começar nela', pick.sel === 10 && /TRIGON/.test(pick.label) && pick.st === 'play' && pick.stage === 10, pick);
+  ok('menu: escolher a última fase (12) no título e começar nela', pick.sel === 11 && /LABIRINTO|PRISMA/.test(pick.label) && pick.st === 'play' && pick.stage === 11, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -899,6 +899,71 @@ async page => {
   ok('Trigon: Esfera de Luz aparece na fase 2 e quem pega bate 75% mais forte', tri.orb && tri.lightT > 0 && tri.lit === Math.round(tri.normal * 1.75), tri);
   ok('Trigon: o final da luz começa antes de ele cair e, com ATAQUE, a Ravena vence (fase concluída)', tri.finale && !tri.deadEarly && tri.dead && tri.finaleFrames < 700 && tri.state === 'clear', tri);
 
+  // 4b4f11b) Fase 12: Estilhaço (shard) com investida de espinhos e cacos ao morrer; Lanterna Prismática (lantern) com feixe em leque;
+  //          Prisma (chefe) com leque arco-íris, cópias espelhadas que quebram com dano, e Caleidoscópio deixando-o em guarda aberta (dano dobrado)
+  const s12 = await ev(() => {
+    const g = TT.game, out = {};
+    TT.debug.start(11); TT.debug.toSection(0); TT.debug.step(5); TT.debug.god(true);
+    g.stage = Object.assign({}, g.stage, { sections: [] }); g.effects.length = 0; g.enemies.length = 0;
+    const p = g.player; p.hp = p.maxHp = 9999; p.invul = 0; p.y = 590;
+
+    // 1) Minion: shard
+    const sh = g.spawnEnemy('shard', 0, 1); sh.x = p.x + 200; sh.y = p.y; sh.entering = false;
+    sh.startAttack(sh.def.attacks[0]); // investida com espinhos
+    out.shardAtk = !!(sh.atk && sh.atk.zones && sh.atk.zones.length);
+    sh.takeHit({ x: sh.x - 10, dmgMul: 1 }, { dmg: 9999 }); // deve morrer e estilhaçar
+    out.shardDead = sh.dead;
+
+    // 2) Minion: lantern
+    const lt = g.spawnEnemy('lantern', 0, 1); lt.x = p.x + 220; lt.y = p.y; lt.entering = false;
+    out.lanternZ = lt.z;
+    lt.startAttack(lt.def.attacks[0]); // feixe em 3 feixes
+    out.lanternBeamZones = lt.atk && lt.atk.zones ? lt.atk.zones.length : 0;
+    lt.takeHit({ x: lt.x - 10, dmgMul: 1 }, { dmg: 9999 });
+
+    // 3) Chefe Prisma
+    TT.debug.start(11); TT.debug.toSection(4);
+    let n = 0; while ((!g.boss || !g.boss.active) && n++ < 400) g.step();
+    const b = g.boss; b.cool = 1e9;
+    out.bossName = b.name;
+    const d0 = { dmg: 10 };
+    let h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.normalDmg = h - b.hp;
+
+    // Ataque cópias espelhadas
+    b.startAttack(b.ATK.mirrors);
+    for (let t = 0; t < b.ATK.mirrors.s + 6; t++) g.step(); // as cópias surgem no quadro "s" do ataque
+    const mirrors = g.enemies.filter((e) => e instanceof TT.PrismaMirror);
+    out.mirrorCount = mirrors.length;
+    if (mirrors.length > 0) {
+      mirrors[0].takeHit({ x: mirrors[0].x - 10, dmgMul: 1 }, { dmg: 5 });
+      out.mirrorShattered = mirrors[0].dead;
+    }
+
+    // Ataque Caleidoscópio e guarda aberta
+    b.hp = b.maxHp * 0.45; // fase 2
+    b.setState('idle'); b.atk = null;
+    b.startAttack(b.ATK.kaleidoscope);
+    for (let t = 0; t < 300 && b.state !== 'open'; t++) g.step();
+    out.openState = b.state;
+    h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, d0); out.openDmg = h - b.hp;
+
+    TT.debug.god(false); g.enemies.length = 0;
+    return out;
+  });
+  ok('fase 12: Estilhaço (shard) ataca com espinhos e morre; Lanterna voa (z=120) com feixe em 3 zonas', s12.shardAtk && s12.shardDead && s12.lanternZ >= 100 && s12.lanternBeamZones === 3, s12);
+  ok('fase 12: Prisma cria cópias que quebram com 1 golpe e Caleidoscópio deixa guarda aberta (dano dobrado)', s12.bossName === 'PRISMA' && s12.mirrorCount >= 2 && s12.mirrorShattered && s12.openState === 'open' && s12.openDmg === s12.normalDmg * 2, s12);
+
+  // 4b4f11c) COMBO FINAL (□ □ △ = J J K) de todo personagem equipável só a partir da fase 8 (nível de poder 2);
+  //          as versões alternativas têm o seu próprio combo final, diferente do Titã de origem
+  const cf = await ev(() => {
+    const keys = TT.ROSTER.filter((r) => TT.Unlocks.available(r.key)).map((r) => r.key);
+    const early = keys.filter((k) => TT.TITANS[k].ender || TT.TITANS_PLUS[k].ender);
+    const missing = keys.filter((k) => !TT.TITANS_COMBO[k].ender);
+    const sameAsBase = keys.filter((k) => TT.TITANS_COMBO[k].base && TT.TITANS_COMBO[k].base !== k && TT.TITANS_COMBO[k].ender === TT.TITANS_COMBO[TT.TITANS_COMBO[k].base].ender);
+    return { n: keys.length, early, missing, sameAsBase };
+  });
+  ok('combo final □□△: todos os equipáveis têm, só a partir da fase 8, e as versões alternativas têm o próprio', cf.n >= 23 && !cf.early.length && !cf.missing.length && !cf.sameAsBase.length, cf);
+
   // 4b4f12) História: cena de abertura (para o jogo, ATAQUE avança, Esc pula), cena antes do chefe, rádio dos
   //         Titãs nas áreas e epílogo antes da tela de fase concluída
   const story = await ev(() => {
@@ -978,7 +1043,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 11 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 12 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.

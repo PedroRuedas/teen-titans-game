@@ -1,9 +1,9 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): onze fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): doze fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
 **O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak**, **A Academia do
-Mad Mod** e **O Fim: o Reino de Trigon**), os 5 Titãs jogáveis com troca
+Mad Mod**, **O Fim: o Reino de Trigon** e **O Labirinto de Espelhos**), os 5 Titãs jogáveis com troca
 em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
 36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
 **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
@@ -201,14 +201,14 @@ Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, espe
 | **Mammoth** | Fase 5 | pisão | supersalto (cai com onda de choque) | FÚRIA DO MAMMOTH (três pisões avançando) |
 | **Mumbo** | Fase 6 | leque de cartas | **MUMBO JUMBO!** (os inimigos viram coelhos) | O GRANDE FINAL (cartolas caem nos inimigos) |
 | **Coelho-Guarda** | Fase 6 | cenoura | estouro de coelhos | CENOURA EXPLOSIVA |
-| **Mutano Palhaço** | Fase 6 | golpes do Mutano, já com os combos da fase 8 | | |
+| **Mutano Palhaço** | Fase 6 | golpes do Mutano (no nível da fase) | | PICADEIRO SELVAGEM (holofotes, malabares que explodem em confete e o pisão do elefante) |
 | **Slade** | Fase 7 | bomba de disco | fogo de Trigon (anéis de chamas) | XEQUE-MATE (teleporta e golpeia cada um) |
-| **Aprendiz** | Fase 7 | golpes do Robin, já com os combos da fase 8 | | |
+| **Aprendiz** | Fase 7 | golpes do Robin (no nível da fase) | | TRILHA EM CHAMAS (três investidas, chão em chamas e colunas de fogo em cada inimigo) |
 | **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
 | **Mad Mod** | Fase 10 | raio hipnótico | espiral que puxa os inimigos e explode | REVOLUÇÃO BRITÂNICA (Guardas Reais marcham pela tela) |
 | **Trigon** | Fase 11 | raios dos quatro olhos | chuva de fogo embaixo de cada inimigo | O FIM (onda vermelha e colunas de fogo) |
-| **Ravena Vermelha** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (manto vermelho e quatro olhos) | | |
-| **Ravena Branca** | Fase 11 | golpes da Ravena, já com os combos da fase 8 (o manto branco do fim de "O Fim") | | |
+| **Ravena Vermelha** | Fase 11 | golpes da Ravena (manto vermelho e quatro olhos) | | SELO DA IRA (selo de runas, correntes que puxam os inimigos e explosão) |
+| **Ravena Branca** | Fase 11 | golpes da Ravena (o manto branco do fim de "O Fim") | | TEMPESTADE DE PENAS (chuva de penas de luz; o clarão final cura a equipe) |
 
 ### Personagens que entram nas próximas fases
 
@@ -326,6 +326,26 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
      vezes** para dar a força dos amigos a ela. Robin, Estelar, Ciborgue e Mutano acendem um por um, torcendo;
      com a barra cheia a **Ravena Branca** derrota o pai com a luz — *"Azarath Metrion Zinthos!"*.
    - Zerar a fase libera **Trigon**, a **Ravena Vermelha** e a **Ravena Branca** no menu PERSONAGENS.
+
+12. **O Labirinto de Espelhos** — parque de diversões abandonado no cais de Jump City:
+    - **História:** Uma casa de espelhos abandonada no cais libertou Prisma, uma entidade de cristal vivo que
+      rouba os reflexos da cidade e usa a luz como arma. Os Titãs investigam o cais à noite para quebrar o feitiço.
+    - **Cenário:** Cais noturno sobre o mar escuro, calçadão com tábuas de madeira, silhuetas distantes da roda-gigante
+      e da montanha-russa, barracas de jogos e doces com varais de lâmpadas coloridas piscando, e o Pavilhão dos
+      Espelhos com grandes painéis de espelho refletindo cores prismáticas e mosaicos de cristal.
+    - **Inimigos:** **Estilhaços (shards)** — autômatos de cristal facetado translúcido; atacam com soco e uma
+      investida que faz brotar do chão uma linha de espinhos de cristal afiados; ao morrer, estilhaçam em cacos com
+      som de vidro quebrando. **Lanternas Prismáticas (lanterns)** — prismas voadores de alta altitude (`z=120`) que
+      disparam um feixe branco que se refrata em 3 raios de arco-íris em leque, além de um flash ofuscante ao redor.
+    - **Chefe: PRISMA** — entidade humanoide de cristal facetado com cabeça hexagonal de núcleo cromático pulsante,
+      mãos de lâminas de vidro e capa de cacos flutuantes. Surge montando-se a partir de cacos voadores. Golpes:
+      **Leque arco-íris** (5 feixes coloridos à frente), **Reflexos** (invoca 2 cópias espelhadas que atacam junto;
+      qualquer golpe quebra a cópia com "CRACK!" e som de vidro), e **Chuva de cristais** (estalactites caem do alto
+      nos círculos marcados).
+    - Abaixo de 50% de vida usa o **CALEIDOSCÓPIO**: a tela ganha um tom giratório de arco-íris com feixes varrendo
+      a arena como ponteiros de relógio.
+    - **Fraqueza:** após o Caleidoscópio, Prisma fica com o **cristal rachado e atordoada** — parada em guarda aberta,
+      levando dano dobrado!
 
 ## Música e vozes
 

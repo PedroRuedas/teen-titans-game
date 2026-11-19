@@ -143,9 +143,9 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone, shard: TT.ShardEnemy, lantern: TT.PrismaticLantern }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
-      if (kind === 'drone') e.z = 120;
+      if (kind === 'drone' || kind === 'lantern') e.z = 120;
       this.addEnemy(e);
       return e;
     }
@@ -266,6 +266,11 @@
         b = new TT.ControlFreak(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'tv';
+      } else if (sec.boss === 'prisma') {
+        // surge se montando a partir de cacos de cristal convergindo
+        b = new TT.Prisma(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'shards';
       } else if (sec.boss === 'trigon') {
         // sobe do chão rachado, gigante, com o céu ficando vermelho
         b = new TT.Trigon(this, this.camX + 860, 590);
@@ -347,6 +352,23 @@
         if (k === 55) this.say(b, 'Olá, Titãs.', '#ffb070');
         if (k === 90) { this.impact(b.x, b.y, 'SLADE!', '#ff7a1a', 1.2); A().play('boom'); }
         if (k === 120) this.say(b, 'Golpes novos? Vamos ver se aprenderam alguma coisa.', '#ffb070');
+      }
+      if (this.introKind === 'shards') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 15) / 55, 0, 1);
+        if (k < 70) {
+          if (k % 8 === 0) {
+            const ang = Math.random() * Math.PI * 2, dist = 140 * (1 - k / 70) + 30;
+            this.particles.spawn('debris', b.x + Math.cos(ang) * dist, b.y - 110 + Math.sin(ang) * dist, {
+              vx: -Math.cos(ang) * 4, vy: -Math.sin(ang) * 4,
+              color: TT.choice(['#7bf0ff', '#b87aff', '#ff7adf', '#ffffff']),
+              size: TT.rand(5, 10), life: 18,
+            });
+            A().play('glass');
+          }
+        }
+        if (k === 70) { b.alpha = 1; this.impact(b.x, b.y, 'PRISMA!', '#7bf0ff', 1.4); A().play('glass'); this.whiteFlash = 8; }
+        if (k === 95) this.say(b, 'Eu sou Prisma... e seus reflexos agora me pertencem!', '#c2f2ff');
       }
       if (this.introKind === 'trigon') {
         const k = 170 - this.bossIntro;
@@ -1088,7 +1110,22 @@
 
     drawAmbient(ctx, camX) {
       const f = this.frame;
-      if (this.stage.id === 11) {
+      if (this.stage.id === 12) {
+        // reflexos prismáticos e brilhos coloridos flutuando
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 22; i++) {
+          const x = (i * 187 + f * 0.4) % W, y = (i * 67 + Math.sin(f * 0.03 + i) * 40) % H;
+          const hue = (f * 2 + i * 25) % 360;
+          ctx.fillStyle = 'hsla(' + hue + ', 90%, 75%, 0.35)';
+          ctx.fillRect(x, y, 4 + (i % 3) * 3, 4 + (i % 3) * 3);
+        }
+        if (camX > 5600) {
+          ctx.globalAlpha = 0.04 + 0.03 * Math.sin(f * 0.05);
+          ctx.fillStyle = (f >> 5) % 2 ? '#7bf0ff' : '#ff7adf';
+          ctx.fillRect(0, 0, W, H);
+        }
+        ctx.restore();
+      } else if (this.stage.id === 11) {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 34; i++) {
           const x = (i * 173 + Math.sin(f * 0.02 + i) * 30) % W, y = H - ((f * (1.2 + (i % 5) * 0.4) + i * 97) % (H + 40));

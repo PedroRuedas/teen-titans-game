@@ -1491,6 +1491,33 @@
   };
   // Clone Sombrio (fase 11): os ataques vêm do Titã copiado (CLONE_ATK).
   ENEMIES.clone = { name: 'Clone Sombrio', style: 'robin', hp: 92, speed: 3.2, range: 170, score: 300, aggr: 1.2, attacks: [] };
+  // Estilhaço (fase 12): golem de cristal facetado; investida que faz brotar uma linha de espinhos
+  // de cristal do chão (faixa marcada) e soco de cristal de perto. Ao morrer, estilhaça em cacos.
+  ENEMIES.shard = {
+    name: 'Estilhaço', style: 'shard', hp: 86, speed: 2.8, range: 170, score: 250, aggr: 1.15,
+    attacks: [
+      { pose: 'jab', glow: '#7bf0ff', s: 24, a: 10, r: 20, lunge: 10, dmg: 12, zoneHit: true, knockdown: true, launch: 5, kb: 7, sound0: 'whoosh',
+        zone(f) { return [{ k: 'rect', x0: f.x - f.facing * 10, x1: f.x + f.facing * 260, y: f.y, d: 26, arrows: true }]; } },
+      { pose: 'swing', s: 14, a: 5, r: 16, lunge: 4, dmg: 10, reach: [0, 88], kb: 5, sound0: 'whoosh' },
+    ],
+  };
+  // Lanterna Prismática (fase 12): prisma voador giratório; raio branco que se divide em 3 feixes de arco-íris
+  // em leque (3 faixas marcadas) e flash ofuscante em volta (círculo marcado).
+  ENEMIES.lantern = {
+    name: 'Lanterna Prismática', style: 'lantern', hp: 60, speed: 3.0, range: 180, score: 240, aggr: 1.1,
+    attacks: [
+      { pose: 'beam', glow: '#ffffff', s: 28, a: 12, r: 20, dmg: 9, zoneHit: true, stun: 18, kb: 3, sound0: 'alarm', sound: 'laser',
+        zone(f) {
+          return [
+            { k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 380, y: f.y, d: 22, arrows: true },
+            { k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 360, y: f.y - 45, d: 20, arrows: true },
+            { k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 360, y: f.y + 45, d: 20, arrows: true },
+          ];
+        } },
+      { pose: 'jab', s: 22, a: 5, r: 22, dmg: 8, zoneHit: true, stun: 45, kb: 3, dazzle: true, sound0: 'alarm', sound: 'boom',
+        zone(f) { return [{ k: 'ell', x: f.x, y: f.y, rx: 110, ry: 46 }]; } },
+    ],
+  };
   TT.ENEMIES = ENEMIES;
 
   class Enemy extends Fighter {
@@ -2254,6 +2281,291 @@
     }
   }
   TT.ShadowClone = ShadowClone;
+
+  // Espinho de cristal brotando do chão (investida do Estilhaço)
+  class CrystalSpike {
+    constructor(game, x, y, delay) {
+      Object.assign(this, { game, x, y, t: -(delay || 0), remove: false, h: 0, maxH: TT.rand(35, 55), life: 45 });
+    }
+    update() {
+      this.t++;
+      if (this.t < 0) return;
+      if (this.t < 6) this.h = this.maxH * (this.t / 6);
+      else if (this.t > this.life - 10) this.h = Math.max(0, this.maxH * (1 - (this.t - (this.life - 10)) / 10));
+      if (this.t > this.life) this.remove = true;
+    }
+    draw(ctx, camX) {
+      if (this.t < 0 || this.h <= 0) return;
+      const sx = this.x - camX, sy = this.y, h = this.h;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(sx - 12, sy);
+      ctx.lineTo(sx - 2, sy - h);
+      ctx.lineTo(sx + 3, sy - h * 1.15);
+      ctx.lineTo(sx + 12, sy);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(120, 225, 255, 0.85)';
+      ctx.fill();
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx - 2, sy - h);
+      ctx.lineTo(sx, sy);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      TT.drawGlow(ctx, '#7bf0ff', sx, sy - h * 0.5, 20, 0.4);
+      ctx.restore();
+    }
+  }
+  TT.CrystalSpike = CrystalSpike;
+
+  // Estilhaço (fase 12): golem de cristal facetado translúcido
+  class ShardEnemy extends ShockTrooper {
+    constructor(game, x, y) {
+      super(game, x, y, 'shard');
+      this.radius = 28; this.height = 135; this.shadowW = 34;
+    }
+    die(dir, d) {
+      super.die(dir, d);
+      A().play('glass');
+      const g = this.game;
+      for (let i = 0; i < 14; i++) {
+        g.particles.spawn('debris', this.x + TT.rand(-25, 25), this.y - TT.rand(20, 110), {
+          vx: TT.rand(-6, 6), vy: TT.rand(-8, -2), grav: 0.45,
+          color: TT.choice(['#7bf0ff', '#b87aff', '#e0f8ff', '#ffffff']),
+          size: TT.rand(5, 9), vr: 0.35, life: 30, floor: this.y,
+        });
+      }
+      g.particles.spawn('text', this.x, this.y - 150, { text: 'CRACK!', size: 30, color: '#e0f8ff', color2: '#2a60b5', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+    }
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk, d = a && a.def, fl = this.flash > 3;
+      const tell = a && this.state === 'attack' && a.t < d.s ? a.t / d.s : -1, blink = tell > 0.55 && (a.t >> 1) % 2 === 0;
+      const down = this.state === 'down', hurt = this.state === 'hurt';
+      const x = this.x - camX, y = this.y - this.z, W = fl || blink;
+      const col = (c) => (W ? '#ffffff' : c);
+      if (this.invul > 0 && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.6;
+      ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+      if (down) ctx.rotate(Math.min(1.4, this.st * 0.1)); else if (hurt) ctx.rotate(-0.2);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      TT.drawGlow(ctx, '#7bf0ff', 0, -65, 55, 0.45);
+      const legWalk = Math.sin(t * 0.2) * 12;
+      for (const [lx, s] of [[-14, -1], [14, 1]]) {
+        const lo = (this.state === 'walk' ? legWalk * s : 0);
+        ctx.beginPath();
+        ctx.moveTo(lx, -44);
+        ctx.lineTo(lx + lo + 8, -22);
+        ctx.lineTo(lx + lo + 4, -4);
+        ctx.lineTo(lx + lo - 8, -4);
+        ctx.lineTo(lx - 4, -22);
+        ctx.closePath();
+        ctx.fillStyle = col(s < 0 ? '#4a6eb5' : '#628ee0'); ctx.fill();
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+        if (!W) {
+          ctx.beginPath(); ctx.moveTo(lx, -44); ctx.lineTo(lx + lo + 4, -4);
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+      }
+      ctx.beginPath();
+      ctx.moveTo(0, -96);
+      ctx.lineTo(24, -76);
+      ctx.lineTo(16, -44);
+      ctx.lineTo(-16, -44);
+      ctx.lineTo(-24, -76);
+      ctx.closePath();
+      ctx.fillStyle = col('rgba(110, 190, 245, 0.88)'); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.stroke();
+      if (!W) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(0, -96); ctx.lineTo(0, -44);
+        ctx.moveTo(-24, -76); ctx.lineTo(24, -76);
+        ctx.moveTo(0, -70); ctx.lineTo(-16, -44);
+        ctx.moveTo(0, -70); ctx.lineTo(16, -44);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, -70, 5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(-14, -100);
+      ctx.lineTo(0, -126);
+      ctx.lineTo(14, -100);
+      ctx.lineTo(10, -90);
+      ctx.lineTo(-10, -90);
+      ctx.closePath();
+      ctx.fillStyle = col('#a6e8ff'); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      if (!W) {
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(4, -102, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0, -126); ctx.lineTo(0, -90); ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      const atkP = a && this.state === 'attack';
+      const armFwd = atkP && a.t >= d.s ? 24 : 0;
+      ctx.beginPath();
+      ctx.moveTo(18, -80);
+      ctx.lineTo(34 + armFwd, -60);
+      ctx.lineTo(46 + armFwd, -50);
+      ctx.lineTo(30 + armFwd, -42);
+      ctx.lineTo(16, -60);
+      ctx.closePath();
+      ctx.fillStyle = col('#7bf0ff'); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      if (tell >= 0) TT.drawGlow(ctx, '#7bf0ff', x + this.facing * 30, y - 65, 24 + 30 * tell, 0.4 + 0.5 * tell);
+      if (a && a.def === this.def.attacks[0] && this.state === 'attack' && a.t === d.s) {
+        A().play('glass');
+        this.game.impact(this.x + this.facing * 120, this.y, 'CRACK!', '#7bf0ff', 1.0);
+        for (let i = 0; i < 6; i++) {
+          const spX = this.x + this.facing * (40 + i * 38);
+          this.game.addEffect(new TT.CrystalSpike(this.game, spX, this.y + TT.rand(-6, 6), i * 2));
+        }
+      }
+    }
+  }
+  TT.ShardEnemy = ShardEnemy;
+
+  // Lanterna Prismática (fase 12): prisma voador giratório
+  class PrismaticLantern extends ShockTrooper {
+    constructor(game, x, y) {
+      super(game, x, y, 'lantern');
+      this.radius = 24; this.height = 140; this.shadowW = 22;
+      this.hover = 80; this.z = this.hover;
+    }
+    die(dir, d) {
+      super.die(dir, d);
+      A().play('glass');
+      const g = this.game;
+      for (let i = 0; i < 12; i++) {
+        g.particles.spawn('debris', this.x + TT.rand(-20, 20), this.y - 110, {
+          vx: TT.rand(-6, 6), vy: TT.rand(-8, -2), grav: 0.45,
+          color: TT.choice(['#ff7adf', '#b87aff', '#7bf0ff', '#ffffff']),
+          size: TT.rand(4, 8), vr: 0.35, life: 30, floor: this.y,
+        });
+      }
+      g.particles.spawn('text', this.x, this.y - 160, { text: 'SHIK-CLASH!', size: 28, color: '#ffc8f0', color2: '#7a2bb5', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+    }
+    draw(ctx, camX) {
+      if (this.dead && this.state === 'down' && this.st > 25 && (this.st >> 2) % 2 === 0) return;
+      const t = this.animT, a = this.atk, d = a && a.def, fl = this.flash > 3;
+      const tell = a && this.state === 'attack' && a.t < d.s ? a.t / d.s : -1, blink = tell > 0.55 && (a.t >> 1) % 2 === 0;
+      const down = this.state === 'down', hurt = this.state === 'hurt';
+      const hover = down ? Math.max(8, 75 - this.st * 5) : 75 + Math.sin(t * 0.08) * 8;
+      const x = this.x - camX, y = this.y - this.z - hover - 30, W = fl || blink;
+      const col = (c) => (W ? '#ffffff' : c);
+      if (this.invul > 0 && (this.invul >> 2) % 2 === 0) ctx.globalAlpha = 0.6;
+      ctx.save(); ctx.translate(x, y); ctx.scale(this.facing, 1);
+      if (down) ctx.rotate(Math.min(1.5, this.st * 0.12)); else if (hurt) ctx.rotate(-0.25);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      const hue = (t * 3) % 360;
+      TT.drawGlow(ctx, 'hsl(' + hue + ', 100%, 70%)', 0, 0, 46, 0.5);
+      const rot = t * 0.06;
+      const topY = -36, botY = 32;
+      const pts = [
+        [Math.cos(rot) * 26, Math.sin(rot) * 8],
+        [Math.cos(rot + (Math.PI * 2) / 3) * 26, Math.sin(rot + (Math.PI * 2) / 3) * 8],
+        [Math.cos(rot + (Math.PI * 4) / 3) * 26, Math.sin(rot + (Math.PI * 4) / 3) * 8],
+      ];
+      for (let i = 0; i < 3; i++) {
+        const p1 = pts[i], p2 = pts[(i + 1) % 3];
+        ctx.beginPath();
+        ctx.moveTo(0, topY); ctx.lineTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.closePath();
+        ctx.fillStyle = col(i === 0 ? 'rgba(140, 220, 255, 0.8)' : i === 1 ? 'rgba(210, 140, 255, 0.8)' : 'rgba(255, 160, 230, 0.8)');
+        ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, botY); ctx.lineTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.closePath();
+        ctx.fillStyle = col(i === 0 ? 'rgba(90, 160, 220, 0.8)' : i === 1 ? 'rgba(150, 90, 210, 0.8)' : 'rgba(200, 100, 180, 0.8)');
+        ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      }
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      if (tell >= 0) TT.drawGlow(ctx, '#ffffff', x + this.facing * 18, y, 24 + 32 * tell, 0.4 + 0.5 * tell);
+      if (!a || this.state !== 'attack' || this.dead) return;
+      if (d === this.def.attacks[0] && a.t >= d.s && a.t < d.s + d.a + 4) {
+        const k = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1;
+        const x0 = x + this.facing * 28, y0 = y, L = 350 * k;
+        const targets = [
+          { x: x0 + this.facing * L, y: this.y - 40 - 45, col: '#ff4477' },
+          { x: x0 + this.facing * L, y: this.y - 40, col: '#55ffff' },
+          { x: x0 + this.facing * L, y: this.y - 40 + 45, col: '#aa44ff' },
+        ];
+        ctx.save(); ctx.globalAlpha = fade; ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + this.facing * 40 * k, y0); ctx.stroke();
+        for (const tg of targets) {
+          ctx.strokeStyle = tg.col; ctx.lineWidth = 20;
+          ctx.beginPath(); ctx.moveTo(x0 + this.facing * 35 * k, y0); ctx.lineTo(tg.x, tg.y); ctx.stroke();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.moveTo(x0 + this.facing * 35 * k, y0); ctx.lineTo(tg.x, tg.y); ctx.stroke();
+        }
+        ctx.restore();
+      } else if (d === this.def.attacks[1] && a.t >= d.s && a.t < d.s + d.a + 6) {
+        const k = 1 - (a.t - d.s) / (d.a + 6);
+        TT.drawGlow(ctx, '#ffffff', x, this.y - 50, 160 * k + 40, k);
+        TT.drawGlow(ctx, '#ff7adf', x, this.y - 50, 120 * k + 30, k * 0.7);
+      }
+    }
+  }
+  TT.PrismaticLantern = PrismaticLantern;
+
+  // Cópia espelhada da Prisma (ataque Reflexos)
+  class PrismaMirror extends Fighter {
+    constructor(game, x, y, boss) {
+      super(game, x, y);
+      this.boss = boss;
+      this.team = 'enemy';
+      this.kind = 'mirror';
+      this.style = TT.STYLES.prisma;
+      this.hp = this.maxHp = 1;
+      this.radius = 35; this.height = 220; this.shadowW = 50;
+      this.facing = boss ? boss.facing : -1;
+      this.entering = false;
+      this.alpha = 0.72;
+      this.life = 400;
+    }
+    takeHit(src, d, dir) {
+      this.die(dir, d);
+      return true;
+    }
+    die(dir, d) {
+      this.dead = true;
+      this.remove = true;
+      const g = this.game;
+      A().play('glass');
+      g.particles.spawn('text', this.x, this.y - 150, { text: 'CRACK!', size: 36, color: '#e0f8ff', color2: '#5a3aa0', vy: -0.6, life: 30, rot: TT.rand(-0.2, 0.2) });
+      for (let i = 0; i < 14; i++) {
+        g.particles.spawn('debris', this.x + TT.rand(-25, 25), this.y - TT.rand(30, 180), {
+          vx: TT.rand(-7, 7), vy: TT.rand(-9, -2), grav: 0.45,
+          color: TT.choice(['#7bf0ff', '#b87aff', '#ff7adf', '#ffffff']),
+          size: TT.rand(5, 10), vr: 0.35, life: 30, floor: this.y,
+        });
+      }
+    }
+    think() {
+      if (this.dead || !this.boss || this.boss.dead) { this.remove = true; return; }
+      if (--this.life <= 0) { this.die(1, {}); return; }
+      const p = this.game.targetFor(this);
+      if (p) this.facing = p.x > this.x ? 1 : -1;
+      this.anim = this.boss.anim || 'idle';
+      this.animT = this.boss.animT;
+      this.vx *= 0.85; this.vy *= 0.85;
+    }
+    draw(ctx, camX) {
+      if (this.dead) return;
+      const x = this.x - camX, y = this.y - this.z;
+      ctx.save();
+      ctx.globalAlpha = 0.7 + Math.sin(this.animT * 0.1) * 0.15;
+      TT.drawGlow(ctx, '#7bf0ff', x, y - 100, 80, 0.4);
+      if (this.boss && this.boss.drawCrystalBody) {
+        this.boss.drawCrystalBody(ctx, x, y, this.facing, this.animT, true, false);
+      }
+      ctx.restore();
+    }
+  }
+  TT.PrismaMirror = PrismaMirror;
 
   // Fissura de fogo (fase 11): rachadura no chão que entra em erupção em ciclos — fica calma, avisa
   // (marca vermelha que vai enchendo) e solta uma coluna de fogo que queima QUALQUER UM em cima,
@@ -4929,6 +5241,337 @@
     }
   }
   TT.Trigon = Trigon;
+
+  // ---- Prisma: a entidade de cristal vivo (chefe da fase 12)
+  // Surge se montando a partir de cacos voadores.
+  // Ataques:
+  // 1. Leque arco-íris (5 feixes de cores diferentes em leque à frente)
+  // 2. Reflexos (cria 2 cópias espelhadas translúcidas; acertar uma quebra com "CRACK!" e cacos)
+  // 3. Chuva de cristais (estalactites caem do teto nos círculos marcados no chão)
+  // 4. CALEIDOSCÓPIO (abaixo de 50% de HP): tela de arco-íris girando e feixes giratórios como ponteiros.
+  //    Depois do caleidoscópio, Prisma fica RACHADA E ATORDOADA (parada, dano dobrado!).
+  const PRISMA_COLORS = ['#ff3366', '#ffaa00', '#33ff88', '#33ccff', '#aa44ff'];
+  class Prisma extends Boss {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.name = 'PRISMA';
+      this.style = TT.STYLES.prisma;
+      this.hp = this.maxHp = 3000;
+      this.radius = 44; this.height = 230; this.shadowW = 58;
+      this.poiseMax = 190;
+      this.def = { score: 22000 };
+      this.openT = 0; this.alpha = 1; this.atkCount = 0; this.p2Said = false; this.summonCool = 0; this.out = {};
+      this.shards = [];
+      for (let i = 0; i < 12; i++) {
+        this.shards.push({
+          ox: TT.rand(-26, 26), oy: TT.rand(-140, -40),
+          size: TT.rand(8, 18), ang: Math.random() * Math.PI * 2, spd: TT.rand(0.04, 0.08),
+        });
+      }
+      this.taunts = [
+        'Vejam como sua luz se apaga diante do espelho!',
+        'Apenas um reflexo do que vocês poderiam ser.',
+        'Mil facetas, nenhuma piedade!',
+        'Vocês não passam de sombras no vidro.',
+      ];
+      const clampX = (g, px, m) => TT.clamp(px, g.camX + m, g.camX + TT.W - m);
+      const clampY = (py) => TT.clamp(py, TT.FLOOR_TOP + 40, TT.FLOOR_BOTTOM - 26);
+      this.ATK = {
+        // 1. Leque arco-íris: 5 feixes de cores diferentes em leque à frente
+        rainbow: {
+          pose: 'beam', glow: '#7bf0ff', s: 36, a: 14, r: 20, dmg: 14, knockdown: true, launch: 6, kb: 8, zoneHit: true, color: '#7bf0ff', sound0: 'alarm', sound: 'laser',
+          zone(f) {
+            const zs = [];
+            const dys = [-70, -35, 0, 35, 70];
+            for (let i = 0; i < 5; i++) {
+              zs.push({ k: 'rect', x0: f.x + f.facing * 30, x1: f.x + f.facing * 760, y: clampY(f.y + dys[i]), d: 18, arrows: true, col: PRISMA_COLORS[i] });
+            }
+            return zs;
+          },
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'A luz da verdade vai cegar vocês!', '#bfeeff');
+            if (t === this.s) { g.shake = Math.max(g.shake, 8); A().play('laser'); }
+          },
+        },
+        // 2. Reflexos: cria 2 cópias espelhadas
+        mirrors: {
+          pose: 'castUp', s: 30, a: 2, r: 22, color: '#b87aff', sound0: 'select',
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'Espelho, espelho meu... quem é o mais letal?!', '#f2d4ff');
+            if (t !== this.s) return;
+            A().play('glass');
+            for (const s of [-1, 1]) {
+              const mx = clampX(g, f.x + s * 160, 60), my = clampY(f.y + s * 45);
+              const m = new PrismaMirror(g, mx, my, f);
+              g.addEnemy(m);
+              g.poof(mx, my - 60);
+            }
+          },
+        },
+        // 3. Chuva de cristais: estalactites caem do teto
+        crystals: {
+          pose: 'castUp', s: 40, a: 8, r: 24, dmg: 16, knockdown: true, launch: 9, kb: 7, zoneHit: true, color: '#7bf0ff', sound0: 'alarm', sound: 'boom',
+          zone(f, g) {
+            const zs = [], hs = g.heroes();
+            for (const h of hs) zs.push({ k: 'ell', x: clampX(g, h.x, 60), y: clampY(h.y), rx: 75, ry: 34 });
+            let guard = 0;
+            while (zs.length < 5 && guard++ < 30) {
+              const tx = clampX(g, f.x + TT.rand(-350, 350), 60), ty = clampY(f.y + TT.rand(-90, 90));
+              if (zs.every((z) => Math.abs(z.x - tx) > 90 || Math.abs(z.y - ty) > 40)) zs.push({ k: 'ell', x: tx, y: ty, rx: 75, ry: 34 });
+            }
+            return zs;
+          },
+          onFrame(f, t, g, a) {
+            if (t === 2) g.say(f, 'Chuva de vidro!', '#bfeeff');
+            if (t !== this.s || !a.zones) return;
+            A().play('glass');
+            g.shake = Math.max(g.shake, 9);
+            a.zones.forEach((z) => {
+              g.impact(z.x, z.y, 'CRASH!', '#7bf0ff', 1.1);
+              g.debrisBurst(z.x, z.y - 10, 10, '#a6e8ff');
+            });
+          },
+        },
+        // 4. CALEIDOSCÓPIO (fase 2): a tela ganha tom de arco-íris girando e feixes giratórios como ponteiros
+        kaleidoscope: {
+          pose: 'castUp', glow: '#ff7adf', s: 68, a: 110, r: 26, dmg: 16, knockdown: true, launch: 9, kb: 8, zoneHit: true, color: '#ff7adf', sound0: 'alarm', sound: 'super',
+          zone(f, g) {
+            return [
+              { k: 'rect', x0: f.x - 460, x1: f.x + 460, y: f.y, d: 26, arrows: true },
+              { k: 'ell', x: f.x, y: f.y, rx: 170, ry: 66 },
+            ];
+          },
+          onFrame(f, t, g) {
+            if (t === 2) g.say(f, 'CALEIDOSCÓPIO! Quebrem em mil pedaços!', '#ffc8f0');
+            if (t >= this.s && t < this.s + this.a) {
+              const hue = ((t - this.s) * 7) % 360;
+              g.tintScreen('hsl(' + hue + ', 90%, 60%)', 6);
+              if ((t - this.s) % 16 === 0) {
+                A().play('laser');
+                g.shake = Math.max(g.shake, 6);
+              }
+            }
+            if (t === this.s + this.a + this.r - 1) f.shatter();
+          },
+        },
+      };
+      this.applyDifficulty();
+    }
+    get dmgTaken() { return this.openT > 0 ? 2 : 1; }
+    onArmorHit(dmg, d) {
+      if (this.state === 'open') return;
+      super.onArmorHit(dmg, d);
+    }
+    shatter() {
+      this.atk = null;
+      this.setState('open'); this.setAnim('hurt');
+      this.openT = this.phase2() ? 130 : 160; this.vx = this.vy = 0;
+      this.game.say(this, 'Minhas facetas... rachadas! A luz... está vazando!', '#e0f8ff');
+      A().play('glass'); A().play('ko');
+      this.game.whiteFlash = 8; this.game.shake = 12;
+      for (let i = 0; i < 14; i++) {
+        this.game.particles.spawn('debris', this.x + TT.rand(-30, 30), this.y - TT.rand(30, 180), {
+          vx: TT.rand(-6, 6), vy: TT.rand(-8, -2), grav: 0.45,
+          color: TT.choice(['#7bf0ff', '#b87aff', '#ff7adf', '#ffffff']),
+          size: TT.rand(4, 9), vr: 0.3, life: 28, floor: this.y,
+        });
+      }
+    }
+    think() {
+      if (this.commonBoss()) return;
+      const g = this.game;
+      if (this.state === 'open') {
+        this.vx = this.vy = 0;
+        if (--this.openT <= 0) {
+          this.openT = 0; this.setState('idle'); this.setAnim('idle'); this.cool = 25;
+          g.say(this, 'O vidro se recompõe... e minha lâmina continua afiada!', '#e0f8ff');
+          A().play('glass');
+        }
+        return;
+      }
+      if (this.state === 'down' || this.state === 'hurt') this.setState('idle');
+      const p = g.targetFor(this);
+      if (this.state === 'attack') { this.updateAttack(); return; }
+      if (!this.active || !p) { this.vx = this.vy = 0; this.setAnim('idle'); return; }
+      const dx = p.x - this.x, dy = p.y - this.y, adx = Math.abs(dx);
+      this.facing = dx > 0 ? 1 : -1;
+      const p2 = this.phase2();
+      if (p2 && !this.p2Said) {
+        this.p2Said = true;
+        g.say(this, 'Vocês ousaram trincar meu reflexo?! Sintam a refração total!', '#ffe9a0');
+        g.impact(this.x, this.y, 'REFRAÇÃO!', '#7bf0ff', 1.2);
+      }
+      this.dmgMul = p2 ? 1.15 : 1;
+      if (this.cool > 0) this.cool--;
+      if (this.summonCool > 0) this.summonCool--;
+      this.approach(this.sideTarget(p, 190), p.y, p2 ? 2.8 : 2.2);
+      if (this.cool <= 0) {
+        this.vx = this.vy = 0;
+        let pick;
+        if (p2 && this.atkCount % 4 === 3) pick = 'kaleidoscope';
+        else if (p2 && this.summonCool <= 0 && g.enemies.filter((e) => e.kind === 'mirror').length === 0) {
+          pick = 'mirrors'; this.summonCool = 700;
+        } else {
+          const opts = ['rainbow', 'rainbow', 'crystals'];
+          if (p2) opts.push('crystals');
+          pick = TT.choice(opts);
+        }
+        this.atkCount++;
+        this.startAttack(this.ATK[pick]);
+        this.cool = p2 ? this.nextCool(36, 60) : this.nextCool(54, 88);
+        if (pick !== 'kaleidoscope' && Math.random() < 0.28) g.say(this, TT.choice(this.taunts), '#c2f2ff');
+      }
+    }
+    drawGround(ctx, camX) {
+      const a = this.atk;
+      if (a && a.def === this.ATK.kaleidoscope && a.zones && this.state === 'attack' && a.t >= a.def.s && a.t < a.def.s + a.def.a) {
+        const rot = a.t * 0.05;
+        ctx.save();
+        for (let i = 0; i < 8; i++) {
+          const ang = rot + (i / 8) * Math.PI * 2;
+          const col = PRISMA_COLORS[i % 5];
+          ctx.strokeStyle = col; ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(this.x - camX, this.y);
+          ctx.lineTo(this.x - camX + Math.cos(ang) * 440, this.y + Math.sin(ang) * 160);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      super.drawGround(ctx, camX);
+    }
+    drawCrystalBody(ctx, x, y, facing, t, isMirror, isShattered) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(facing, 1);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (let i = 0; i < this.shards.length; i++) {
+        const sh = this.shards[i];
+        const wave = Math.sin(t * sh.spd + i * 0.6) * 10;
+        const sx = -28 - (i % 3) * 12 + wave * 0.5;
+        const sy = -140 + i * 11 + wave;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(sh.ang + wave * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(-sh.size * 0.5, -sh.size * 0.8);
+        ctx.lineTo(sh.size * 0.6, -sh.size * 0.2);
+        ctx.lineTo(sh.size * 0.3, sh.size * 0.9);
+        ctx.lineTo(-sh.size * 0.7, sh.size * 0.4);
+        ctx.closePath();
+        ctx.fillStyle = isMirror ? 'rgba(180, 220, 255, 0.45)' : 'rgba(160, 210, 255, 0.65)';
+        ctx.fill();
+        ctx.strokeStyle = isMirror ? 'rgba(255, 255, 255, 0.8)' : '#17121f';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.restore();
+      }
+      for (const [lx, s] of [[-12, -1], [14, 1]]) {
+        ctx.beginPath();
+        ctx.moveTo(lx, -60); ctx.lineTo(lx + s * 6, -30); ctx.lineTo(lx + s * 3, -4);
+        ctx.lineTo(lx - s * 6, -4); ctx.lineTo(lx - s * 3, -30); ctx.closePath();
+        ctx.fillStyle = isMirror ? 'rgba(120, 180, 240, 0.5)' : '#4a2a7a';
+        ctx.fill(); ctx.strokeStyle = '#17121f'; ctx.lineWidth = 3; ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(0, -145); ctx.lineTo(26, -115); ctx.lineTo(18, -60);
+      ctx.lineTo(-18, -60); ctx.lineTo(-26, -115); ctx.closePath();
+      ctx.fillStyle = isMirror ? 'rgba(150, 210, 255, 0.6)' : 'rgba(80, 45, 130, 0.9)';
+      ctx.fill(); ctx.strokeStyle = '#17121f'; ctx.lineWidth = 3.5; ctx.stroke();
+      const hue = (t * 3.5) % 360;
+      const coreCol = 'hsl(' + hue + ', 100%, 75%)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -145); ctx.lineTo(0, -60);
+      ctx.moveTo(-26, -115); ctx.lineTo(26, -115);
+      ctx.moveTo(0, -100); ctx.lineTo(-18, -60);
+      ctx.moveTo(0, -100); ctx.lineTo(18, -60);
+      ctx.stroke();
+      for (const [ox, dir] of [[-26, -1], [26, 1]]) {
+        ctx.beginPath(); ctx.moveTo(ox, -125); ctx.lineTo(ox + dir * 16, -142); ctx.lineTo(ox + dir * 8, -115); ctx.closePath();
+        ctx.fillStyle = isMirror ? 'rgba(180, 230, 255, 0.6)' : '#7bf0ff';
+        ctx.fill(); ctx.strokeStyle = '#17121f'; ctx.lineWidth = 2.4; ctx.stroke();
+      }
+      for (const [bx, dir] of [[-24, -1], [24, 1]]) {
+        ctx.beginPath();
+        ctx.moveTo(bx, -115); ctx.lineTo(bx + dir * 18, -80); ctx.lineTo(bx + dir * 28, -50);
+        ctx.lineTo(bx + dir * 14, -44); ctx.lineTo(bx + dir * 8, -78); ctx.closePath();
+        ctx.fillStyle = isMirror ? 'rgba(180, 220, 255, 0.6)' : '#7042a6';
+        ctx.fill(); ctx.strokeStyle = '#17121f'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx + dir * 28, -50); ctx.lineTo(bx + dir * 42, -22); ctx.lineTo(bx + dir * 14, -44); ctx.closePath();
+        ctx.fillStyle = 'rgba(200, 245, 255, 0.9)';
+        ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      }
+      const headY = -162, headR = 19;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2 - Math.PI / 6;
+        const px = Math.cos(ang) * headR, py = headY + Math.sin(ang) * headR * 1.15;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = isMirror ? 'rgba(180, 230, 255, 0.8)' : 'rgba(140, 215, 255, 0.92)';
+      ctx.fill(); ctx.strokeStyle = '#17121f'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2 - Math.PI / 6;
+        ctx.beginPath(); ctx.moveTo(0, headY); ctx.lineTo(Math.cos(ang) * headR, headY + Math.sin(ang) * headR * 1.15); ctx.stroke();
+      }
+      TT.drawGlow(ctx, coreCol, 0, headY, headR * 1.8, 0.9);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, headY, headR * 0.32, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = coreCol; ctx.beginPath(); ctx.arc(0, headY, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+      if (isShattered) {
+        ctx.save();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-16, -135); ctx.lineTo(-4, -120); ctx.lineTo(8, -128); ctx.lineTo(16, -100);
+        ctx.moveTo(-8, -100); ctx.lineTo(4, -85); ctx.lineTo(-2, -65);
+        ctx.moveTo(2, headY - 10); ctx.lineTo(-4, headY + 5); ctx.lineTo(6, headY + 12);
+        ctx.stroke();
+        TT.drawGlow(ctx, '#ffffff', 0, -110, 60, 0.8);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    draw(ctx, camX) {
+      const t = this.animT, a = this.atk, k = this.tellK(), d = a && a.def;
+      let al = this.alpha;
+      if (this.state === 'dying' && (this.st >> 2) % 2 === 0) al *= 0.6;
+      const open = this.state === 'open';
+      const x = this.x - camX + this.tellShake() + (open ? Math.sin(t * 0.6) * 3 : 0), y = this.y - this.z;
+      ctx.save();
+      ctx.globalAlpha = al;
+      this.drawCrystalBody(ctx, x, y, this.facing, t, false, open);
+      if (d === this.ATK.rainbow && a.zones && a.t >= d.s && a.t < d.s + d.a + 4) {
+        const u = Math.min(1, (a.t - d.s + 1) / 3), fade = a.t >= d.s + d.a ? 1 - (a.t - d.s - d.a) / 4 : 1;
+        const x0 = x + this.facing * 35, y0 = y - 90;
+        ctx.save(); ctx.globalAlpha = al * fade; ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        for (let i = 0; i < a.zones.length; i++) {
+          const z = a.zones[i];
+          const x1 = x0 + this.facing * 720 * u, y1 = z.y;
+          const col = PRISMA_COLORS[i % PRISMA_COLORS.length];
+          ctx.strokeStyle = col; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          TT.drawGlow(ctx, col, x1, y1, 50, 0.8);
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+      this.drawTell(ctx, x, y, y - this.height - 20);
+      if (this.state === 'stagger') Cinderblock.prototype.drawDizzy.call(this, ctx, x, y - this.height - 10);
+      if (open) {
+        for (let i = 0; i < 4; i++) {
+          const an = t * 0.15 + i * (Math.PI / 2);
+          const col = PRISMA_COLORS[i % PRISMA_COLORS.length];
+          ctx.fillStyle = col;
+          ctx.fillRect(x + Math.cos(an) * 44 - 4, y - this.height - 10 + Math.sin(an) * 14 - 4, 8, 8);
+        }
+        if ((t >> 3) % 2 === 0) TT.drawText(ctx, 'CRISTAL RACHADO! DANO DOBRADO!', x, Math.min(TT.H - 20, y + 44), 22, '#7bf0ff', OUT, 'center', 5);
+      }
+    }
+  }
+  TT.Prisma = Prisma;
 
   // ---- Perfuratriz gigante da perseguição
   class DrillMachine {

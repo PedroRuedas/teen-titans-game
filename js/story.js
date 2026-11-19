@@ -10,7 +10,9 @@
   const speaker = (key) => {
     if (!key) return { name: '', color: '#ffe14a' };
     const d = TT.TITANS[key];
-    return { name: (d ? d.name : key).toUpperCase(), color: d ? d.color : '#ffffff' };
+    if (d) return { name: d.name.toUpperCase(), color: d.color };
+    const colors = { trigon: '#ff3a2a', madmod: '#ff5ad0', prisma: '#7bf0ff' };
+    return { name: key.toUpperCase(), color: colors[key] || '#ffffff' };
   };
   function wrap(ctx, text, maxW, size) {
     ctx.font = size + 'px ' + TT.FONT;

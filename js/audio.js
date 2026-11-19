@@ -124,6 +124,16 @@
              79, 0, 78, 79, 0, 83, 0, 0, 86, 0, 84, 0, 83, 0, 79, 0],
       drums: 'metal',
     },
+    // Chefe Prisma: caixinha de música de cristal em Lá menor (arpejos agudos, clima misterioso e sinistro)
+    prisma: {
+      bpm: 160,
+      chords: [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]],
+      lead: [81, 0, 84, 88, 0, 84, 81, 0, 88, 0, 89, 0, 88, 0, 84, 0,
+             77, 0, 81, 84, 0, 81, 77, 0, 84, 0, 86, 0, 84, 0, 81, 0,
+             79, 0, 83, 86, 0, 83, 79, 0, 86, 0, 88, 0, 91, 0, 88, 0,
+             93, 0, 91, 0, 88, 0, 86, 0, 84, 0, 83, 0, 81, 0, 76, 0],
+      drums: 'metal',
+    },
     victory: {
       bpm: 120,
       chords: [[60, 64, 67], [65, 69, 72], [67, 71, 74], [60, 64, 67]],
@@ -264,6 +274,7 @@
         case 'zap': this.noise(0.18, 0.4, 5000, 'highpass'); this.tone(1800, 0.12, 'square', 0.1, 400); this.tone(90, 0.15, 'sawtooth', 0.15, 60); break;
         case 'thunder': this.noise(0.7, 0.8, 1400); this.noise(0.25, 0.4, 6000, 'highpass'); this.tone(60, 0.6, 'sawtooth', 0.4, 30); break;
         case 'shockwave': this.noise(0.5, 0.7, 300); this.tone(50, 0.5, 'sine', 0.7, 25); break;
+        case 'glass': this.noise(0.18, 0.45, 6000, 'highpass'); this.tone(2200, 0.12, 'triangle', 0.25, 3200); this.tone(3400, 0.08, 'sine', 0.18, 4800); break;
         default: break;
       }
     }
