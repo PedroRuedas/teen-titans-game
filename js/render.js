@@ -1649,6 +1649,68 @@
     },
   });
 
+  // ------------------------------------------------------------ Fase 12 — O Labirinto de Espelhos
+  // Prisma (chefe da fase 12): figura alta de cristal facetado translúcido, cabeça hexagonal
+  // com núcleo de luz brilhante no centro, capa de cacos de espelho flutuantes.
+  S.prisma = mkStyle({
+    scale: 1.8, headR: 16, torsoH: 42, shW: 36, waistW: 22, hipW: 26, legL: [25, 24], armL: [24, 23], legW: 9.5, armW: 9, handR: 8, footR: 8, neck: 4,
+    skin: '#a6e8ff', torso: '#4a2a7a', arm: '#7042a6', glove: '#a6e8ff', hand: '#ffffff', leg: '#2d184c', boot: '#1b0e30',
+    drawHead(ctx, r, pose) {
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2 - Math.PI / 6;
+        const px = Math.cos(ang) * r * 0.95, py = Math.sin(ang) * r * 1.1;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = C('rgba(140, 215, 255, 0.85)'); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      if (!FLASH) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 6; i++) {
+          const ang = (i / 6) * Math.PI * 2 - Math.PI / 6;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(ang) * r * 0.95, Math.sin(ang) * r * 1.1); ctx.stroke();
+        }
+        const a = (pose && pose.t) || 0;
+        const hue = (a * 4) % 360;
+        const coreCol = 'hsl(' + hue + ', 100%, 75%)';
+        TT.drawGlow(ctx, coreCol, 0, 0, r * 1.6, 0.9);
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = coreCol; ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    },
+  });
+
+  // Estilhaço (fase 12): golem de cristal facetado
+  S.shard = mkStyle({
+    scale: 1.12, headR: 16, torsoH: 36, shW: 32, waistW: 22, hipW: 24, legL: [22, 22], armL: [22, 20], legW: 10, armW: 10, handR: 8, footR: 8.5,
+    skin: '#7bf0ff', torso: '#4a6eb5', arm: '#628ee0', glove: '#7bf0ff', hand: '#ffffff', leg: '#2e4270', boot: '#1c2844',
+    drawHead(ctx, r) {
+      ctx.beginPath(); ctx.moveTo(-r * 0.8, -r * 0.4); ctx.lineTo(0, -r * 1.1); ctx.lineTo(r * 0.8, -r * 0.4); ctx.lineTo(r * 0.5, r * 0.9); ctx.lineTo(-r * 0.5, r * 0.9); ctx.closePath();
+      ctx.fillStyle = C('#7bf0ff'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2); ctx.fill();
+        TT.drawGlow(ctx, '#7bf0ff', 0, 0, r * 1.2, 0.7);
+      }
+    },
+  });
+
+  // Lanterna Prismática (fase 12): pirâmide/prisma voador
+  S.lantern = mkStyle({
+    scale: 1.0, headR: 16, torsoH: 30, shW: 26, waistW: 18, hipW: 20, legL: [20, 20], armL: [18, 18], legW: 7, armW: 7, handR: 6, footR: 6,
+    skin: '#ff9ae8', torso: '#7042a6', arm: '#8f5cd0', glove: '#b87aff', hand: '#ffffff', leg: '#3f2066', boot: '#24103c',
+    drawHead(ctx, r) {
+      ctx.beginPath(); ctx.moveTo(0, -r * 1.1); ctx.lineTo(r * 0.9, r * 0.8); ctx.lineTo(-r * 0.9, r * 0.8); ctx.closePath();
+      ctx.fillStyle = C('#b87aff'); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.stroke();
+      if (!FLASH) {
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, r * 0.1, r * 0.25, 0, Math.PI * 2); ctx.fill();
+        TT.drawGlow(ctx, '#ff7adf', 0, r * 0.1, r * 1.2, 0.7);
+      }
+    },
+  });
+
   // ------------------------------------------------------------ Formas animais do Mutano
   // Paleta verde em 4 tons (sombra, base, luz, peito/rosto) — volume com sombreamento em camadas.
   const BB = { D: '#2b6418', M: '#4f9d2d', L: '#86d257', F: '#b4e48c', X: '#1d4710' };

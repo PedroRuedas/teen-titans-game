@@ -1279,15 +1279,295 @@
   }
   for (const k in DEFS) build(k, DEFS[k]);
 
-  // Versões alternativas: poderes do Titã de origem, já com os golpes novos e os combos ("combos mudados" no PS2).
-  function alt(key, base, o) {
-    const d = Object.assign({}, TT.TITANS_COMBO[base], { base, style: key, extra: true }, o);
-    TT.TITANS[key] = TT.TITANS_PLUS[key] = TT.TITANS_COMBO[key] = d;
+  // ================================================================ COMBO FINAL das versões alternativas
+  // Cada versão alternativa tem o seu próprio □ □ △ (J J K), liberado na mesma fase que o dos outros
+  // (fase 8, nível de poder 2). Antes disso usam os golpes do Titã de origem no nível da fase.
+  const CONFETE = ['#ff5a5a', '#ffd23a', '#5ad1ff', '#8dff5a', '#ff7ae0', '#ffffff'];
+  const confetti = (g, x, y, n, up) => {
+    for (let i = 0; i < n; i++) g.particles.spawn('debris', x + TT.rand(-24, 24), y - TT.rand(0, 30), { vx: TT.rand(-7, 7), vy: -TT.rand(4, up || 12), grav: 0.32, color: TT.choice(CONFETE), size: TT.rand(5, 9), vr: TT.rand(-0.5, 0.5), life: TT.randi(40, 70), floor: y + 40 });
+  };
+
+  // Aprendiz: rastro de fogo que fica queimando no chão por onde ele passou.
+  class FlameTrail {
+    constructor(game, owner, x0, x1, y) {
+      Object.assign(this, { game, owner, x0: Math.min(x0, x1), x1: Math.max(x0, x1), y: y + 1, t: 0, T: 80, remove: false, tick: new Map() });
+    }
+    update() {
+      const g = this.game;
+      if (++this.t > this.T) { this.remove = true; return; }
+      if (this.t % 3 === 0) g.particles.spawn('spark', TT.rand(this.x0, this.x1), this.y - TT.rand(10, 70), { vx: TT.rand(-1, 1), vy: -TT.rand(2, 5), color: TT.choice(['#ffb03a', '#ff5a1a', '#fff0a0']), size: 4, life: TT.randi(14, 24) });
+      if (this.t > this.T - 10) return;
+      for (const e of g.enemies) {
+        if (e.dead || e.z > 60 || e.x < this.x0 - 20 || e.x > this.x1 + 20 || Math.abs(e.y - this.y) > 46) continue;
+        if ((this.tick.get(e) || 0) > this.t) continue;
+        this.tick.set(e, this.t + 14);
+        hitOne(g, this.owner, e, { dmg: 4 * pw(this.owner), kb: 0.5, stun: 14 });
+        g.particles.spawn('glow', e.x, e.y - 40, { color: '#ff7a1a', size: 60, life: 10 });
+      }
+    }
+    drawGround(ctx, camX) {
+      const a = Math.min(1, (this.T - this.t) / 16);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 * a;
+      const gr = ctx.createLinearGradient(0, this.y - 30, 0, this.y + 30);
+      gr.addColorStop(0, 'rgba(255,90,20,0)'); gr.addColorStop(0.5, '#ff5a1a'); gr.addColorStop(1, 'rgba(255,90,20,0)');
+      ctx.fillStyle = gr; ctx.fillRect(this.x0 - camX, this.y - 30, this.x1 - this.x0, 60);
+      ctx.restore();
+    }
+    draw(ctx, camX) {
+      const a = Math.min(1, (this.T - this.t) / 16), grow = TT.easeOut(Math.min(1, this.t / 8));
+      ctx.save(); ctx.globalAlpha = a;
+      for (let x = this.x0; x <= this.x1; x += 46) {
+        const h = (34 + 26 * Math.sin(x * 0.05 + this.t * 0.3)) * grow;
+        TT.drawFlame(ctx, x - camX, this.y + ((x / 46) % 2 ? 10 : -8), h, this.t + x, x * 0.07);
+      }
+      ctx.restore();
+    }
   }
-  alt('apprentice', 'robin', { name: 'Aprendiz', color: '#ff7a1a', fx: '#ff9a3a', blurb: 'O Robin como aprendiz do Slade: golpes do Robin, já com os combos da fase 8.' });
-  alt('redraven', 'raven', { name: 'Ravena Vermelha', color: '#c8102e', fx: '#ff3b5a', blurb: 'A Ravena tomada pelo lado de Trigon: poderes da Ravena, já com os combos da fase 8.' });
-  alt('whiteraven', 'raven', { name: 'Ravena Branca', color: '#e6e6f2', fx: '#ffffff', blurb: 'A Ravena de manto branco que venceu Trigon com a luz: poderes da Ravena, já com os combos da fase 8.' });
-  alt('clownbb', 'beastboy', { name: 'Mutano Palhaço', color: '#ffd23a', fx: '#ff5a5a', blurb: 'O Mutano de palhaço no circo do Mumbo: animais do Mutano, já com os combos da fase 8.' });
+
+  // Ravena Vermelha: um selo de runas vermelhas no chão; correntes de energia prendem e puxam os
+  // inimigos para o centro, e o selo explode numa coluna de fúria.
+  class RageSeal {
+    constructor(game, owner, o) {
+      Object.assign(this, { game, owner, o, x: owner.x + owner.facing * 140, y: owner.y + 1, t: 0, remove: false, targets: [] });
+    }
+    get R() { return this.o.r * TT.easeOut(Math.min(1, this.t / 14)); }
+    update() {
+      const g = this.game, f = this.owner, o = this.o;
+      this.t++;
+      if (this.t === 14) {
+        this.targets = g.enemies.filter((e) => !e.dead && Math.abs(e.x - this.x) < 560 && Math.abs(e.x - g.camX - TT.W / 2) < TT.W / 2 + 30).slice(0, 8);
+        A().play('dark');
+        for (const e of this.targets) g.particles.spawn('text', e.x, e.y - e.z - 150, { text: 'PRESO!', size: 24, color: '#ffd0d6', color2: '#8a0010', vy: -0.5, life: 30, rot: TT.rand(-0.2, 0.2) });
+      }
+      if (this.t > 14 && this.t < 38) {
+        for (const e of this.targets) {
+          if (e.dead) continue;
+          if (!e.isBoss) { e.x += (this.x - e.x) * 0.07; e.y += (this.y - e.y) * 0.07; }
+          if ((this.t - 15) % 7 === 0) hitOne(g, f, e, { dmg: 3 * pw(f), kb: 0, stun: 16 });
+        }
+        if (this.t % 2 === 0) g.particles.spawn('glow', this.x + TT.rand(-this.R, this.R) * 0.8, this.y - TT.rand(0, 30), { color: '#ff1a3a', size: 40, life: 10 });
+      }
+      if (this.t === 40) {
+        g.addEffect(new TT.Nova(g, f, { x: this.x, y: this.y, r: o.r + 40, dmg: 26 * pw(f), col: '#ff2a3a', word: 'IRA!' }));
+        const pts = this.targets.filter((e) => !e.dead).map((e, i) => ({ x: e.x, y: e.y, d: 2 + i * 3 }));
+        pts.push({ x: this.x, y: this.y, d: 0 });
+        erupt(g, f, pts, { col: 'rgba(255,30,60,0.9)', dmg: 14 * pw(f), rx: 70, h: 210, launch: 13, sound: 'boom' });
+        g.tintScreen('#8a0010', 20); g.whiteFlash = Math.max(g.whiteFlash, 4);
+      }
+      if (this.t > 66) this.remove = true;
+    }
+    drawGround(ctx, camX) {
+      const R = this.R, x = this.x - camX, y = this.y, fade = this.t > 44 ? Math.max(0, 1 - (this.t - 44) / 20) : 1, rot = this.t * 0.05;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fade;
+      ctx.translate(x, y); ctx.scale(1, 0.42);
+      ctx.fillStyle = 'rgba(200,16,46,0.28)'; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ff2a3a'; ctx.lineWidth = 7;
+      for (const k of [1, 0.78]) { ctx.beginPath(); ctx.arc(0, 0, R * k, 0, Math.PI * 2); ctx.stroke(); }
+      // duas estrelas de 3 pontas girando em sentidos opostos
+      for (const [dir, k] of [[1, 0.74], [-1, 0.74]]) {
+        ctx.beginPath();
+        for (let i = 0; i <= 3; i++) { const ang = rot * dir + i / 3 * Math.PI * 2 + (dir < 0 ? Math.PI / 3 : 0); ctx[i ? 'lineTo' : 'moveTo'](Math.cos(ang) * R * k, Math.sin(ang) * R * k); }
+        ctx.stroke();
+      }
+      // runas na borda
+      ctx.fillStyle = '#ffd0d6';
+      for (let i = 0; i < 10; i++) {
+        const ang = -rot * 1.5 + i / 10 * Math.PI * 2, rx = Math.cos(ang) * R * 0.89, ry = Math.sin(ang) * R * 0.89;
+        ctx.beginPath(); ctx.moveTo(rx, ry - 9); ctx.lineTo(rx + 6, ry); ctx.lineTo(rx, ry + 9); ctx.lineTo(rx - 6, ry); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    draw(ctx, camX) {
+      if (this.t <= 14 || this.t >= 40) return;
+      const cx = this.x - camX, cy = this.y - 60;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const e of this.targets) {
+        if (e.dead) continue;
+        const ex = e.x - camX, ey = e.y - e.z - (e.height || 100) * 0.5;
+        for (const [w, col] of [[9, 'rgba(255,30,60,0.55)'], [3, '#ffe0e4']]) {
+          ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(cx, cy);
+          for (let i = 1; i < 6; i++) { const k = i / 6; ctx.lineTo(cx + (ex - cx) * k + TT.rand(-10, 10), cy + (ey - cy) * k + TT.rand(-10, 10)); }
+          ctx.lineTo(ex, ey); ctx.stroke();
+        }
+        TT.drawGlow(ctx, '#ff2a3a', ex, ey, 40, 0.8);
+      }
+      ctx.restore();
+      TT.drawGlow(ctx, '#ff2a3a', cx, cy, 90, 0.7);
+    }
+  }
+
+  // Ravena Branca: penas de luz caem em diagonal pela tela, acertando quem estiver embaixo; no fim um
+  // clarão branco cura a equipe.
+  class LightFeathers {
+    constructor(game, owner, o) {
+      Object.assign(this, { game, owner, o, t: 0, remove: false, y: owner.y, list: [] });
+    }
+    update() {
+      const g = this.game, f = this.owner, dir = f.facing;
+      this.t++;
+      if (this.t <= 34 && this.t % 1 === 0) {
+        for (let k = 0; k < (this.t % 3 === 0 ? 2 : 1); k++) {
+          const gx = TT.clamp(f.x + dir * TT.rand(-80, 720), g.camX + 30, g.camX + TT.W - 30);
+          this.list.push({ x: gx - dir * 120, y: TT.rand(TT.FLOOR_TOP + 10, TT.FLOOR_BOTTOM - 10), h: TT.rand(380, 520), vx: dir * TT.rand(2.6, 4), vh: TT.rand(9, 13), rot: TT.rand(0, 6), sw: TT.rand(0.1, 0.2) });
+        }
+      }
+      for (const p of this.list) {
+        p.x += p.vx; p.h -= p.vh; p.rot += p.sw;
+        if (p.h <= 40 && !p.done) {
+          p.done = true;
+          for (const e of g.enemies) {
+            if (e.dead) continue;
+            const dx = (e.x - p.x) / 60, dy = (e.y - p.y) / 26;
+            if (dx * dx + dy * dy > 1) continue;
+            hitOne(g, f, e, { dmg: 5 * pw(f), kb: 1, stun: 20 });
+          }
+          g.particles.spawn('star', p.x, p.y - 30, { color: '#ffffff', size: 16, life: 12, rot: Math.random() });
+          g.particles.spawn('glow', p.x, p.y - 20, { color: '#cfe0ff', size: 60, life: 10 });
+        }
+      }
+      this.list = this.list.filter((p) => p.h > 0);
+      if (this.t === 46) {
+        g.whiteFlash = Math.max(g.whiteFlash, 10);
+        g.addEffect(new TT.Nova(g, f, { x: f.x, y: f.y, r: 260, dmg: 16 * pw(f), col: '#cfe0ff', word: 'LUZ!' }));
+        for (const h of g.heroes()) {
+          if (h.dead || h.ko) continue;
+          const add = Math.round(h.maxHp * 0.12);
+          h.hp = Math.min(h.maxHp, h.hp + add);
+          g.particles.spawn('text', h.x, h.y - (h.height || 140) - 30, { text: '+' + add + ' VIDA', size: 26, color: '#ffffff', color2: '#4aa86a', vy: -0.8, life: 40 });
+          for (let i = 0; i < 6; i++) g.particles.spawn('star', h.x + TT.rand(-30, 30), h.y - TT.rand(20, 140), { color: '#eaffef', size: 8, vy: -1.5, life: 26, rot: Math.random() });
+        }
+        A().play('super');
+      }
+      if (this.t > 60 && !this.list.length) this.remove = true;
+    }
+    draw(ctx, camX) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const p of this.list) {
+        const x = p.x - camX, y = p.y - p.h;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(p.rot) * 0.6 + 0.4 * Math.sign(p.vx));
+        TT.drawGlow(ctx, '#cfe0ff', 0, 0, 34, 0.55);
+        ctx.fillStyle = 'rgba(245,248,255,0.92)';
+        ctx.beginPath(); ctx.moveTo(0, -24); ctx.quadraticCurveTo(11, -6, 3, 22); ctx.lineTo(-3, 22); ctx.quadraticCurveTo(-11, -6, 0, -24); ctx.fill();
+        ctx.strokeStyle = '#9fb8ff'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, 26); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Mutano Palhaço: holofotes de circo que varrem a arena até pararem nele.
+  class Spotlights {
+    constructor(game, owner, T) { Object.assign(this, { game, owner, T, t: 0, remove: false, y: owner.y - 1 }); }
+    update() { if (++this.t > this.T) this.remove = true; }
+    draw(ctx, camX) {
+      const f = this.owner, k = Math.min(1, this.t / 24), fade = Math.min(1, (this.T - this.t) / 12);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      [[0.12, '#fff2a0'], [0.5, '#ffd0f0'], [0.88, '#c8f0ff']].forEach(([sx, col], i) => {
+        const x0 = TT.W * sx, wob = Math.sin(this.t * 0.18 + i * 2) * (1 - k) * 260;
+        const tx = f.x - camX + wob, ty = f.y;
+        const gr = ctx.createLinearGradient(x0, 0, tx, ty);
+        gr.addColorStop(0, 'rgba(255,255,255,0.05)'); gr.addColorStop(1, col);
+        ctx.globalAlpha = 0.32 * fade; ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.moveTo(x0 - 10, -10); ctx.lineTo(x0 + 10, -10); ctx.lineTo(tx + 80, ty); ctx.lineTo(tx - 80, ty); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.4 * fade; ctx.fillStyle = col;
+        ctx.beginPath(); ctx.ellipse(tx, ty, 82, 30, 0, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+    }
+  }
+  const BALLS = ['#ff4a4a', '#ffd23a', '#4ab8ff', '#7aff5a', '#ff7ae0'];
+  PDRAW.juggleBall = (p, ctx, x, y) => {
+    TT.drawGlow(ctx, p.col, x, y, 26, 0.6);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(p.spin);
+    ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fillStyle = p.col; ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 9, -0.6, 1.4); ctx.stroke();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  };
+  PTRAIL.juggleBall = (p, g) => {
+    if (p.t % 3 === 0) g.particles.spawn('star', p.x, p.y - p.z, { color: TT.choice(CONFETE), size: 6, life: 12, rot: Math.random() });
+    if (p.z < 22 && p.vz < 0 && !p.conf) { p.conf = true; confetti(g, p.x, p.y, 14, 10); word(g, p.x, p.y - 110, TT.choice(['PLOFT!', 'POF!', 'BOING!']), '#ffffff', p.col, 30); }
+  };
+
+  const ALT_ENDERS = {
+    // TRILHA EM CHAMAS: três investidas fantasmas cruzam a tela, o chão fica pegando fogo e cada
+    // inimigo atravessado explode numa coluna de chamas
+    apprentice: { name: 'TRILHA EM CHAMAS', pose: 'jab', weapon: 'staff', smear: 'jab', s: 7, a: 14, r: 24, dmg: 5, rehit: 4, reach: [-60, 116], depth: 60, kb: 0, stun: 50, lunge: 30, big: true, sound0: 'whoosh',
+      onFrame(f, t, g, a) {
+        if (t === 1) { comboName(f, g, this.name); a.x0 = f.x; a.marked = new Set(); f.invul = Math.max(f.invul, 44); g.tintScreen('#ff7a1a', 8); }
+        if (t < this.s) g.particles.spawn('glow', f.x + TT.rand(-24, 24), f.y - 80 + TT.rand(-36, 36), { color: '#ff7a1a', size: 34, life: 8 });
+        if (t >= this.s && t < this.s + this.a) {
+          g.afterimage(f, '#ff7a1a');
+          for (const e of a.hits) a.marked.add(e);
+          for (let i = 0; i < 2; i++) g.particles.spawn('spark', f.x - f.facing * 30, f.y - TT.rand(20, 120), { vx: -f.facing * TT.rand(2, 6), vy: TT.rand(-3, 1), color: TT.choice(['#ffb03a', '#ff5a1a']), size: 5, life: 16 });
+        }
+        if (t === this.s + this.a) {
+          for (const e of a.hits) a.marked.add(e);
+          for (const dy of [-34, 0, 34]) g.addEffect(new TT.SlashLine(g, a.x0, f.x, f.y + dy, '#ff7a1a'));
+          g.addEffect(new FlameTrail(g, f, a.x0, f.x, f.y));
+          A().play('birdarang');
+        }
+        if (t === this.s + this.a + 8) {
+          let pts = [...a.marked].filter((e) => !e.dead).map((e, i) => ({ x: e.x, y: e.y, d: i * 5 }));
+          if (!pts.length) pts = [0.33, 0.66, 1].map((k, i) => ({ x: a.x0 + (f.x - a.x0) * k, y: f.y, d: i * 5 }));
+          erupt(g, f, pts, { kind: 'fire', col: 'rgba(255,120,20,0.85)', dmg: 24 * pw(f), rx: 82, h: 180, launch: 12, word: 'FWOOSH!', sound: 'boom' });
+          g.shake = Math.max(g.shake, 10);
+        }
+      } },
+    // SELO DA IRA: o selo de runas prende os inimigos com correntes, puxa todos e explode
+    redraven: { name: 'SELO DA IRA', anim: 'rvSpecial', hands: 'open', s: 12, a: 1, r: 44, sound0: 'dark', mouth: 'shout', glow: '#ff2a3a',
+      onFrame(f, t, g) {
+        if (t === 1) { comboName(f, g, this.name); g.tintScreen('#5a0010', 14); }
+        if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-50, 50), f.y - f.z - TT.rand(30, 140), { color: '#5a0010', size: 10, vy: -1.5, life: 26, vr: 0.1 });
+        if (t === this.s) g.addEffect(new RageSeal(g, f, { r: 250 }));
+      } },
+    // TEMPESTADE DE PENAS: ela sobe envolta em luz, uma chuva de penas brilhantes cai sobre os inimigos
+    // e o clarão final cura a equipe
+    whiteraven: { name: 'TEMPESTADE DE PENAS', anim: 'rvSpecial', hands: 'open', s: 16, a: 1, r: 40, sound0: 'super', glow: '#ffffff',
+      onFrame(f, t, g) {
+        if (t === 1) { comboName(f, g, this.name); f.vz = Math.max(f.vz, 3.5); f.z = Math.max(f.z, 1); g.tintScreen('#e6ecff', 16); }
+        if (t < this.s) {
+          const ang = t * 0.7;
+          for (const s of [0, Math.PI]) g.particles.spawn('glow', f.x + Math.cos(ang + s) * 60, f.y - f.z - 40 - t * 6 + Math.sin(ang + s) * 18, { color: '#ffffff', size: 30, life: 12 });
+        }
+        if (t === this.s) { g.addEffect(new LightFeathers(g, f, {})); g.whiteFlash = Math.max(g.whiteFlash, 4); A().play('dark'); }
+      } },
+    // PICADEIRO SELVAGEM: holofotes, bolinhas de malabares que explodem em confete e o elefante que pisa
+    // no picadeiro — "TA-DÁ!"
+    clownbb: { name: 'PICADEIRO SELVAGEM', pose: 'throw', s: 6, a: 36, r: 20, sound0: 'switch', mouth: 'shout',
+      formAt(t) { return t >= 28 ? { form: 'elephant', t: t - 28, s: 12, end: 26 } : null; },
+      onFrame(f, t, g) {
+        if (t === 1) { comboName(f, g, this.name); g.addEffect(new Spotlights(g, f, 64)); confetti(g, f.x, f.y - 120, 10); }
+        if (t >= this.s && t <= this.s + 16 && (t - this.s) % 4 === 0) {
+          const i = (t - this.s) / 4;
+          shot(f, g, { kind: 'juggleBall', col: BALLS[i % BALLS.length], vx: f.facing * (4.2 + i * 1.3), vy: ((i % 3) - 1) * 0.7, vz: 13, grav: 0.62, r: 16, dmg: 6 * pw(f), kb: 2, stun: 18,
+            explodeOnGround: 80, blastDmg: 12 * pw(f), blastColor: BALLS[i % BALLS.length], life: 120, trailN: 6 });
+          A().play('whoosh');
+        }
+        if (t === 28) { g.morph(f.x, f.y - 70); A().play('roar'); }
+        if (t === 40) {
+          g.addEffect(new TT.Shockwave(g, f.x + f.facing * 90, f.y, 320, 16 * pw(f), 'hero'));
+          g.groundRing(f.x + f.facing * 90, f.y, '#ffd23a'); g.shake = Math.max(g.shake, 16);
+          confetti(g, f.x + f.facing * 90, f.y, 40, 15);
+          word(g, f.x + f.facing * 60, f.y - 230, 'TA-DÁ!', '#ffe14a', '#ff4a4a', 64);
+          g.tintScreen('#ffd23a', 10); A().play('boom');
+        }
+        if (t === this.s + this.a + this.r - 1) g.morph(f.x, f.y - 70, true);
+      } },
+  };
+
+  // Versões alternativas: poderes do Titã de origem no mesmo nível de poder dos outros personagens
+  // (golpes novos na fase 7; combo de 5 e o COMBO FINAL próprio só a partir da fase 8).
+  function alt(key, base, o) {
+    const mk = (lv) => Object.assign({}, lv[base], { base, style: key, extra: true }, o);
+    TT.TITANS[key] = mk(TT.TITANS);
+    TT.TITANS_PLUS[key] = mk(TT.TITANS_PLUS);
+    TT.TITANS_COMBO[key] = Object.assign(mk(TT.TITANS_COMBO), { ender: ALT_ENDERS[key] });
+  }
+  alt('apprentice', 'robin', { name: 'Aprendiz', color: '#ff7a1a', fx: '#ff9a3a', blurb: 'O Robin como aprendiz do Slade: golpes do Robin e, a partir da fase 8, o combo final Trilha em Chamas.' });
+  alt('redraven', 'raven', { name: 'Ravena Vermelha', color: '#c8102e', fx: '#ff3b5a', blurb: 'A Ravena tomada pelo lado de Trigon: poderes da Ravena e, a partir da fase 8, o combo final Selo da Ira.' });
+  alt('whiteraven', 'raven', { name: 'Ravena Branca', color: '#e6e6f2', fx: '#ffffff', blurb: 'A Ravena de manto branco que venceu Trigon com a luz: poderes da Ravena e, a partir da fase 8, a Tempestade de Penas (que cura).' });
+  alt('clownbb', 'beastboy', { name: 'Mutano Palhaço', color: '#ffd23a', fx: '#ff5a5a', blurb: 'O Mutano de palhaço no circo do Mumbo: animais do Mutano e, a partir da fase 8, o Picadeiro Selvagem.' });
 
   // Resumo dos golpes para o menu (nome do forte/especial/combo final de cada um).
   TT.MOVE_INFO = {
@@ -1310,10 +1590,10 @@
     freak: ['Controle remoto', 'ZAP!', 'Botão de PAUSA', 'Maratona de TV'],
     madmod: ['Bengala', 'Raio hipnótico', 'Espiral que puxa', 'Revolução Britânica'],
     trigon: ['Socos gigantes', 'Raios dos quatro olhos', 'Chuva de fogo', 'O Fim'],
-    redraven: ['Energia negra (combo de 5)', 'Telecinese', 'Tentáculos de sombra', 'Esferas de Azarath'],
-    whiteraven: ['Energia negra (combo de 5)', 'Telecinese', 'Tentáculos de sombra', 'Esferas de Azarath'],
-    apprentice: ['Bastão (combo de 5)', 'Disco congelante', 'Discos explosivos', 'Golpe Relâmpago'],
-    clownbb: ['Animais (combo de 5)', 'Elefante', 'A Fera', 'Estouro da Manada'],
+    redraven: ['Energia negra (combo)', 'Telecinese', 'Tentáculos de sombra', 'Selo da Ira'],
+    whiteraven: ['Energia negra (combo)', 'Telecinese', 'Tentáculos de sombra', 'Tempestade de Penas'],
+    apprentice: ['Bastão (combo)', 'Disco congelante', 'Discos explosivos', 'Trilha em Chamas'],
+    clownbb: ['Animais (combo)', 'Elefante', 'A Fera', 'Picadeiro Selvagem'],
   };
 
   // ================================================================ Equipe escolhida (salva no navegador)

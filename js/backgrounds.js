@@ -2987,7 +2987,385 @@
     });
   }
 
+  // ---------------------------------------------------------------- Fase 12 — O Labirinto de Espelhos
+  // Parque de diversões abandonado no cais de Jump City à noite: calçadão de madeira sobre o mar escuro,
+  // barracas de parque com lâmpadas coloridas piscando, silhuetas de roda-gigante e montanha-russa,
+  // e o pavilhão dos espelhos com painéis de cristal e reflexos prismáticos.
+  const S12_MIDWAY = 2200, S12_PAVILION = 4200;
+
+  // Barraca de parque com toldo listrado.
+  function carnivalBooth(g, x, base, title, col1, col2, r) {
+    const w = 180, h = 170, top = base - h;
+    g.fillStyle = '#261b16'; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.fillRect(x, top, w, h); g.strokeRect(x, top, w, h);
+    // toldo listrado ondulado
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = (i % 2 === 0) ? col1 : col2;
+      g.fillRect(x + i * 30, top - 30, 30, 36);
+      g.beginPath(); g.arc(x + i * 30 + 15, top + 6, 15, 0, Math.PI); g.fill();
+    }
+    g.strokeStyle = OUT; g.lineWidth = 2.5;
+    for (let i = 0; i < 6; i++) {
+      g.strokeRect(x + i * 30, top - 30, 30, 36);
+      g.beginPath(); g.arc(x + i * 30 + 15, top + 6, 15, 0, Math.PI); g.stroke();
+    }
+    // balcão de madeira
+    g.fillStyle = '#3e2a20'; g.fillRect(x - 6, base - 60, w + 12, 14);
+    g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x - 6, base - 60, w + 12, 14);
+    // interior escuro com prêmios / alvos
+    g.fillStyle = '#140c12'; g.fillRect(x + 12, top + 18, w - 24, h - 84);
+    g.fillStyle = '#ffe14a';
+    for (let i = 0; i < 3; i++) {
+      g.beginPath(); g.arc(x + 40 + i * 50, top + 55, 14, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(x + 40 + i * 50, top + 55, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffe14a';
+    }
+    sign(g, x + w / 2, top - 45, 150, 28, title, '#1e1424', '#ffe14a');
+    // luzes no topo do toldo
+    for (let i = 0; i < 5; i++) {
+      const lx = x + 15 + i * 38, ly = top - 32;
+      const lc = ['#ffe14a', '#6fe3ff', '#ff5ad0', '#5dff8a', '#ff9a2a'][i % 5];
+      g.fillStyle = lc; g.beginPath(); g.arc(lx, ly, 4, 0, Math.PI * 2); g.fill();
+      glowPool(g, lx, ly, 22, 22, lc, 0.4);
+    }
+  }
+
+  // Painel de espelho gigante com reflexos facetados e moldura dourada / art-déco.
+  function mirrorPanel(g, x, y, w, h, r) {
+    g.fillStyle = '#7a5a22'; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.fillRect(x - 8, y - 8, w + 16, h + 16); g.strokeRect(x - 8, y - 8, w + 16, h + 16);
+    g.fillStyle = '#c9a24a'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
+    // espelho com gradiente reflexivo frio/arco-íris
+    const mg = g.createLinearGradient(x, y, x + w, y + h);
+    mg.addColorStop(0, '#2a3a5a'); mg.addColorStop(0.3, '#5c4a78'); mg.addColorStop(0.6, '#3a6a8a'); mg.addColorStop(1, '#6a4a82');
+    g.fillStyle = mg; g.fillRect(x, y, w, h);
+    // faixas de reflexo brilhante diagonais
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.beginPath(); g.moveTo(x - 40, y + h); g.lineTo(x + 40, y); g.lineTo(x + 90, y); g.lineTo(x + 10, y + h); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(120,240,255,0.25)';
+    g.beginPath(); g.moveTo(x + 70, y + h); g.lineTo(x + 150, y); g.lineTo(x + 180, y); g.lineTo(x + 100, y + h); g.closePath(); g.fill();
+    // rachaduras no espelho
+    if (r() < 0.6) {
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2;
+      const rx = x + w * 0.45, ry = y + h * 0.55;
+      g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx - 30, ry - 40); g.lineTo(rx - 60, ry - 30);
+      g.moveTo(rx, ry); g.lineTo(rx + 45, ry - 25); g.lineTo(rx + 75, ry - 60);
+      g.moveTo(rx, ry); g.lineTo(rx + 15, ry + 50); g.lineTo(rx + 50, ry + 80);
+      g.moveTo(rx, ry); g.lineTo(rx - 40, ry + 40); g.stroke();
+    }
+    g.restore();
+    g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x, y, w, h);
+    glowPool(g, x + w / 2, y + h / 2, w * 0.7, h * 0.7, '#7bf0ff', 0.2);
+  }
+
+  // Cristais brotando do chão do cais.
+  function crystalCluster(g, x, base, col, s) {
+    g.save(); g.translate(x, base); g.scale(s, s);
+    const blades = [[-18, 55, 12, -0.35], [-4, 85, 15, -0.05], [14, 65, 13, 0.28]];
+    for (const [dx, h, w, rot] of blades) {
+      g.save(); g.rotate(rot);
+      g.beginPath(); g.moveTo(dx - w, 0); g.lineTo(dx - w * 0.5, -h * 0.78); g.lineTo(dx, -h); g.lineTo(dx + w * 0.5, -h * 0.78); g.lineTo(dx + w, 0); g.closePath();
+      g.fillStyle = col; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2.5; g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.55)';
+      g.beginPath(); g.moveTo(dx - w * 0.3, -h * 0.1); g.lineTo(dx - w * 0.2, -h * 0.82); g.lineTo(dx, -h * 0.92); g.lineTo(dx, 0); g.closePath(); g.fill();
+      g.restore();
+    }
+    g.restore();
+    glowPool(g, x, base - 35 * s, 60 * s, 60 * s, col, 0.35);
+  }
+
+  // Chão do cais em tábuas de madeira.
+  function pierPlanks(g, x0, x1, seed) {
+    // base de madeira escura
+    g.fillStyle = '#281c16'; g.fillRect(x0, FT, x1 - x0, H - FT);
+    // tábuas horizontais
+    const plankH = 26;
+    for (let y = FT, row = 0; y < H; y += plankH, row++) {
+      g.fillStyle = row % 2 ? '#34231b' : '#2b1d17';
+      g.fillRect(x0, y, x1 - x0, plankH - 3);
+      // ranhuras e juntas de tábuas
+      g.fillStyle = '#18100c';
+      g.fillRect(x0, y + plankH - 3, x1 - x0, 3);
+      // divisões verticais escalonadas de tábuas (com pregos)
+      const offset = (row * 137 + seed * 23) % 240;
+      for (let x = Math.floor((x0 - offset) / 240) * 240 + offset; x < x1; x += 240) {
+        g.fillRect(x, y, 3, plankH - 3);
+        // pregos escuros
+        g.fillStyle = '#100a08';
+        g.fillRect(x - 5, y + 4, 3, 3); g.fillRect(x - 5, y + plankH - 9, 3, 3);
+        g.fillRect(x + 5, y + 4, 3, 3); g.fillRect(x + 5, y + plankH - 9, 3, 3);
+        g.fillStyle = '#18100c';
+      }
+    }
+    // borda superior do cais com arremate
+    g.fillStyle = '#422c22'; g.fillRect(x0, FT, x1 - x0, 6);
+    g.fillStyle = '#140c08'; g.fillRect(x0, FT + 6, x1 - x0, 2);
+  }
+
+  function s12Far(g, x0, x1) {
+    const sky = g.createLinearGradient(0, 0, 0, 420);
+    sky.addColorStop(0, '#0a081c'); sky.addColorStop(0.5, '#16143c'); sky.addColorStop(0.85, '#282460'); sky.addColorStop(1, '#3e2c6e');
+    g.fillStyle = sky; g.fillRect(x0, 0, x1 - x0, H);
+    // estrelas cintilantes no céu noturno
+    cells(x0, x1, 80, 1201, (cx, r) => {
+      g.fillStyle = 'rgba(255,255,255,' + (0.35 + r() * 0.55) + ')';
+      g.fillRect(cx + r() * 80, r() * 220, 2, 2);
+      if (r() < 0.2) { g.fillStyle = 'rgba(180,240,255,0.7)'; g.fillRect(cx + r() * 80 - 1, r() * 220, 4, 1); g.fillRect(cx + r() * 80, r() * 220 - 1, 1, 4); }
+    });
+    // lua crescente prateada com brilho suave
+    cells(x0, x1, 2600, 1203, (cx) => {
+      const lx = cx + 700, ly = 95;
+      glowPool(g, lx, ly, 160, 160, '#c2e2ff', 0.4);
+      g.fillStyle = '#e8f4ff'; g.beginPath(); g.arc(lx, ly, 38, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#16143c'; g.beginPath(); g.arc(lx + 14, ly - 6, 34, 0, Math.PI * 2); g.fill();
+    });
+    // silhuetas de atrações distantes do parque: roda-gigante e montanha-russa
+    cells(x0, x1, 1800, 1205, (cx) => {
+      // roda-gigante
+      const rx = cx + 450, ry = 230, rad = 130;
+      g.strokeStyle = '#181438'; g.lineWidth = 5;
+      g.beginPath(); g.arc(rx, ry, rad, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(rx, ry, rad * 0.65, 0, Math.PI * 2); g.stroke();
+      // suportes em V
+      g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx - 70, 420); g.moveTo(rx, ry); g.lineTo(rx + 70, 420); g.stroke();
+      // raios com luzes
+      g.lineWidth = 2.5;
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI / 6;
+        g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx + Math.cos(a) * rad, ry + Math.sin(a) * rad); g.stroke();
+        // cabine / gôndola
+        const gx = rx + Math.cos(a) * rad, gy = ry + Math.sin(a) * rad;
+        g.fillStyle = '#181438'; g.fillRect(gx - 7, gy - 7, 14, 14);
+        const col = ['#ffe14a', '#7bf0ff', '#ff5ad0', '#5dff8a'][i % 4];
+        g.fillStyle = col; g.beginPath(); g.arc(gx, gy, 3, 0, Math.PI * 2); g.fill();
+      }
+      // montanha-russa estilizada (loops e trilhos)
+      const mx = cx + 1100;
+      g.strokeStyle = '#1a163e'; g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(mx - 200, 420);
+      g.quadraticCurveTo(mx - 100, 80, mx, 220);
+      g.quadraticCurveTo(mx + 60, 320, mx + 120, 160);
+      g.quadraticCurveTo(mx + 180, 20, mx + 260, 260);
+      g.quadraticCurveTo(mx + 330, 420, mx + 420, 420);
+      g.stroke();
+      // suportes verticais da montanha-russa
+      g.lineWidth = 2;
+      for (let sx = mx - 160; sx <= mx + 380; sx += 45) {
+        g.beginPath(); g.moveTo(sx, 420); g.lineTo(sx, 200 + Math.sin((sx - mx) * 0.02) * 100); g.stroke();
+      }
+    });
+    // mar calmo refletindo as luzes do cais
+    const sea = g.createLinearGradient(0, 350, 0, H);
+    sea.addColorStop(0, '#1c1844'); sea.addColorStop(0.25, '#121032'); sea.addColorStop(1, '#08061a');
+    g.fillStyle = sea; g.fillRect(x0, 350, x1 - x0, H - 350);
+    cells(x0, x1, 70, 1207, (cx, r) => {
+      for (let k = 0; k < 3; k++) {
+        const y = 358 + r() * 110, w = 18 + r() * 40;
+        const col = pick(r, ['rgba(120,220,255,0.4)', 'rgba(255,180,240,0.3)', 'rgba(255,230,120,0.35)', 'rgba(90,140,255,0.25)']);
+        g.fillStyle = col; g.fillRect(cx + r() * 70, y, w, 2.5);
+      }
+    });
+  }
+
+  function s12Mid(g, x0, x1) {
+    // Calçadão intermediário: silhuetas de barracas, tendas de circo e postes com varal de luzes
+    cells(x0, x1, 460, 1211, (cx, r) => {
+      const x = cx + r() * 80, base = 470;
+      // barraca de parque com telhado pontudo
+      const bw = 160 + r() * 60, bh = 140 + r() * 80, top = base - bh;
+      g.fillStyle = '#1c152a'; g.strokeStyle = OUT; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(x, base); g.lineTo(x, top + 40); g.lineTo(x + bw / 2, top); g.lineTo(x + bw, top + 40); g.lineTo(x + bw, base); g.closePath(); g.fill(); g.stroke();
+      // janelas iluminadas com silhuetas de prêmios
+      g.fillStyle = r() < 0.5 ? 'rgba(255,225,120,0.45)' : 'rgba(120,240,255,0.4)';
+      g.fillRect(x + 16, top + 55, bw - 32, bh - 75);
+      g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(x + 16, top + 55, bw - 32, bh - 75);
+    });
+    // Varal de lâmpadas coloridas no plano médio
+    cells(x0, x1, 320, 1213, (cx) => {
+      const ya = 220, yb = 210, xa = cx, xb = cx + 320;
+      g.strokeStyle = 'rgba(20,15,35,0.7)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(xa, ya); g.quadraticCurveTo((xa + xb) / 2, ya + 35, xb, yb); g.stroke();
+      for (let i = 1; i <= 6; i++) {
+        const u = i / 7, lx = xa + (xb - xa) * u, ly = ya + (yb - ya) * u + 4 * 35 * u * (1 - u);
+        const col = ['#ff5ad0', '#ffe14a', '#7bf0ff', '#5dff8a', '#ff8a3a'][i % 5];
+        g.fillStyle = col; g.beginPath(); g.arc(lx, ly, 4, 0, Math.PI * 2); g.fill();
+        glowPool(g, lx, ly, 20, 20, col, 0.35);
+      }
+    });
+    // No trecho do Pavilhão dos Espelhos (S12_PAVILION em diante): a cúpula de cristal gigante no fundo
+    part(g, x0, x1, S12_PAVILION - 200, 1e5, () => {
+      cells(x0, x1, 1400, 1215, (cx) => {
+        const mx = cx + 700, base = 470;
+        // cúpula imponente com espirais e facetas de cristal
+        g.fillStyle = '#221638'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.beginPath(); g.arc(mx, base - 100, 260, Math.PI, 0); g.fill(); g.stroke();
+        // costelas da cúpula
+        g.strokeStyle = '#442b6a'; g.lineWidth = 3;
+        for (let a = Math.PI; a <= Math.PI * 2; a += Math.PI / 8) {
+          g.beginPath(); g.moveTo(mx, base - 100); g.lineTo(mx + Math.cos(a) * 260, base - 100 + Math.sin(a) * 260); g.stroke();
+        }
+        // agulha de cristal no ápice
+        g.fillStyle = '#7bf0ff';
+        g.beginPath(); g.moveTo(mx - 14, base - 360); g.lineTo(mx, base - 440); g.lineTo(mx + 14, base - 360); g.closePath(); g.fill();
+        glowPool(g, mx, base - 440, 80, 80, '#7bf0ff', 0.5);
+      });
+    });
+  }
+
+  function s12Near(g, x0, x1) {
+    // --- Trecho 1: Entrada do Cais e Alameda Inicial
+    part(g, x0, x1, -1e5, S12_MIDWAY, () => {
+      cells(x0, x1, 840, 1221, (cx, r) => {
+        const fx = cx + 40;
+        // portal de entrada em arco de madeira ornamentada
+        g.fillStyle = '#3a261c'; g.strokeStyle = OUT; g.lineWidth = 5;
+        g.fillRect(fx, 130, 48, FT - 130); g.strokeRect(fx, 130, 48, FT - 130);
+        g.fillRect(fx + 360, 130, 48, FT - 130); g.strokeRect(fx + 360, 130, 48, FT - 130);
+        // arco superior
+        g.beginPath(); g.moveTo(fx, 180); g.quadraticCurveTo(fx + 204, 90, fx + 408, 180);
+        g.lineTo(fx + 408, 130); g.quadraticCurveTo(fx + 204, 50, fx, 130); g.closePath(); g.fill(); g.stroke();
+        sign(g, fx + 204, 120, 260, 40, 'PARQUE DAS BRISAS', '#1e1424', '#ffe14a');
+        // grade de proteção do cais com vista para o mar escuro
+        for (let gx = fx + 48; gx < fx + 360; gx += 28) {
+          g.fillStyle = '#4a3225'; g.fillRect(gx, FT - 110, 10, 110);
+          g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(gx, FT - 110, 10, 110);
+        }
+        g.fillStyle = '#5c3f2f'; g.fillRect(fx + 48, FT - 115, 312, 14);
+        g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(fx + 48, FT - 115, 312, 14);
+      });
+      pierPlanks(g, x0, x1, 1223);
+    });
+
+    // --- Trecho 2: Alameda das Atrações e Jogos
+    part(g, x0, x1, S12_MIDWAY, S12_PAVILION, () => {
+      cells(x0, x1, 600, 1231, (cx, r) => {
+        const title = pick(r, ['TIRO AO ALVO', 'ROLETA MÁGICA', 'TESTE DE FORÇA', 'DARDOS']);
+        const col1 = pick(r, ['#d7263e', '#7a2bb5', '#1d70b8', '#1f9a6a']);
+        const col2 = '#f2ebd9';
+        carnivalBooth(g, cx + 50, FT, title, col1, col2, r);
+        // poste com alto-falante e lâmpadas
+        g.fillStyle = '#2a1e18'; g.fillRect(cx + 280, 140, 14, FT - 140);
+        g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(cx + 280, 140, 14, FT - 140);
+        g.fillStyle = '#4a3628'; g.beginPath(); g.moveTo(cx + 270, 160); g.lineTo(cx + 250, 145); g.lineTo(cx + 250, 175); g.closePath(); g.fill(); g.stroke();
+      });
+      pierPlanks(g, x0, x1, 1233);
+    });
+
+    // --- Trecho 3: O Pavilhão dos Espelhos / Covil de Prisma
+    part(g, x0, x1, S12_PAVILION, 1e5, () => {
+      // parede do pavilhão: tapeçaria roxo-escura com molduras douradas e espelhos mágicos
+      const wall = g.createLinearGradient(0, 0, 0, FT);
+      wall.addColorStop(0, '#100a1c'); wall.addColorStop(0.6, '#201438'); wall.addColorStop(1, '#321c54');
+      g.fillStyle = wall; g.fillRect(x0, 0, x1 - x0, FT);
+      // colunas facetadas
+      cells(x0, x1, 520, 1241, (cx, r) => {
+        const px = cx + 50;
+        g.fillStyle = '#26163e'; g.strokeStyle = OUT; g.lineWidth = 4;
+        g.fillRect(px, 30, 60, FT - 30); g.strokeRect(px, 30, 60, FT - 30);
+        g.fillStyle = '#462a6e'; g.fillRect(px - 10, 30, 80, 22); g.strokeRect(px - 10, 30, 80, 22);
+        g.fillRect(px - 10, FT - 22, 80, 22); g.strokeRect(px - 10, FT - 22, 80, 22);
+        // grandes painéis de espelho ornamentados entre colunas
+        mirrorPanel(g, px + 90, 80, 280, FT - 120, r);
+      });
+      // piso de madeira laqueada com mosaicos de cristal losangulares
+      g.fillStyle = '#1c122a'; g.fillRect(x0, FT, x1 - x0, H - FT);
+      for (let y = FT, row = 0; y < H; y += 38, row++) {
+        for (let x = Math.floor(x0 / 76) * 76 + (row % 2) * 38; x < x1; x += 76) {
+          g.fillStyle = ((x / 38) + row) % 2 ? '#2a1a3e' : '#3c2458';
+          g.beginPath(); g.moveTo(x + 38, y); g.lineTo(x + 76, y + 19); g.lineTo(x + 38, y + 38); g.lineTo(x, y + 19); g.closePath();
+          g.fill();
+          g.strokeStyle = 'rgba(120,240,255,0.25)'; g.lineWidth = 1.5; g.stroke();
+        }
+      }
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0, FT, x1 - x0, 8);
+    });
+  }
+
+  function d12(g, x0, x1) {
+    // Detalhes da fase 12
+    part(g, x0, x1, -1e5, S12_MIDWAY, () => {
+      cells(x0, x1, 440, 1251, (cx, r) => {
+        // cabeço de amarração náutica (bollard) com corda
+        const bx = cx + 80, by = FT + 8;
+        g.fillStyle = '#1e1c22'; g.strokeStyle = OUT; g.lineWidth = 3;
+        g.fillRect(bx - 12, by - 34, 24, 34); g.strokeRect(bx - 12, by - 34, 24, 34);
+        g.fillRect(bx - 18, by - 42, 36, 10); g.strokeRect(bx - 18, by - 42, 36, 10);
+        g.strokeStyle = '#c2a878'; g.lineWidth = 4;
+        g.beginPath(); g.arc(bx, by - 16, 18, 0, Math.PI * 2); g.stroke();
+        // tickets de parque espalhados no chão
+        if (r() < 0.5) {
+          g.fillStyle = pick(r, ['#ff5ad0', '#ffe14a', '#7bf0ff']);
+          g.save(); g.translate(cx + 220, FT + 60 + r() * 120); g.rotate(r() * 2);
+          g.fillRect(-12, -7, 24, 14); g.strokeStyle = OUT; g.lineWidth = 1.5; g.strokeRect(-12, -7, 24, 14);
+          g.restore();
+        }
+      });
+    });
+
+    part(g, x0, x1, S12_MIDWAY, S12_PAVILION, () => {
+      cells(x0, x1, 380, 1253, (cx, r) => {
+        // brinquedos caídos, cacos de vidro brilhando no chão
+        if (r() < 0.6) {
+          const x = cx + r() * 220, y = FT + 40 + r() * 140;
+          g.fillStyle = 'rgba(120,240,255,0.7)';
+          for (let k = 0; k < 4; k++) {
+            g.save(); g.translate(x + k * 14, y + (k % 2) * 8); g.rotate(k * 0.8);
+            g.beginPath(); g.moveTo(-5, 0); g.lineTo(0, -9); g.lineTo(6, 3); g.closePath(); g.fill();
+            g.restore();
+          }
+        }
+      });
+    });
+
+    part(g, x0, x1, S12_PAVILION, 1e5, () => {
+      cells(x0, x1, 460, 1255, (cx, r) => {
+        // formações de cristais prismáticos brotando do piso laqueado
+        const x = cx + 120 + r() * 180;
+        const col = pick(r, ['#7bf0ff', '#b87aff', '#ff7adf', '#5df2d6']);
+        crystalCluster(g, x, FT + 8, col, 0.8 + r() * 0.4);
+      });
+      cells(x0, x1, 320, 1257, (cx, r) => {
+        // espelhos quebrados no chão refletindo luz de arco-íris
+        if (r() < 0.5) {
+          const x = cx + r() * 160, y = FT + 50 + r() * 140;
+          glowPool(g, x, y, 70, 25, '#7bf0ff', 0.25);
+          g.fillStyle = 'rgba(255,255,255,0.4)';
+          g.beginPath(); g.ellipse(x, y, 36, 12, 0.2, 0, Math.PI * 2); g.fill();
+        }
+      });
+    });
+  }
+
+  // Primeiro plano: pilares de madeira do cais com cordas enroladas e bandeirolas no topo
+  function s12Fg(g, x0, x1) {
+    cells(x0, x1, 980, 1271, (cx, r) => {
+      // pilar de madeira robusto no primeiro plano subindo da borda inferior
+      const x = cx + 180;
+      g.fillStyle = '#22150e'; g.strokeStyle = OUT; g.lineWidth = 5;
+      g.fillRect(x - 36, H - 240, 72, 240); g.strokeRect(x - 36, H - 240, 72, 240);
+      // anel de metal enferrujado
+      g.fillStyle = '#3e2a20'; g.fillRect(x - 40, H - 210, 80, 16);
+      g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(x - 40, H - 210, 80, 16);
+      // corda náutica enrolada
+      g.strokeStyle = '#a68856'; g.lineWidth = 6;
+      for (let y = H - 180; y < H - 110; y += 14) {
+        g.beginPath(); g.moveTo(x - 36, y); g.lineTo(x + 36, y + 6); g.stroke();
+      }
+      // cacos de cristal no topo do pilar se estiver no pavilhão
+      if (x > S12_PAVILION) {
+        g.fillStyle = '#7bf0ff';
+        g.beginPath(); g.moveTo(x - 10, H - 240); g.lineTo(x, H - 280); g.lineTo(x + 12, H - 240); g.closePath(); g.fill();
+        glowPool(g, x, H - 260, 40, 40, '#7bf0ff', 0.4);
+      }
+    });
+  }
+
   TT.makeBackground = function (id) {
+    if (id === 12) {
+      return { layers: [new Layer(0.1, s12Far, 44), new Layer(0.38, s12Mid, 45), new Layer(1, detailed(s12Near, d12, 'rgba(20,10,40,0.3)'), 46)], fg: new Layer(1.18, s12Fg, 47), id };
+    }
     if (id === 11) {
       return { layers: [new Layer(0.1, s11Far, 40), new Layer(0.38, s11Mid, 41), new Layer(1, detailed(s11Near, d11, 'rgba(60,0,0,0.35)'), 42)], fg: new Layer(1.18, s11Fg, 43), id };
     }
