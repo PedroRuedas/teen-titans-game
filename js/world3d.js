@@ -956,7 +956,20 @@
         // 2ª arena 3D: vista de cima, quase um tabuleiro
         s = { x: cx, y: 40, z: 20, yaw: 0.12, pitch: 0.8, fov: 40, dist: 0, roll: 0, sm: 0.05, frame: 1180 };
       }
-      if (!s.dist) s.dist = this.fitDist(s.fov, s.frame || W);
+      if (!s.dist) {
+        // ninguém importante fica fora do quadro: alarga e desloca o enquadramento para caber os Titãs (e o chefe)
+        let lo = 1e9, hi = -1e9;
+        for (const t of ps) { lo = Math.min(lo, t.x); hi = Math.max(hi, t.x); }
+        if (b && !b.dead) { lo = Math.min(lo, b.x); hi = Math.max(hi, b.x); }
+        let fw = s.frame || W;
+        if (hi > lo - 1) {
+          const m = 170 + Math.abs(Math.sin(s.yaw)) * 120;
+          lo -= m; hi += m;
+          if (hi - lo > fw) { fw = hi - lo; s.x = (lo + hi) / 2; }
+          else s.x = TT.clamp(s.x, hi - fw / 2, lo + fw / 2);
+        }
+        s.dist = this.fitDist(s.fov, fw);
+      }
       // DOBRA DIMENSIONAL: o chefe achata o mundo e a câmera volta a ser plana
       const fl = b && b.flat ? b.flat : 0;
       if (fl > 0) {
