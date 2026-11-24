@@ -1,7 +1,7 @@
 // Servidor estático mínimo para testes: node tests/serve.js  ->  http://localhost:8765
 const http = require('http'), fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.mp3': 'audio/mpeg', '.webmanifest': 'application/manifest+json' };
 http.createServer((q, r) => {
   let p = decodeURIComponent(q.url.split('?')[0]);
   if (p === '/') p = '/index.html';
