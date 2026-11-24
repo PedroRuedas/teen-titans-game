@@ -11,7 +11,7 @@
     if (!key) return { name: '', color: '#ffe14a' };
     const d = TT.TITANS[key];
     if (d) return { name: d.name.toUpperCase(), color: d.color };
-    const colors = { trigon: '#ff3a2a', madmod: '#ff5ad0', prisma: '#7bf0ff' };
+    const colors = { trigon: '#ff3a2a', madmod: '#ff5ad0', prisma: '#7bf0ff', 'vértice': '#5ff2ff' };
     return { name: key.toUpperCase(), color: colors[key] || '#ffffff' };
   };
   function wrap(ctx, text, maxW, size) {

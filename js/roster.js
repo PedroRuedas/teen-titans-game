@@ -297,7 +297,7 @@
   const onScreen = (g, front, f) => g.enemies.filter((e) => !e.dead && Math.abs(e.x - g.camX - TT.W / 2) < TT.W / 2 + 30 && (!front || (e.x - f.x) * f.facing > -40));
   const hitOne = (g, f, e, d) => { if (e.takeHit(f, d, TT.sign(e.x - f.x) || f.facing)) g.onHit(f, e, d); };
   const word = (g, x, y, text, c1, c2, size) => g.particles.spawn('text', x, y, { text, size: size || 40, color: c1 || '#ffe14a', color2: c2 || '#ff4a3a', vy: -0.6, life: 38, rot: TT.rand(-0.2, 0.2) });
-  const comboName = (f, g, text) => { g.comboTag = { text, col: f.def.color, fx: f.def.fx || f.def.color, t: 0 }; g.particles.spawn('ring', f.x, f.y - f.z - 80, { color: f.def.fx || f.def.color, size: 140, life: 18 }); };
+  const comboName = (f, g, text) => { g.comboTag = { text, col: f.def.color, fx: f.def.fx || f.def.color, t: 0, f }; g.particles.spawn('ring', f.x, f.y - f.z - 80, { color: f.def.fx || f.def.color, size: 140, life: 18 }); };
   const burst = (g, x, y, col, n) => {
     for (let i = 0; i < (n || 8); i++) { const a = Math.random() * Math.PI * 2, sp = TT.rand(3, 9); g.particles.spawn('star', x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, color: TT.choice([col, '#ffffff']), size: TT.rand(6, 11), life: TT.randi(12, 20), rot: Math.random(), vr: 0.2 }); }
     g.particles.spawn('glow', x, y, { color: col, size: 90, life: 10 });

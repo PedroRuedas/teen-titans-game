@@ -3362,7 +3362,10 @@
     });
   }
 
+  // Peças para cenários definidos fora deste arquivo (js/fase13.js).
+  TT.BG = { Layer, cells, glowPool, detailed, clipX };
   TT.makeBackground = function (id) {
+    if (TT.BG_EXTRA && TT.BG_EXTRA[id]) return TT.BG_EXTRA[id]();
     if (id === 12) {
       return { layers: [new Layer(0.1, s12Far, 44), new Layer(0.38, s12Mid, 45), new Layer(1, detailed(s12Near, d12, 'rgba(20,10,40,0.3)'), 46)], fg: new Layer(1.18, s12Fg, 47), id };
     }
