@@ -360,11 +360,17 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       elevado** com o trem passando; **telões** mostrando o olho do Vértice; a **Torre Titã** na baía ao longe; cubos e
       pirâmides flutuando no céu; e o **Núcleo**: uma plataforma de hexágonos neon com um poliedro gigante girando no
       céu e um feixe de luz.
-    - **Personagens 3D:** os Titãs (e qualquer personagem do menu PERSONAGENS) viram bonecos 3D em estilo de desenho
-      (sombreado em faixas e contorno preto), com o rosto, o cabelo, a capa do Robin, o manto e a joia da Ravena, o
-      olho vermelho do Ciborgue, o cabelão da Estelar e as orelhas do Mutano. Eles são animados pelos **mesmos ângulos
-      de pose** do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D (as transformações animais do
-      Mutano continuam desenhadas em 2D).
+    - **Personagens 3D:** os cinco Titãs (e o Aprendiz, a Ravena Vermelha, a Ravena Branca e o Mutano Palhaço) viram
+      bonecos 3D em estilo de desenho (sombreado em faixas e contorno preto). O rosto é pintado com o **mesmo traço dos
+      rostos 2D** (olhos, máscara do Robin, olhos verdes da Estelar, olho vermelho do Ciborgue, chakra da Ravena) numa
+      cabeça de desenho animado com queixo fino; o cabelo tem volume (pontas do Robin e do Mutano, franja e mechas da
+      Estelar, chanel da Ravena sob o capuz) e o uniforme vem pintado no tronco (emblema R, placas azuis do Ciborgue,
+      cinto de discos da Ravena, top, barriga e saia da Estelar). A **capa do Robin**, o **manto da Ravena** e o
+      **cabelão da Estelar** são tecido: pendem dos ombros, balançam para trás com o movimento e são empurrados para
+      fora do corpo, então não atravessam braços nem pernas. Os bonecos são animados pelos **mesmos ângulos de pose**
+      do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D. Os outros personagens jogáveis (vilões e
+      soldados liberados) e as transformações animais do Mutano continuam com o desenho 2D original, de pé na
+      profundidade deles.
     - **Câmera diretora:** 3/4 nas arenas, **perseguição** pela avenida entre as arenas, **vista de cima** na 2ª arena
       3D, **close no COMBO FINAL**, **volta completa** em torno do chefe quando ele aparece e câmera que passeia de
       um lado para o outro na fase 2 do chefe.

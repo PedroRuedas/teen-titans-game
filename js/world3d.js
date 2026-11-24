@@ -31,6 +31,172 @@
   const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   const seeded = TT.seeded;
 
+  // ------------------------------------------------------------ Pintura dos rostos 3D
+  // Textura 512x256 enrolada na esfera da cabeça: o centro (256, 128) é a frente do rosto (+X), x = longitude
+  // (canvas para a direita = esquerda do personagem), y = latitude. Desenha no espaço dos rostos 2D de faces.js
+  // (cabeça de raio 100, y para baixo), só que de frente: 1 unidade = 0,8 px. Mesmos olhos, bocas e cores do 2D.
+  const FK = 0.8, INK3 = '#140a22';
+  function faceSpace(g, fn) { g.save(); g.translate(256, 128); g.scale(FK, FK); fn(); g.restore(); }
+  // tudo cabelo, depois a "janela" de pele do rosto com a linha do cabelo contornada a nanquim
+  function hairWindow(g, K, hair, skin, win) {
+    g.fillStyle = hair; g.fillRect(0, 0, 512, 256);
+    faceSpace(g, () => K.fill(g, win, skin, 6));
+  }
+  const nose = (g, K, skin) => K.line(g, 'M 3 12 Q 9 26 0 31', 4, K.shade(skin));
+  const SIDES = (y) => `L 150 10 L 330 ${y} L 330 300 L -330 300 L -330 ${y} L -150 10 `;
+  const R_MASK = 'M -92 -42 L -62 -27 C -42 -35 -16 -31 0 -23 C 16 -31 42 -35 62 -27 L 92 -42 L 86 -10 C 76 6 52 12 36 8 C 22 6 9 2 0 -2 C -9 2 -22 6 -36 8 C -52 12 -76 6 -86 -10 Z';
+  const R_LENS = ['M -60 -16 C -52 -27 -25 -27 -14 -14 C -20 -4 -36 0 -47 -2 C -55 -4 -60 -10 -60 -16 Z', 'M 60 -16 C 52 -27 25 -27 14 -14 C 20 -4 36 0 47 -2 C 55 -4 60 -10 60 -16 Z'];
+  const FACE3D = {
+    robin(g, K, pose) {
+      const skin = '#f6c7a2';
+      hairWindow(g, K, '#141419', skin, 'M -150 10 L -122 -20 L -104 -50 L -84 -32 L -64 -58 L -42 -38 L -20 -62 L 0 -42 L 20 -62 L 42 -38 L 64 -58 L 84 -32 L 104 -50 L 122 -20 ' + SIDES(40) + 'Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        K.fill(g, R_MASK, '#141318', 0);
+        if (pose.eyes !== 'shut' && pose.eyes !== 'x') { K.fill(g, R_LENS[0], '#ffffff', 0); K.fill(g, R_LENS[1], '#ffffff', 0); }
+        else K.line(g, 'M -54 -11 L -18 -11 M 18 -11 L 54 -11', 4, '#ffffff');
+        K.mouth(g, 0, 58, pose);
+      });
+    },
+    starfire(g, K, pose) {
+      const skin = '#f2a14a';
+      // franja reta e cheia; mechas dos lados descem emoldurando o rosto
+      hairWindow(g, K, '#b81f2b', skin, 'M -76 300 L -76 -18 L -72 -34 L -58 -25 L -46 -36 L -32 -26 L -18 -37 L -4 -27 L 10 -37 L 24 -26 L 38 -36 L 52 -25 L 66 -35 L 76 -18 L 76 300 Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        const o = { rx: 22, ry: 26, sclera: '#3fd36e', iris: '#a6ffbf', irisK: 0.55, pupil: '#0d7a35', look: 0, lashes: true };
+        K.eye(g, -34, 2, pose, Object.assign({ lash: 1 }, o));
+        K.eye(g, 34, 2, pose, Object.assign({ lash: -1 }, o));
+        K.mouth(g, 0, 62, pose, { def: 'smile' });
+      });
+    },
+    beastboy(g, K, pose) {
+      const skin = '#86c95a';
+      hairWindow(g, K, '#2c5e20', skin, 'M -150 10 L -120 -24 L -100 -42 L -84 -28 L -70 -52 L -52 -32 L -36 -56 L -18 -34 L 0 -58 L 18 -34 L 36 -56 L 52 -32 L 70 -52 L 84 -28 L 100 -42 L 120 -24 ' + SIDES(40) + 'Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        const o = { rx: 20, ry: 23, iris: '#2f8f22', irisK: 0.56, look: 0, browCol: '#1d4214', browW: 6 };
+        K.eye(g, -32, -2, pose, Object.assign({ brow: 'M -54 -30 Q -32 -40 -10 -30' }, o));
+        K.eye(g, 32, -2, pose, Object.assign({ brow: 'M 10 -30 Q 32 -40 54 -30' }, o));
+        K.mouth(g, 0, 56, pose, { grin: true, fang: true });
+      });
+    },
+    cyborg(g, K, pose) {
+      const skin = '#6e4329';
+      g.fillStyle = '#d6dce4'; g.fillRect(0, 0, 512, 256);
+      faceSpace(g, () => {
+        K.line(g, 'M -330 -78 L 330 -78 M -150 -78 L -150 160 M 150 -78 L 150 160', 3, '#a8b0bc'); // emendas das placas do crânio
+        // metade humana (lado direito dele) e placa de metal sobre o olho vermelho
+        K.fill(g, 'M -98 -44 C -60 -52 -20 -52 4 -50 L 10 -18 L 4 30 L 12 98 C -20 106 -62 98 -86 76 C -102 50 -106 0 -98 -44 Z', skin, 5);
+        nose(g, K, skin);
+        K.eye(g, -34, -8, pose, { rx: 16, ry: 15, iris: '#3a2214', irisK: 0.6, look: 0, lidW: 7, brow: 'M -58 -32 L -14 -27', browW: 8 });
+        g.fillStyle = '#25252c'; g.beginPath(); g.arc(36, -8, 15, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(36, -8, 9.5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#ffd0d0'; g.beginPath(); g.arc(32, -12, 3.5, 0, Math.PI * 2); g.fill();
+        K.mouth(g, -6, 62, pose);
+      });
+    },
+    raven(g, K, pose, st) {
+      const skin = '#c9c3d7', demon = st.faceOpt && st.faceOpt.demon;
+      // cabelo violeta em chanel, franja repartida no meio deixando o chakra à mostra
+      hairWindow(g, K, '#46307a', skin, 'M -78 300 L -78 -22 L -60 -34 L -20 -36 L 0 -62 L 20 -36 L 60 -34 L 78 -22 L 78 300 Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        if (!demon) { g.fillStyle = '#e0233f'; g.beginPath(); g.ellipse(0, -44, 6, 7.5, 0, 0, Math.PI * 2); g.fill(); }
+        const o = { rx: 22, ry: 19, iris: '#5c3fa6', irisDark: '#3a2672', irisK: 0.56, pupil: '#1a1238', look: 0, lid: skin, lidK: 0.34, lidW: 8, browCol: '#2e1d5c', browW: 4.5 };
+        K.eye(g, -32, 2, pose, Object.assign({ brow: 'M -54 -20 Q -32 -28 -10 -22' }, o));
+        K.eye(g, 32, 2, pose, Object.assign({ brow: 'M 10 -22 Q 32 -28 54 -20' }, o));
+        if (pose.eyes !== 'shut' && pose.eyes !== 'x') K.line(g, 'M -50 18 Q -32 26 -14 16 M 14 16 Q 32 26 50 18', 3, '#7b6f92');
+        K.mouth(g, 0, 62, pose);
+        if (demon) { // tomada por Trigon: quatro olhos vermelhos
+          for (const [ex, ey, rr] of [[-32, 4, 14], [32, 4, 14], [-22, -40, 9], [22, -40, 9]]) {
+            g.fillStyle = '#ff2a3a'; g.beginPath(); g.ellipse(ex, ey, rr, rr * 0.7, 0, 0, Math.PI * 2); g.fill();
+            g.fillStyle = '#ffe0e0'; g.beginPath(); g.ellipse(ex, ey, rr * 0.35, rr * 0.25, 0, 0, Math.PI * 2); g.fill();
+          }
+        }
+      });
+    },
+  };
+  FACE3D.apprentice = FACE3D.robin;
+  FACE3D.clownbb = FACE3D.beastboy;
+
+  // ------------------------------------------------------------ Pintura dos uniformes (tronco)
+  // Textura 256x128 enrolada no cilindro do tronco: x = 64 é a frente (+X), 192 as costas, 128 o lado esquerdo
+  // do personagem; y = 0 nos ombros e 128 na cintura.
+  function beltBand(g, col, dark, y, h) {
+    g.fillStyle = col; g.fillRect(0, y, 256, h);
+    g.strokeStyle = INK3; g.lineWidth = 2; g.strokeRect(-4, y, 264, h);
+    if (dark) { g.fillStyle = dark; for (let x = 4; x < 256; x += 20) g.fillRect(x, y + 4, 9, h - 8); }
+  }
+  function emblem(g, x, y, col, ch, chCol) {
+    g.beginPath(); g.ellipse(x, y, 19, 16, 0, 0, Math.PI * 2); g.fillStyle = col; g.fill();
+    g.strokeStyle = INK3; g.lineWidth = 3; g.stroke();
+    g.fillStyle = chCol; g.font = 'bold 24px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, x, y + 1);
+  }
+  const TORSO3D = {
+    robin(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      g.strokeStyle = '#7d0d14'; g.lineWidth = 3; g.beginPath(); g.moveTo(66, 0); g.lineTo(63, 98); g.stroke(); // fecho da túnica
+      beltBand(g, '#f2c21c', '#b88c0e', 98, 22); // cinto de utilidades
+      emblem(g, 86, 40, '#f2c21c', 'R', INK3);
+    },
+    apprentice(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      g.fillStyle = '#ff7a1a'; g.fillRect(0, 0, 58, 98); g.fillRect(198, 0, 58, 98); // metade laranja
+      g.strokeStyle = INK3; g.lineWidth = 2; for (const x of [58, 198]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 98); g.stroke(); }
+      beltBand(g, '#8a909a', '#5e646e', 98, 22);
+      emblem(g, 86, 40, '#8a909a', 'S', '#ff7a1a');
+    },
+    starfire(g, st) {
+      g.fillStyle = st.skin; g.fillRect(0, 0, 256, 128); // barriga à mostra
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(256, 0);
+      for (let x = 256; x >= 0; x -= 8) g.lineTo(x, 54 + 8 * Math.cos((x - 64) / 256 * Math.PI * 2));
+      g.closePath(); g.fillStyle = st.torso; g.fill(); g.strokeStyle = INK3; g.lineWidth = 3; g.stroke(); // top roxo
+    },
+    beastboy(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      g.fillStyle = '#1d1a24'; g.fillRect(0, 0, 36, 128); g.fillRect(92, 0, 72, 128); g.fillRect(220, 0, 36, 128); // laterais pretas
+      g.strokeStyle = INK3; g.lineWidth = 2; for (const x of [36, 92, 164, 220]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke(); }
+      beltBand(g, '#b6bcc5', null, 104, 18); // cinto prata
+    },
+    clownbb(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      const cols = ['#e8343a', '#3a6ee8', '#3ec46a'];
+      for (let i = 0; i < 18; i++) { g.beginPath(); g.arc((i * 47) % 256 + 10, 14 + ((i * 29) % 100), 9, 0, Math.PI * 2); g.fillStyle = cols[i % 3]; g.fill(); }
+    },
+    cyborg(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      for (const cx of [64, 192]) { // placas azuis no peito e nas costas
+        g.beginPath(); g.moveTo(cx - 46, 6); g.lineTo(cx + 46, 6); g.lineTo(cx + 38, 58); g.lineTo(cx, 78); g.lineTo(cx - 38, 58); g.closePath();
+        g.fillStyle = '#3b78d8'; g.fill(); g.strokeStyle = INK3; g.lineWidth = 3; g.stroke();
+      }
+      g.fillStyle = '#3a3d47'; g.fillRect(64 - 30, 82, 60, 26); // abdômen escuro segmentado
+      g.fillStyle = '#7a808c'; for (const y of [89, 97]) g.fillRect(64 - 26, y, 52, 3);
+      g.strokeStyle = INK3; g.lineWidth = 2; g.strokeRect(64 - 30, 82, 60, 26);
+      beltBand(g, '#3a3d47', null, 110, 18); // cintura
+      g.fillStyle = '#ff3b3b'; g.beginPath(); g.arc(64, 34, 10, 0, Math.PI * 2); g.fill(); // luz vermelha no peito
+      g.fillStyle = '#ffd0d0'; g.beginPath(); g.arc(61, 31, 3.5, 0, Math.PI * 2); g.fill();
+    },
+    raven(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      for (let x = 10; x < 256; x += 24) { // cinto de discos dourados com gemas vermelhas
+        g.beginPath(); g.arc(x, 116, 9, 0, Math.PI * 2); g.fillStyle = '#e2b23c'; g.fill(); g.strokeStyle = INK3; g.lineWidth = 2; g.stroke();
+        g.beginPath(); g.arc(x, 116, 4, 0, Math.PI * 2); g.fillStyle = '#d61f3a'; g.fill();
+      }
+    },
+    hive(g, st) {
+      g.fillStyle = st.torso; g.fillRect(0, 0, 256, 128);
+      beltBand(g, '#f0c62e', null, 104, 18);
+      g.beginPath(); g.moveTo(64, 14); g.lineTo(84, 26); g.lineTo(84, 50); g.lineTo(64, 62); g.lineTo(44, 50); g.lineTo(44, 26); g.closePath();
+      g.fillStyle = '#f0c62e'; g.fill(); g.strokeStyle = INK3; g.lineWidth = 2.5; g.stroke();
+      g.fillStyle = INK3; g.font = 'bold 26px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', 64, 39);
+    },
+  };
+  // Quem ganha modelo 3D: os cinco Titãs (e as versões alternativas deles) e os inimigos da fase.
+  // Os outros personagens jogáveis continuam com o desenho 2D original, de pé no plano da profundidade
+  // (um boneco genérico em 3D não pareceria com eles).
+  const MODELED = new Set(['robin', 'apprentice', 'starfire', 'raven', 'cyborg', 'beastboy', 'clownbb']);
+
   class World3D {
     constructor(game) {
       this.game = game;
@@ -75,6 +241,9 @@
         side: T.BackSide,
       });
       this.flashMat = new T.MeshBasicMaterial({ color: 0xffffff });
+      this.flashMatD = new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide });
+      this.inkLine = new T.LineBasicMaterial({ color: 0x140a22 });
+      this.tmpV = new T.Vector3(); this.invM = new T.Matrix4(); this.segs = [];
       this.glowTex = this.makeGlowTex();
       // luzes: céu roxo, chão quente e o sol do fim de tarde (com sombras)
       this.scene.add(new T.HemisphereLight(0xc6b4ff, 0x4a3040, 0.72));
@@ -144,77 +313,87 @@
       const k = kind + ':' + (st.skin || '') + ':' + (st.cloak || '') + ':' + variant;
       let tx = this.faces.get(k);
       if (tx) return tx;
-      const c = mkCanvas(256, 128), g = c.getContext('2d');
-      const skin = kind === 'cyborg' ? '#c9ced8' : kind === 'slade' ? '#f08a1a' : st.skin || '#f4c39e';
-      g.fillStyle = skin; g.fillRect(0, 0, 256, 128);
-      const shut = variant === 'hurt', open = variant !== 'n';
-      const OUTC = '#150b22';
-      const eye = (x, y, w, h, iris, white) => {
-        if (shut) { g.strokeStyle = OUTC; g.lineWidth = 3; g.beginPath(); g.moveTo(x - w, y); g.quadraticCurveTo(x, y + 5, x + w, y); g.stroke(); return; }
-        g.fillStyle = white || '#ffffff'; g.beginPath(); g.ellipse(x, y, w, h, 0, 0, Math.PI * 2); g.fill();
-        g.strokeStyle = OUTC; g.lineWidth = 2.5; g.stroke();
-        if (iris) {
-          g.fillStyle = iris; g.beginPath(); g.ellipse(x + 1, y + 1, w * 0.6, h * 0.66, 0, 0, Math.PI * 2); g.fill();
-          g.fillStyle = OUTC; g.beginPath(); g.arc(x + 1.5, y + 1, w * 0.3, 0, Math.PI * 2); g.fill();
-          g.fillStyle = '#fff'; g.beginPath(); g.arc(x - w * 0.2, y - h * 0.35, w * 0.22, 0, Math.PI * 2); g.fill();
-        }
-      };
-      const mouth = (x, y, fang) => {
-        g.strokeStyle = OUTC; g.lineWidth = 2.5;
-        if (open) { g.fillStyle = '#5a1020'; g.beginPath(); g.ellipse(x, y, 7, 6, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = '#e0607a'; g.beginPath(); g.ellipse(x, y + 3, 4, 2, 0, 0, Math.PI * 2); g.fill(); }
-        else { g.beginPath(); g.moveTo(x - 7, y); g.quadraticCurveTo(x, y + 3, x + 7, y - 1); g.stroke(); }
-        if (fang) { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x + 1, y + 1); g.lineTo(x + 6, y + 1); g.lineTo(x + 3, y + 7); g.closePath(); g.fill(); g.lineWidth = 1.2; g.stroke(); }
-      };
-      const brows = (y, angry) => { g.strokeStyle = OUTC; g.lineWidth = 3; g.beginPath(); g.moveTo(102, y - (angry ? 2 : 0)); g.lineTo(120, y + (angry ? 3 : 0)); g.moveTo(136, y + (angry ? 3 : 0)); g.lineTo(154, y - (angry ? 2 : 0)); g.stroke(); };
-      if (kind === 'robin' || kind === 'apprentice') {
-        // máscara preta com lentes brancas pontudas
-        g.fillStyle = '#141218'; g.beginPath(); g.moveTo(92, 60); g.quadraticCurveTo(128, 46, 164, 60); g.lineTo(170, 54); g.lineTo(160, 76); g.quadraticCurveTo(128, 82, 96, 76); g.lineTo(86, 54); g.closePath(); g.fill();
-        for (const x of [111, 145]) { g.fillStyle = shut ? '#141218' : '#ffffff'; g.beginPath(); g.moveTo(x - 10, 66); g.quadraticCurveTo(x, 56, x + 10, 63); g.quadraticCurveTo(x, 72, x - 10, 66); g.fill(); }
-        mouth(128, 94);
-      } else if (kind === 'cyborg') {
-        // metade humana (lado da câmera) e metade de metal com o olho vermelho
-        g.fillStyle = '#6e4329'; g.beginPath(); g.moveTo(60, 30); g.lineTo(128, 30); g.lineTo(128, 110); g.lineTo(60, 110); g.closePath(); g.fill();
-        g.strokeStyle = '#3a3d47'; g.lineWidth = 3; g.beginPath(); g.moveTo(128, 30); g.lineTo(128, 110); g.stroke();
-        eye(112, 64, 8, 10, '#5a3a20');
-        g.fillStyle = '#3a3d47'; g.beginPath(); g.arc(146, 64, 11, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(146, 64, 7, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#ffd0d0'; g.beginPath(); g.arc(144, 62, 2.5, 0, Math.PI * 2); g.fill();
-        mouth(126, 94);
-      } else if (kind === 'raven') {
-        eye(112, 66, 8, 10, '#6a3aa8'); eye(144, 66, 8, 10, '#6a3aa8');
-        g.fillStyle = '#d0202a'; g.beginPath(); g.arc(128, 48, 4, 0, Math.PI * 2); g.fill(); // chakra
-        if (st.cloak === '#a8122a' && !shut) { for (const x of [104, 112, 144, 152]) { g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(x, 76, 3, 0, Math.PI * 2); g.fill(); } } // olhos de demônio
-        mouth(128, 92);
-      } else if (kind === 'starfire') {
-        eye(111, 64, 10, 12, '#2bd86a', '#e8fff0'); eye(145, 64, 10, 12, '#2bd86a', '#e8fff0');
-        mouth(128, 94);
-      } else if (kind === 'beastboy') {
-        eye(112, 64, 9, 11, '#3a7a2a'); eye(144, 64, 9, 11, '#3a7a2a');
-        mouth(128, 92, true);
-      } else if (kind === 'hive') {
-        g.fillStyle = '#f0c62e'; g.fillRect(84, 52, 88, 22); g.strokeStyle = OUTC; g.lineWidth = 3; g.strokeRect(84, 52, 88, 22);
-        mouth(128, 94);
-      } else if (kind === 'slade') {
-        g.fillStyle = '#141218'; g.fillRect(0, 0, 128, 128);
-        g.fillStyle = '#141218'; g.beginPath(); g.ellipse(146, 64, 8, 5, 0, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#fff'; g.beginPath(); g.arc(147, 64, 2.5, 0, Math.PI * 2); g.fill();
-        g.strokeStyle = '#3a2a1a'; g.lineWidth = 2; for (const y of [92, 98, 104]) { g.beginPath(); g.moveTo(132, y); g.lineTo(158, y); g.stroke(); }
-      } else {
-        eye(113, 64, 8, 10, '#3a2a4a'); eye(143, 64, 8, 10, '#3a2a4a');
-        brows(50, true);
-        mouth(128, 92);
-      }
+      const c = mkCanvas(512, 256), g = c.getContext('2d');
+      if (FACE3D[kind] && TT.FACE_KIT) {
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        FACE3D[kind](g, TT.FACE_KIT, { eyes: variant === 'hurt' ? 'shut' : null, mouth: variant === 'open' ? 'shout' : null }, st);
+      } else { g.scale(2, 2); this.simpleFace(g, kind, st, variant); }
       tx = new T.CanvasTexture(c);
+      tx.anisotropy = 4;
       this.faces.set(k, tx);
       return tx;
     }
+    // rosto simples dos inimigos (soldados da H.I.V.E. e outros), num canvas de 256x128
+    simpleFace(g, kind, st, variant) {
+      const skin = kind === 'slade' ? '#f08a1a' : st.skin || '#f4c39e';
+      g.fillStyle = skin; g.fillRect(0, 0, 256, 128);
+      const shut = variant === 'hurt', open = variant !== 'n';
+      const OUTC = '#150b22';
+      const eye = (x, y, w, h, iris) => {
+        if (shut) { g.strokeStyle = OUTC; g.lineWidth = 3; g.beginPath(); g.moveTo(x - w, y); g.quadraticCurveTo(x, y + 5, x + w, y); g.stroke(); return; }
+        g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(x, y, w, h, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = OUTC; g.lineWidth = 2.5; g.stroke();
+        g.fillStyle = iris; g.beginPath(); g.ellipse(x + 1, y + 1, w * 0.6, h * 0.66, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = OUTC; g.beginPath(); g.arc(x + 1.5, y + 1, w * 0.3, 0, Math.PI * 2); g.fill();
+      };
+      const mouth = (x, y) => {
+        g.strokeStyle = OUTC; g.lineWidth = 2.5;
+        if (open) { g.fillStyle = '#5a1020'; g.beginPath(); g.ellipse(x, y, 7, 6, 0, 0, Math.PI * 2); g.fill(); g.stroke(); }
+        else { g.beginPath(); g.moveTo(x - 7, y); g.quadraticCurveTo(x, y + 3, x + 7, y - 1); g.stroke(); }
+      };
+      if (kind === 'hive') {
+        g.fillStyle = '#f0c62e'; g.fillRect(84, 52, 88, 22); g.strokeStyle = OUTC; g.lineWidth = 3; g.strokeRect(84, 52, 88, 22);
+        mouth(128, 94);
+      } else {
+        eye(113, 64, 8, 10, '#3a2a4a'); eye(143, 64, 8, 10, '#3a2a4a');
+        g.strokeStyle = OUTC; g.lineWidth = 3; g.beginPath(); g.moveTo(102, 48); g.lineTo(120, 53); g.moveTo(136, 53); g.lineTo(154, 48); g.stroke();
+        mouth(128, 92);
+      }
+    }
+    // Uniforme pintado no tronco (emblema do Robin, placas do Ciborgue, cinto da Ravena, top da Estelar...)
+    torsoMat(kind, st) {
+      const P = TORSO3D[kind];
+      if (!P) return null;
+      const key = 'torso:' + kind + ':' + st.torso + ':' + (st.skin || '');
+      let m = this.mats.get(key);
+      if (!m) {
+        const c = mkCanvas(256, 128), g = c.getContext('2d');
+        P(g, st);
+        const tx = new T.CanvasTexture(c); tx.anisotropy = 4;
+        m = new T.MeshToonMaterial({ map: tx, gradientMap: this.grad });
+        this.mats.set(key, m);
+      }
+      return m;
+    }
+    // Cabeça de desenho animado: crânio mais cheio atrás, maxilar estreito e queixo fino para a frente.
+    // (as normais continuam as da esfera: o contorno e a luz ficam lisos)
+    headGeo(r) {
+      return this.geo('head' + r, () => {
+        const g = new T.SphereGeometry(r, 32, 24), p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+          const nx = x / r, ny = y / r;
+          if (nx < 0) x *= 1.06;
+          y *= 1.03;
+          if (ny < 0) {
+            const d = -ny, fr = Math.max(0, nx);
+            z *= 1 - 0.3 * d;
+            x += r * 0.13 * d * fr;
+            y -= r * 0.05 * d * fr;
+          }
+          p.setXYZ(i, x, y, z);
+        }
+        return g;
+      });
+    }
+    torsoR(st, k) { const wW = st.waistW || st.hipW * 0.9; return lerp(wW * 0.5, st.shW * 0.47, k); }
 
     // ------------------------------------------------------------ Bonecos 3D
     // Esqueleto igual ao do 2D: quadril -> tronco (inclinação "lean") -> braços/cabeça; pernas no quadril.
     // Ângulos: 0 = para baixo, +PI/2 = para a frente (+X local), PI = para cima.
     buildHumanoid(f, kind) {
       const st = f.style;
-      const M = { root: new T.Group(), meshes: [], kind, st, faceMats: [] };
+      const M = { root: new T.Group(), meshes: [], kind, st, faceMats: [], cloths: [] };
       const L1 = st.legL[0], L2 = st.legL[1];
       const shape = kind === 'cuboid' ? 'box' : kind === 'vertice' ? 'crystal' : 'toon';
       const MAT = (c) => (shape === 'crystal' ? this.gem(c) : this.toon(c));
@@ -238,11 +417,11 @@
         const g = this.glowSprite(TT.F13.NEON, 60, 0.9); g.position.copy(core.position); M.torso.add(g);
         for (const s of [-1, 1]) { const o = this.part(M, M.torso, this.geo('octa13', () => new T.OctahedronGeometry(13)), this.gem('#a8e8ff')); o.position.set(0, th - 2, s * shW * 0.5); }
       } else {
-        const t1 = this.part(M, M.torso, this.cyl(shW * 0.47, wW * 0.5, th, 16), MAT(st.torso));
+        const t1 = this.part(M, M.torso, this.cyl(shW * 0.47, wW * 0.5, th, 24), this.torsoMat(kind, st) || MAT(st.torso));
         t1.position.y = th / 2; t1.scale.z = 0.66;
-        const chest = this.part(M, M.torso, this.geo('dome' + Math.round(shW), () => new T.SphereGeometry(shW * 0.47, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), MAT(st.torso));
+        const chest = this.part(M, M.torso, this.geo('dome' + Math.round(shW), () => new T.SphereGeometry(shW * 0.47, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2)), MAT(st.torso));
         chest.position.y = th; chest.scale.set(1, 0.4, 0.66);
-        const pel = this.part(M, M.hip, this.sph(st.hipW * 0.55), MAT(kind === 'raven' ? st.torso : st.leg));
+        const pel = this.part(M, M.hip, this.sph(st.hipW * 0.55), MAT(kind === 'raven' || kind === 'starfire' ? st.torso : st.leg));
         pel.position.y = -1; pel.scale.set(1, 0.62, 0.74);
         this.part(M, M.torso, this.cyl(st.headR * 0.32, st.headR * 0.34, (st.neck || 3) + 8, 10), MAT(st.neckCol || st.skin)).position.y = th + (st.neck || 3) / 2 + 2;
       }
@@ -299,7 +478,7 @@
       else this.part(M, end, this.sph(endR), shape === 'crystal' ? this.gem(endCol) : this.toon(endCol));
       return { up, lo, end };
     }
-    // Cabeça de cada personagem: esfera com o rosto pintado + cabelo, capuz, orelhas, capacete...
+    // Cabeça de cada personagem: rosto pintado + volume do cabelo, capuz, orelhas, peças de metal...
     buildHead(M, f, kind, st, shape) {
       const r = st.headR, hd = M.head;
       if (shape === 'box') {
@@ -322,87 +501,211 @@
         shapes.forEach((g, i) => { const m = new T.Mesh(g, this.gem(i % 2 ? '#ff9ae8' : '#9af5ff', { emissive: i % 2 ? 0x601040 : 0x104060 })); m.castShadow = true; M.torso.add(m); M.orbit.push(m); });
         return;
       }
-      const look = kind;
       const variants = {};
-      const faceMat = (v) => variants[v] || (variants[v] = new T.MeshToonMaterial({ map: this.face(look, st, v), gradientMap: this.grad }));
-      const headMesh = this.part(M, hd, this.sph(r, 24, 16), faceMat('n'));
+      const faceMat = (v) => variants[v] || (variants[v] = new T.MeshToonMaterial({ map: this.face(kind, st, v), gradientMap: this.grad }));
+      const headMesh = this.part(M, hd, FACE3D[kind] ? this.headGeo(r) : this.sph(r, 24, 16), faceMat('n'));
       M.faceMesh = headMesh; M.faceMat = faceMat;
-      const hair = (col, sx, sy, spikes, scale) => {
-        const cap = this.part(M, hd, this.sph(r * 1.06, 18, 12), this.toon(col));
-        cap.position.set(-r * 0.26, r * 0.14, 0); cap.scale.set(scale || 1, 1, 1);
-        for (const [ax, ay, az, len] of spikes) {
-          const c = this.part(M, hd, this.cone(r * 0.32, r * len, 6), this.toon(col));
-          const dir = new T.Vector3(ax, ay, az).normalize();
-          c.position.copy(dir).multiplyScalar(r * 0.95).add(new T.Vector3(-r * 0.2, r * 0.1, 0));
+      // volume do cabelo: calota sobre o crânio (a linha do cabelo na testa vem pintada no rosto)
+      const capG = (len) => this.geo('hcap' + r + ':' + len, () => new T.SphereGeometry(r * 1.1, 28, 10, 0, Math.PI * 2, 0, Math.PI * len));
+      const hairCap = (col, len, tilt) => { const m = this.part(M, hd, capG(len), this.toon(col, { side: T.DoubleSide })); m.position.x = -r * 0.05; m.rotation.z = tilt || 0; return m; };
+      const spikes = (col, list) => {
+        for (const [ax, ay, az, len] of list) {
+          const dir = new T.Vector3(ax, ay, az).normalize(), h = r * len;
+          const c = this.part(M, hd, this.cone(r * 0.3, h, 6), this.toon(col));
+          c.position.copy(dir).multiplyScalar(r * 0.98 + h * 0.22); c.position.x -= r * 0.06;
           c.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
         }
       };
-      if (look === 'robin' || look === 'apprentice') {
-        hair('#16161c', 0, 0, [[-0.9, 0.5, 0.3, 1.0], [-0.9, 0.5, -0.3, 1.0], [-0.6, 0.9, 0, 0.9], [-1, 0.1, 0.5, 0.8], [-1, 0.1, -0.5, 0.8], [-0.2, 1, 0.4, 0.7], [-0.2, 1, -0.4, 0.7]]);
-      } else if (look === 'beastboy') {
-        hair('#2c5a24', 0, 0, [[-0.7, 0.7, 0.3, 0.8], [-0.7, 0.7, -0.3, 0.8], [-0.2, 1, 0, 0.8], [-1, 0.2, 0.3, 0.7], [-1, 0.2, -0.3, 0.7]]);
-        for (const s of [-1, 1]) { // orelhas pontudas
-          const e = this.part(M, hd, this.cone(r * 0.22, r * 0.75, 6), this.toon(st.skin));
-          e.position.set(-r * 0.1, r * 0.15, s * r * 0.95); e.rotation.set(s * 1.25, 0, 0.5);
+      const skinBit = (x, y, z, sx, sy, sz) => { const e = this.part(M, hd, this.sph(r * 0.3, 10, 8), this.toon(st.skin)); e.position.set(x, y, z); e.scale.set(sx, sy, sz); return e; };
+      if (kind === 'robin' || kind === 'apprentice') {
+        // mechas grossas e curtas penteadas para cima e para trás
+        hairCap('#141419', 0.3, 0.18);
+        spikes('#141419', [[-0.5, 0.86, 0, 0.95], [-0.85, 0.5, 0.26, 0.95], [-0.85, 0.5, -0.26, 0.95], [-0.97, 0.1, 0.42, 0.8], [-0.97, 0.1, -0.42, 0.8], [-0.97, -0.25, 0, 0.75],
+          [-0.12, 1, 0.34, 0.78], [-0.12, 1, -0.34, 0.78], [0.32, 0.95, 0, 0.62], [0.3, 0.9, 0.4, 0.5], [0.3, 0.9, -0.4, 0.5], [-0.45, 0.62, 0.64, 0.7], [-0.45, 0.62, -0.64, 0.7]]);
+        for (const s of [-1, 1]) skinBit(-r * 0.05, -r * 0.08, s * r * 0.98, 0.55, 0.85, 0.38); // orelhas
+      } else if (kind === 'beastboy' || kind === 'clownbb') {
+        hairCap('#2c5e20', 0.3, 0.18);
+        spikes('#2c5e20', [[-0.6, 0.8, 0, 0.75], [-0.9, 0.42, 0.3, 0.7], [-0.9, 0.42, -0.3, 0.7], [-0.97, 0, 0.4, 0.6], [-0.97, 0, -0.4, 0.6], [-0.1, 1, 0.3, 0.6], [-0.1, 1, -0.3, 0.6],
+          [0.7, 0.66, 0, 0.5], [0.62, 0.7, 0.35, 0.45], [0.62, 0.7, -0.35, 0.45], [-0.4, 0.66, 0.62, 0.55], [-0.4, 0.66, -0.62, 0.55]]);
+        for (const s of [-1, 1]) { // orelhas pontudas (élficas), para trás e para cima
+          const e = this.part(M, hd, this.cone(r * 0.2, r * 0.95, 6), this.toon(st.skin));
+          e.position.set(-r * 0.35, r * 0.05, s * r * 1.02); e.rotation.set(s * 1.15, 0, 0.95);
         }
-      } else if (look === 'starfire') {
-        const cap = this.part(M, hd, this.sph(r * 1.1, 18, 12), this.toon('#c8302a')); cap.position.set(-r * 0.3, r * 0.12, 0);
-        const fr = this.part(M, hd, this.boxG(r * 0.5, r * 0.4, r * 1.6), this.toon('#c8302a')); fr.position.set(r * 0.62, r * 0.72, 0); fr.rotation.z = -0.3; // franja
-      } else if (look === 'raven') {
-        const hood = this.part(M, hd, this.geo('hood' + r, () => new T.SphereGeometry(r * 1.34, 20, 12, Math.PI + 0.85, Math.PI * 2 - 1.7, 0, Math.PI * 0.72)), this.toon(st.cloak || '#2a3a9e', { side: T.DoubleSide }));
-        hood.position.set(-r * 0.12, r * 0.12, 0);
-        const hairG = this.part(M, hd, this.sph(r * 1.03, 18, 12), this.toon('#3a2a6a')); hairG.position.set(-r * 0.2, r * 0.08, 0);
-      } else if (look === 'cyborg') {
-        for (const s of [-1, 1]) { const e = this.part(M, hd, this.cyl(r * 0.42, r * 0.42, 5, 14), this.toon('#3a3d47')); e.position.set(-r * 0.05, 0, s * r * 0.96); e.rotation.x = Math.PI / 2; }
-        const cap = this.part(M, hd, this.sph(r * 1.03, 18, 12), this.toon('#c9ced8')); cap.position.set(-r * 0.3, r * 0.18, 0);
-      } else if (look === 'hive') {
+        if (kind === 'clownbb') {
+          const nose = this.part(M, hd, this.sph(r * 0.24, 12, 10), this.toon('#ff2a3a')); nose.position.set(r * 1.08, -r * 0.12, 0);
+          const hat = this.part(M, hd, this.cone(r * 0.42, r * 0.95, 12), this.toon('#3a6ee8')); hat.position.set(-r * 0.1, r * 1.38, 0); hat.rotation.z = 0.28;
+          const pom = this.part(M, hd, this.sph(r * 0.16, 10, 8), this.toon('#ffd23a')); pom.position.set(-r * 0.34, r * 1.85, 0);
+        }
+      } else if (kind === 'starfire') {
+        hairCap('#b81f2b', 0.36, 0.05);
+        for (const s of [-1, 1]) { // mechas descendo dos lados do rosto
+          const l = this.part(M, hd, this.cap(r * 0.2, r * 1.35), this.toon('#b81f2b')); l.position.set(r * 0.28, -r * 0.45, s * r * 0.9); l.scale.set(1.15, 1, 0.42); l.rotation.x = s * 0.06;
+        }
+      } else if (kind === 'raven') {
+        hairCap('#46307a', 0.38, 0.12);
+        for (const s of [-1, 1]) { // chanel até o queixo
+          const l = this.part(M, hd, this.cap(r * 0.3, r * 0.75), this.toon('#46307a')); l.position.set(r * 0.1, -r * 0.35, s * r * 0.9); l.scale.set(1, 1, 0.6);
+        }
+        // capuz levantado: aberto na frente, forro escuro por dentro, descendo até os ombros
+        const hc = (st.faceOpt && st.faceOpt.hood) || ['#10153f', st.cloak || '#2a3a9e'];
+        const hg = this.geo('hood' + r, () => new T.SphereGeometry(r * 1.32, 28, 16, Math.PI + 1.0, Math.PI * 2 - 2.0, 0, Math.PI * 0.8));
+        const hood = this.part(M, hd, hg, this.toon(st.cloak || hc[1], { side: T.FrontSide }));
+        hood.position.set(-r * 0.14, r * 0.1, 0);
+        const lining = new T.Mesh(hg, this.toon(hc[0], { side: T.BackSide })); lining.userData.mat = lining.material; hood.add(lining); M.meshes.push(lining);
+      } else if (kind === 'cyborg') {
+        for (const s of [-1, 1]) { // peças dos ouvidos
+          const e = this.part(M, hd, this.cyl(r * 0.42, r * 0.42, 5, 16), this.toon('#3a3d47')); e.position.set(-r * 0.12, -r * 0.05, s * r * 0.98); e.rotation.x = Math.PI / 2;
+          const b = new T.Mesh(this.cyl(r * 0.2, r * 0.2, 1, 12), this.neon('#3b78d8')); b.position.y = s * 2.6; e.add(b);
+        }
+      } else if (kind === 'hive') {
         const helm = this.part(M, hd, this.sph(r * 1.1, 18, 12), this.toon('#5a6170')); helm.position.set(-r * 0.22, r * 0.18, 0);
-      } else if (look === 'jinx') {
-        for (const s of [-1, 1]) { const h = this.part(M, hd, this.cone(r * 0.38, r * 1.5, 8), this.toon('#ff5fb4')); h.position.set(-r * 0.3, r * 0.95, s * r * 0.55); h.rotation.set(s * 0.6, 0, 0.35); }
-        const cap = this.part(M, hd, this.sph(r * 1.05, 18, 12), this.toon('#ff5fb4')); cap.position.set(-r * 0.3, r * 0.15, 0);
-      } else if (look !== 'slade') {
-        hair(st.hairCol || '#2a2038', 0, 0, []);
+      } else {
+        hairCap(st.hairCol || '#2a2038', 0.4, 0.2);
       }
     }
     buildExtras(M, f, kind, st) {
-      const th = st.torsoH;
-      if (kind === 'robin' || kind === 'apprentice') {
-        // capa: preta por fora, forro amarelo por dentro; abre com o movimento
-        M.cape = new T.Group(); M.cape.position.set(-st.shW * 0.2, th - 2, 0); M.torso.add(M.cape);
-        const cg = this.geo('cape' + st.shW, () => { const g = new T.PlaneGeometry(st.shW * 1.05, 62, 1, 6); g.translate(0, -31, 0); return g; });
-        const out = new T.Mesh(cg, this.toon(kind === 'apprentice' ? '#1c1b22' : '#141218', { side: T.FrontSide }));
-        const inn = new T.Mesh(cg, this.toon(kind === 'apprentice' ? '#ff7a1a' : '#f2c230', { side: T.BackSide }));
-        for (const m of [out, inn]) { m.rotation.y = -Math.PI / 2; m.castShadow = true; m.userData.mat = m.material; M.cape.add(m); M.meshes.push(m); }
-        const belt = this.part(M, M.torso, this.geo('belt' + st.waistW, () => new T.TorusGeometry(st.waistW * 0.52, 2.6, 6, 18)), this.toon(kind === 'apprentice' ? '#8a909a' : '#f2c230'), { outline: false });
-        belt.rotation.x = Math.PI / 2; belt.position.y = 2; belt.scale.set(1, 0.7, 1);
-        if (kind === 'robin') { const em = new T.Mesh(this.cyl(5, 5, 1.5, 14), this.toon('#f2c230')); em.rotation.z = Math.PI / 2; em.position.set(st.shW * 0.3, th * 0.7, st.shW * 0.12); M.torso.add(em); }
+      const th = st.torsoH, r = st.headR, shW = st.shW;
+      if (kind === 'robin') {
+        // gola alta e capa: preta por fora, forro amarelo por dentro
+        const col = this.part(M, M.torso, this.cyl(shW * 0.25, shW * 0.33, 7, 18, true), this.toon('#17171d', { side: T.DoubleSide }));
+        col.position.y = th + 1.5;
+        this.buildCloth(M, { parent: M.torso, at: [-1, th - 1, 0], rows: 9, cols: 9, len: th + st.legL[0] + st.legL[1] * 0.4, aTop: 1.2, aBot: 1.4,
+          rx: [shW * 0.5, shW * 0.5], rz: [shW * 0.5, shW * 0.84], outer: '#1c1b22', inner: '#efb81e', base: 0.07, swing: 0.9, flutter: 0.08, margin: 2.5 });
+      } else if (kind === 'apprentice') {
+        for (const s of [-1, 1]) { const p = this.part(M, M.torso, this.sph(st.armW * 0.95, 12, 8), this.toon('#8a909a')); p.position.set(0, th - 3, s * shW * 0.47); p.scale.set(1, 0.7, 1); } // ombreiras
       } else if (kind === 'raven') {
-        // manto longo aberto na frente
-        M.cape = new T.Group(); M.cape.position.set(-2, th - 1, 0); M.torso.add(M.cape);
-        const cg = this.geo('cloak', () => { const g = new T.CylinderGeometry(st.shW * 0.42, st.shW * 0.95, 78, 18, 3, true, Math.PI * 0.25, Math.PI * 1.5); g.translate(0, -39, 0); return g; });
-        const cl = new T.Mesh(cg, this.toon(st.cloak || '#2a3a9e', { side: T.DoubleSide }));
-        cl.rotation.y = Math.PI / 2; cl.castShadow = true; cl.userData.mat = cl.material; M.cape.add(cl); M.meshes.push(cl);
-        const belt = this.part(M, M.torso, this.geo('rbelt', () => new T.TorusGeometry(st.waistW * 0.55, 1.8, 6, 18)), this.toon('#c9a232'), { outline: false });
-        belt.rotation.x = Math.PI / 2; belt.position.y = 1; belt.scale.set(1, 0.7, 1);
-        const gemB = new T.Mesh(this.sph(2.6, 8, 6), this.neon('#d0202a')); gemB.position.set(st.waistW * 0.55, 1, 0); M.torso.add(gemB);
+        // manto longo preso nos ombros, aberto na frente
+        const hc = (st.faceOpt && st.faceOpt.hood) || ['#10153f', st.cloak || '#2a3a9e'];
+        this.buildCloth(M, { parent: M.torso, at: [0, th + 1, 0], rows: 9, cols: 15, len: th + st.legL[0] + st.legL[1] - 4, aTop: 2.45, aBot: 2.7,
+          rx: [shW * 0.5, shW * 0.95], rz: [shW * 0.52, shW * 0.98], outer: st.cloak || '#2a3a9e', inner: hc[0], base: 0.03, swing: 0.55, flutter: 0.05, margin: 2 });
+        const br = this.part(M, M.torso, this.cyl(3.4, 3.4, 1.6, 14), this.toon('#e2b23c')); br.rotation.z = Math.PI / 2; br.position.set(this.torsoR(st, 1) * 0.85 + 1.5, th - 1, 0); // broche
+        const gm = new T.Mesh(this.sph(1.7, 8, 6), this.neon('#d61f3a')); gm.position.y = 1; br.add(gm);
       } else if (kind === 'starfire') {
-        // cabelão vermelho descendo pelas costas
-        M.hairBack = new T.Group(); M.hairBack.position.set(-st.headR * 0.5, th + 14, 0); M.torso.add(M.hairBack);
-        const hb = this.part(M, M.hairBack, this.cap(st.headR * 0.72, 46), this.toon('#c8302a')); hb.position.y = -24; hb.scale.set(0.7, 1, 1.25);
-        const collar = this.part(M, M.torso, this.geo('collar', () => new T.TorusGeometry(st.shW * 0.3, 2.2, 6, 16)), this.toon('#c9cfd8'), { outline: false });
+        // cabelão vermelho, liso, descendo pelas costas até a cintura
+        this.buildCloth(M, { parent: M.head, at: [-r * 0.08, r * 0.2, 0], rows: 8, cols: 9, len: r * 0.9 + th * 0.85, aTop: 1.45, aBot: 1.0,
+          rx: [r * 1.14, r * 0.74], rz: [r * 1.14, r * 0.72], outer: '#b81f2b', inner: '#7e1018', base: 0.1, swing: 0.45, flutter: 0.06, margin: 2 });
+        const collar = this.part(M, M.torso, this.geo('collar', () => new T.TorusGeometry(shW * 0.3, 2.2, 6, 16)), this.toon('#c9cfd8'), { outline: false });
         collar.rotation.x = Math.PI / 2; collar.position.y = th + 1;
-        const gm = new T.Mesh(this.sph(2.6, 8, 6), this.neon('#3ee07a')); gm.position.set(st.shW * 0.3, th - 1, 0); M.torso.add(gm);
+        const gm = new T.Mesh(this.sph(2.6, 8, 6), this.neon('#3ee07a')); gm.position.set(shW * 0.3 + 1, th, 0); M.torso.add(gm);
+        // minissaia roxa
+        const sk = this.part(M, M.hip, this.cyl(st.hipW * 0.56, st.hipW * 0.8, 13, 18, true), this.toon(st.torso, { side: T.DoubleSide }));
+        sk.position.y = -2.5; sk.scale.z = 0.8;
       } else if (kind === 'cyborg') {
-        const light = new T.Mesh(this.cyl(5, 5, 2, 14), this.neon('#ff3a3a')); light.rotation.z = Math.PI / 2; light.position.set(st.shW * 0.33, th * 0.66, st.shW * 0.1); M.torso.add(light);
-        const lg = this.glowSprite('#ff3a3a', 26, 0.8); lg.position.copy(light.position); M.torso.add(lg);
-        for (const [y, w] of [[th * 0.45, 0.6], [th * 0.25, 0.5]]) { const p = this.part(M, M.torso, this.boxG(3, 6, st.shW * w), this.toon('#3b78d8'), { outline: false }); p.position.set(st.shW * 0.3, y, 0); }
-        for (const s of [-1, 1]) { const sh = this.part(M, M.torso, this.sph(st.armW * 0.85), this.toon('#c9ced8')); sh.position.set(0, th - 4, s * st.shW * 0.47); }
-      } else if (kind === 'hive') {
-        const lg = this.part(M, M.torso, this.boxG(3, 8, st.shW * 0.55), this.toon('#f0c62e'), { outline: false }); lg.position.set(st.shW * 0.33, st.torsoH * 0.6, 0);
+        const R = this.torsoR(st, 0.73);
+        const light = new T.Mesh(this.cyl(5, 5, 1.6, 16), this.neon('#ff3b3b')); light.rotation.z = Math.PI / 2; light.position.set(R + 0.6, th * 0.73, 0); M.torso.add(light);
+        const lg = this.glowSprite('#ff3b3b', 26, 0.8); lg.position.copy(light.position); M.torso.add(lg);
+        for (const s of [-1, 1]) { // ombros de metal com placa azul
+          const sh = this.part(M, M.torso, this.sph(st.armW * 0.66), this.toon('#c9ced8')); sh.position.set(0, th - 3, s * shW * 0.47); sh.scale.set(1, 0.85, 1);
+          const pl = this.part(M, sh, this.sph(st.armW * 0.55, 14, 10), this.toon('#3b78d8'), { outline: false }); pl.position.z = s * st.armW * 0.42; pl.scale.z = 0.45;
+        }
+      } else if (kind === 'clownbb') {
+        const ruff = this.part(M, M.torso, this.geo('ruff', () => new T.TorusGeometry(shW * 0.32, 3.2, 8, 18)), this.toon('#ffffff'));
+        ruff.rotation.x = Math.PI / 2; ruff.position.y = th + 1;
       }
       // bastão do Robin (aparece nos golpes de bastão)
       M.staff = new T.Group(); M.armF.end.add(M.staff); M.staff.visible = false;
       const sm = new T.Mesh(this.cyl(2.6, 2.6, 1, 8), this.toon('#c3cad6')); sm.castShadow = true; M.staff.add(sm); M.staffMesh = sm;
+    }
+
+    // ------------------------------------------------------------ Tecido (capa, manto, cabelo longo)
+    // Faixa de N linhas x K colunas, cada linha um arco em volta do eixo do corpo (aberto na frente).
+    // A cada quadro as linhas pendem do ponto de apoio, balançam PARA TRÁS com o movimento e são empurradas
+    // para fora do corpo (tronco, braços e pernas), então o pano nunca atravessa o boneco.
+    buildCloth(M, o) {
+      const N = o.rows, K = o.cols;
+      const pos = new Float32Array(N * K * 3), uv = new Float32Array(N * K * 2), idx = [];
+      for (let i = 0; i < N; i++) for (let j = 0; j < K; j++) { uv[(i * K + j) * 2] = j / (K - 1); uv[(i * K + j) * 2 + 1] = 1 - i / (N - 1); }
+      for (let i = 0; i < N - 1; i++) for (let j = 0; j < K - 1; j++) { const a = i * K + j, b = a + K; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3).setUsage(T.DynamicDrawUsage));
+      geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      const border = [];
+      for (let i = 0; i < N; i++) border.push(i * K);
+      for (let j = 1; j < K; j++) border.push((N - 1) * K + j);
+      for (let i = N - 2; i >= 0; i--) border.push(i * K + K - 1);
+      const lp = new Float32Array(border.length * 3), lg = new T.BufferGeometry();
+      lg.setAttribute('position', new T.BufferAttribute(lp, 3).setUsage(T.DynamicDrawUsage));
+      const line = new T.Line(lg, this.inkLine);
+      line.frustumCulled = false; M.root.add(line);
+      for (const [col, side] of [[o.outer, T.FrontSide], [o.inner, T.BackSide]]) { // fora: faces da frente; forro: as de trás
+        const m = new T.Mesh(geo, this.toon(col, { side }));
+        m.castShadow = true; m.frustumCulled = false;
+        m.userData.mat = m.material; m.userData.flash = this.flashMatD;
+        M.root.add(m); M.meshes.push(m);
+      }
+      const anchor = new T.Object3D(); anchor.position.set(o.at[0], o.at[1], o.at[2]); o.parent.add(anchor);
+      M.cloths.push(Object.assign({ geo, pos, lp, lg, border, anchor, cur: new Float32Array(N * 2), init: false }, o));
+    }
+    // Contorno do corpo visto de lado (no espaço do modelo): segmentos [x0, y0, x1, y1, raio]
+    bodySegs(M) {
+      const S = this.segs, inv = this.invM, v = this.tmpV, st = M.st;
+      S.length = 0;
+      const P = (obj, x, y) => { v.set(x, y, 0).applyMatrix4(obj.matrixWorld).applyMatrix4(inv); return [v.x, v.y]; };
+      const back = [P(M.hip, -st.hipW * 0.55, -1)];
+      for (const k of [0, 0.5, 1]) back.push(P(M.torso, -this.torsoR(st, k), k * st.torsoH));
+      for (let i = 0; i < back.length - 1; i++) S.push([back[i][0], back[i][1], back[i + 1][0], back[i + 1][1], 0.5]);
+      const limb = (L, rad, endR) => {
+        const a = P(L.up, 0, 0), b = P(L.lo, 0, 0), c = P(L.end, 0, 0);
+        S.push([a[0], a[1], b[0], b[1], rad], [b[0], b[1], c[0], c[1], Math.max(rad, endR)]);
+      };
+      limb(M.legB, st.legW * 0.6, st.footR * 0.8); limb(M.legF, st.legW * 0.6, st.footR * 0.8);
+      limb(M.armB, st.armW * 0.6, st.handR); limb(M.armF, st.armW * 0.6, st.handR);
+      return S;
+    }
+    // x mais para trás ocupado pelo corpo na altura h
+    backAt(S, h) {
+      let m = 1e9;
+      for (const s of S) {
+        const lo = Math.min(s[1], s[3]) - s[4], hi = Math.max(s[1], s[3]) + s[4];
+        if (h < lo || h > hi) continue;
+        const dy = s[3] - s[1];
+        const x = Math.abs(dy) < 1e-3 ? Math.min(s[0], s[2]) : s[0] + (s[2] - s[0]) * TT.clamp((h - s[1]) / dy, 0, 1);
+        if (x - s[4] < m) m = x - s[4];
+      }
+      return m;
+    }
+    updateCloths(M, f, pose) {
+      M.root.updateMatrixWorld(true);
+      this.invM.copy(M.root.matrixWorld).invert();
+      const S = this.bodySegs(M), v = this.tmpV, t = f.animT || 0;
+      const drag = Math.min(1.25, (pose.cape || 0) + (f.z > 2 ? 0.3 : 0));
+      for (const C of M.cloths) {
+        const N = C.rows, K = C.cols, cur = C.cur, pos = C.pos;
+        C.anchor.getWorldPosition(v); v.applyMatrix4(this.invM);
+        const ax = v.x, ay = v.y, az = v.z, seg = C.len / (N - 1), sw = C.base + drag * C.swing;
+        // alvo: corrente pendurada, curvando para trás conforme o personagem corre/pula/gira
+        let px = 0, py = 0;
+        const sm = C.init ? 0.3 : 1; C.init = true;
+        let push = 0;
+        for (let i = 0; i < N; i++) {
+          const k = i / (N - 1);
+          if (i > 0) {
+            const a = sw * (0.45 + 0.9 * k) + Math.sin(t * 0.13 + i * 0.75) * C.flutter * k * (0.5 + sw);
+            px -= Math.sin(a) * seg; py -= Math.cos(a) * seg;
+            if (ay + py < 1) { px -= 1 - (ay + py); py = 1 - ay; } // chegou no chão: escorrega para trás
+          }
+          cur[i * 2] += (px - cur[i * 2]) * sm; cur[i * 2 + 1] += (py - cur[i * 2 + 1]) * sm;
+          // não deixa o pano entrar no corpo
+          const rx = lerp(C.rx[0], C.rx[1], k), lim = this.backAt(S, ay + cur[i * 2 + 1]) - C.margin;
+          push = Math.max(push * 0.85, ax + cur[i * 2] - rx - lim, 0);
+          cur[i * 2] -= push;
+        }
+        for (let i = 0; i < N; i++) {
+          const k = i / (N - 1), rx = lerp(C.rx[0], C.rx[1], k), rz = lerp(C.rz[0], C.rz[1], k), al = lerp(C.aTop, C.aBot, k);
+          const cx = ax + cur[i * 2], cy = ay + cur[i * 2 + 1];
+          for (let j = 0; j < K; j++) {
+            const s = j / (K - 1) * 2 - 1, a = s * al, o = (i * K + j) * 3;
+            pos[o] = cx - rx * Math.cos(a) + Math.sin(t * 0.21 + j * 1.1 + i * 0.6) * C.flutter * 12 * k;
+            pos[o + 1] = cy;
+            pos[o + 2] = az + rz * Math.sin(a);
+          }
+        }
+        C.geo.attributes.position.needsUpdate = true;
+        C.geo.computeVertexNormals();
+        C.border.forEach((bi, n) => { C.lp[n * 3] = pos[bi * 3]; C.lp[n * 3 + 1] = pos[bi * 3 + 1]; C.lp[n * 3 + 2] = pos[bi * 3 + 2]; });
+        C.lg.attributes.position.needsUpdate = true;
+      }
     }
     // Sólido voador (Tetraedro)
     buildTetra() {
@@ -440,9 +743,10 @@
       if (!d.style || !d.pose || typeof d.think !== 'function') return null;
       if (d.key === 'apprentice') return 'apprentice';
       if (d.key === 'hivesoldier') return 'hive';
-      if (d.key) return d.base || d.key;
-      if (d.kind === 'hive' || d.kind === 'slade' || d.kind === 'jinx') return d.kind;
-      return 'generic';
+      if (d.key === 'clownbb') return 'clownbb';
+      if (d.key) { const k = d.key === 'redraven' || d.key === 'whiteraven' ? 'raven' : d.key; return MODELED.has(k) ? k : null; }
+      if (d.kind === 'hive') return 'hive';
+      return null;
     }
     modelFor(d) {
       let M = this.models.get(d);
@@ -477,7 +781,7 @@
       const blinkOut = (f.dead && f.state === 'down' && f.st > 25 && (f.st >> 2) % 2 === 0) || (f.invul > 0 && f.state !== 'getup' && f.state !== 'dash' && (f.invul >> 2) % 2 === 0 && f.team === 'hero');
       root.visible = !blinkOut && (f.alpha == null || f.alpha > 0.05);
       const fl = f.flash > 3 || (f.tellFlash && f.tellFlash()) || (f.team === 'enemy' && f.atk && f.state === 'attack' && f.atk.t < f.atk.def.s && f.atk.t / f.atk.def.s > 0.55 && (f.atk.t >> 1) % 2 === 0);
-      for (const m of M.meshes) m.material = fl ? this.flashMat : m.userData.mat;
+      for (const m of M.meshes) m.material = fl ? (m.userData.flash || this.flashMat) : m.userData.mat;
       const grow = f.alpha != null && f.alpha < 1 ? 0.3 + 0.7 * f.alpha : 1;
       if (M.kind === 'tetra') {
         const hz = f.hoverZ ? f.hoverZ() : 80;
@@ -514,10 +818,7 @@
         const v = pose.eyes === 'shut' || pose.eyes === 'x' ? 'hurt' : pose.mouth === 'shout' || pose.mouth === 'open' ? 'open' : 'n';
         const m = M.faceMat(v); M.faceMesh.material = m; M.faceMesh.userData.mat = m;
       }
-      // capa / manto / cabelo balançando com a velocidade
       const t = f.animT || 0;
-      if (M.cape) M.cape.rotation.z = 0.12 + (pose.cape || 0) * 0.75 + Math.sin(t * 0.12) * 0.05 + (f.z > 0 ? 0.25 : 0);
-      if (M.hairBack) M.hairBack.rotation.z = 0.15 + (pose.cape || 0) * 0.5 + Math.sin(t * 0.1) * 0.06;
       // bastão
       const staff = pose.weapon === 'staff' || st.staff;
       M.staff.visible = !!staff;
@@ -537,6 +838,8 @@
       if (M.halo) { M.halo[0].rotation.set(t * 0.03, 1.2, t * 0.02); M.halo[1].rotation.set(-t * 0.025, 0.8, -t * 0.03); }
       if (M.orbit) M.orbit.forEach((o, i) => { const a = t * 0.04 + i * (Math.PI * 2 / M.orbit.length); o.position.set(Math.cos(a) * 46, st.torsoH * 0.6 + Math.sin(a * 2) * 10, Math.sin(a) * 46); o.rotation.set(t * 0.05 + i, t * 0.07, 0); });
       if (M.core) M.core.rotation.y = t * 0.05;
+      // capa / manto / cabelo longo (depois da pose: o pano segue o corpo já posicionado)
+      if (M.cloths && M.cloths.length && root.visible) this.updateCloths(M, f, pose);
     }
 
     // ------------------------------------------------------------ Cenário: céu

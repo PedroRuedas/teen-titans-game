@@ -109,6 +109,8 @@
 
   const F = {};
   TT.FACES = F;
+  // peças do traço (olho, boca, preenchimento com contorno) para os rostos pintados nos modelos 3D (fase 13)
+  TT.FACE_KIT = { eye, mouth, fill, line, shade: SKIN_SH };
 
   // ------------------------------------------------------------------ Robin
   // Cabeça mais estreita, maxilar marcado e queixo pontudo (traço do Robin na série).
