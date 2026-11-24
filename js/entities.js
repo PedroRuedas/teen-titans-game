@@ -13,6 +13,7 @@
       p.type = type; p.x = x; p.y = y;
       p.vx = 0; p.vy = 0; p.life = 30; p.max = 30; p.size = 6; p.color = '#fff';
       p.grav = 0; p.rot = 0; p.vr = 0; p.text = ''; p.floor = 9999; p.add = false; p.color2 = null;
+      p.gy = TT.depthHint != null ? TT.depthHint : y; // profundidade no chão (para desenhar no modo 3D)
       if (o) for (const k in o) p[k] = o[k];
       p.max = p.life;
       if (this.list.length < 700) this.list.push(p); else this.pool.push(p);
@@ -30,8 +31,10 @@
       }
     }
     clear() { while (this.list.length) this.pool.push(this.list.pop()); }
-    draw(ctx, camX) {
+    // each(p) opcional (modo 3D): prepara a transformação de cada partícula; false = não desenha.
+    draw(ctx, camX, each) {
       for (const p of this.list) {
+        if (each && each(p) === false) continue;
         const k = p.life / p.max, x = p.x - camX, y = p.y;
         switch (p.type) {
           case 'spark': {
@@ -687,7 +690,7 @@
   // Junta um efeito extra ao onFrame de um golpe existente.
   const withFx = (d, k, fx) => { const b = boost(d, k), orig = d.onFrame; b.onFrame = function (f, t, g, a) { if (orig) orig.call(this, f, t, g, a); fx.call(this, f, t, g, a); }; return b; };
   // Nome do combo final na tela (e um anel na cor do Titã).
-  const comboName = (f, g, text) => { g.comboTag = { text, col: f.def.color, fx: f.def.fx || f.def.color, t: 0 }; g.particles.spawn('ring', f.x, f.y - f.z - 80, { color: f.def.fx || f.def.color, size: 140, life: 18 }); };
+  const comboName = (f, g, text) => { g.comboTag = { text, col: f.def.color, fx: f.def.fx || f.def.color, t: 0, f }; g.particles.spawn('ring', f.x, f.y - f.z - 80, { color: f.def.fx || f.def.color, size: 140, life: 18 }); };
   // Faíscas em estrela na mão da frente (golpes de energia).
   const fistBurst = (f, g, col, n) => {
     const R = f.rigOut, x = R && R.fx != null ? R.fx + g.camX : f.x + f.facing * 60, y = R && R.fy != null ? R.fy : f.y - f.z - 100;
@@ -839,6 +842,7 @@
   const BUFFERED = ['light', 'heavy', 'special', 'jump', 'dash'];
   // Formas animais do Mutano: nome da função de desenho em render.js.
   const FORMS = { gorilla: 'drawGorilla', trex: 'drawTRex', rhino: 'drawRhino', kangaroo: 'drawKangaroo', ram: 'drawRam', elephant: 'drawElephant', beast: 'drawBeast', cheetahAtk: 'drawCheetahAtk' };
+  TT.TITAN_FORMS = FORMS;
 
   class Titan extends Fighter {
     constructor(game, key) {

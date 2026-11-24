@@ -1,9 +1,10 @@
 # Jovens Titãs — A Batalha de Jump City (rascunho jogável)
 
-Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): doze fases
+Beat 'em up 2.5D inspirado no *Teen Titans* de PS2 (2006): treze fases
 (**Torre Titã**, **Perfuratriz do Terror**, **Usina de Energia**, **Fábrica de Gosma**, **Academia H.I.V.E.**,
 **O Show do Mumbo**, **O Covil do Slade**, **A Base da Irmandade**, **O Canal do Control Freak**, **A Academia do
-Mad Mod**, **O Fim: o Reino de Trigon** e **O Labirinto de Espelhos**), os 5 Titãs jogáveis com troca
+Mad Mod**, **O Fim: o Reino de Trigon**, **O Labirinto de Espelhos** e **A Terceira Dimensão**, que vira **3D de verdade**
+no meio da fase), os 5 Titãs jogáveis com troca
 em tempo real (com **golpes novos** a partir da fase 7 e **combos novos** a partir da fase 8), **menu PERSONAGENS** com os
 36 personagens do jogo de PS2 (vilões e versões alternativas liberados ao zerar a fase deles), inimigos da série,
 **3 níveis de dificuldade** e **co-op local para 2 jogadores**.
@@ -346,6 +347,38 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       a arena como ponteiros de relógio.
     - **Fraqueza:** após o Caleidoscópio, Prisma fica com o **cristal rachado e atordoada** — parada em guarda aberta,
       levando dano dobrado!
+
+13. **A Terceira Dimensão** — a fase que sai do 2D e vira **3D** no meio:
+    - **História:** um ser vindo de "onde as coisas têm todos os lados", **Vértice**, começa a arrancar Jump City do
+      plano. A fase começa em 2D na Avenida Central ao pôr do sol (lojas, postes, céu roxo e laranja) com falhas
+      geométricas no ar — cubos de arame e rachaduras de luz no asfalto que aumentam conforme os Titãs avançam.
+    - **A virada:** depois da 2ª arena a tela se **desmonta em ladrilhos** que giram e caem, revelando por trás a
+      cidade em 3D; a câmera sai de uma vista plana (que imita o 2D) para a perspectiva num *dolly-zoom* e dá um giro
+      em volta dos Titãs: **"TERCEIRA DIMENSÃO!"**. Os controles continuam os mesmos (direita anda pela avenida).
+    - **Mapa 3D:** avenida com faixas e calçadas, prédios com janelas acesas, lojas com toldos e letreiros, caixas
+      d'água e antenas piscando nos telhados, outdoors; a **praça da fonte** com um "T" dourado e árvores; um **trilho
+      elevado** com o trem passando; **telões** mostrando o olho do Vértice; a **Torre Titã** na baía ao longe; cubos e
+      pirâmides flutuando no céu; e o **Núcleo**: uma plataforma de hexágonos neon com um poliedro gigante girando no
+      céu e um feixe de luz.
+    - **Personagens 3D:** os Titãs (e qualquer personagem do menu PERSONAGENS) viram bonecos 3D em estilo de desenho
+      (sombreado em faixas e contorno preto), com o rosto, o cabelo, a capa do Robin, o manto e a joia da Ravena, o
+      olho vermelho do Ciborgue, o cabelão da Estelar e as orelhas do Mutano. Eles são animados pelos **mesmos ângulos
+      de pose** do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D (as transformações animais do
+      Mutano continuam desenhadas em 2D).
+    - **Câmera diretora:** 3/4 nas arenas, **perseguição** pela avenida entre as arenas, **vista de cima** na 2ª arena
+      3D, **close no COMBO FINAL**, **volta completa** em torno do chefe quando ele aparece e câmera que passeia de
+      um lado para o outro na fase 2 do chefe.
+    - **Inimigos:** **Cubóides** — golens de blocos que socam o chão e levantam uma **fila de cubos**; ao morrer viram
+      uma chuva de blocos ("CLONK!"). **Tetraedros** — pirâmides voadoras que giram, disparam um **laser que queima
+      uma faixa do chão** e **mergulham** com um anel de choque. Soldados da H.I.V.E. ajudam.
+    - **Chefe: VÉRTICE** — figura de cristal com cabeça de gema de um olho só, halo de anéis e poliedros orbitando.
+      Golpes: **Grade Vetorial** (paredes de laser sobem do chão em linhas e colunas — escolha o quadrado seguro),
+      **Chuva de Poliedros** (cubos e pirâmides caem do céu nos círculos marcados), **Giro de Arestas** (corte em volta
+      dele para quem chega perto) e, na fase 2, a **DOBRA DIMENSIONAL**: o mundo é **achatado de volta para 2D** (a
+      câmera volta a ser plana), todos escorregam para a linha do meio e uma lâmina de luz varre o chão — **PULE!**
+    - **Fraqueza:** depois da Dobra ele fica **"DESDOBRADO"**: parado e levando dano dobrado.
+    - O modo 3D usa o **Three.js** (r149, licença MIT, em `js/vendor/`), carregado só nesta fase; sem WebGL a fase
+      inteira continua jogável em 2D.
 
 ## Música e vozes
 

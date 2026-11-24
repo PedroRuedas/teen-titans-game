@@ -274,6 +274,7 @@
   // Desenha um personagem humanoide com o estilo dado. opt: { flash, t, scale, out }
   // out (opcional) recebe posições em coordenadas do mundo: cabeça (hx, hy) e mão da frente (fx, fy).
   TT.drawRig = function (ctx, st, pose, x, y, facing, opt) {
+    if (TT.SKIP_RIG) return; // modo 3D: o corpo é o modelo 3D (js/world3d.js)
     const sc = st.scale * (opt && opt.scale ? opt.scale : 1);
     FLASH = !!(opt && opt.flash);
     TOON = st.toon !== false; BIGSHOES = !!st.bigShoes;
@@ -485,6 +486,7 @@
 
   const S = {};
   TT.STYLES = S;
+  TT.mkStyle = mkStyle;
 
   // ------------------------------------------------------------ Titãs (visual da série animada de 2003 / jogo de PS2)
   // Traço anime: corpos esguios, rosto de queixo fino, contorno preto e sombra chapada em 2 tons.

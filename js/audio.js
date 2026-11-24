@@ -134,6 +134,17 @@
              93, 0, 91, 0, 88, 0, 86, 0, 84, 0, 83, 0, 81, 0, 76, 0],
       drums: 'metal',
     },
+    // Chefe Vértice: synthwave em Mi menor (i - VI - III - VII), arpejo em escada que sobe e desce
+    // como uma figura geométrica girando, e um refrão em oitavas no fim
+    vertice: {
+      bpm: 168,
+      chords: [[52, 55, 59], [48, 52, 55], [55, 59, 62], [50, 54, 57]],
+      lead: [76, 0, 79, 83, 88, 0, 83, 79, 76, 0, 71, 0, 76, 0, 79, 0,
+             72, 0, 76, 79, 84, 0, 79, 76, 72, 0, 67, 0, 72, 0, 76, 0,
+             79, 0, 83, 86, 91, 0, 86, 83, 79, 0, 74, 0, 79, 0, 83, 0,
+             78, 0, 81, 0, 86, 0, 90, 0, 88, 0, 86, 0, 83, 0, 81, 0],
+      drums: 'punk',
+    },
     victory: {
       bpm: 120,
       chords: [[60, 64, 67], [65, 69, 72], [67, 71, 74], [60, 64, 67]],

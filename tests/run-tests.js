@@ -69,7 +69,7 @@ async page => {
     g.stageSel = 0; TT.debug.start(0);
     return res;
   });
-  ok('menu: escolher a última fase (12) no título e começar nela', pick.sel === 11 && /LABIRINTO|PRISMA/.test(pick.label) && pick.st === 'play' && pick.stage === 11, pick);
+  ok('menu: escolher a última fase (13) no título e começar nela', pick.sel === 12 && /TERCEIRA DIMENS/.test(pick.label) && pick.st === 'play' && pick.stage === 12, pick);
 
   // 2) Movimento, ataque e troca de Titã com teclado real
   const x0 = await ev(() => TT.game.player.x);
@@ -953,6 +953,59 @@ async page => {
   ok('fase 12: Estilhaço (shard) ataca com espinhos e morre; Lanterna voa (z=120) com feixe em 3 zonas', s12.shardAtk && s12.shardDead && s12.lanternZ >= 100 && s12.lanternBeamZones === 3, s12);
   ok('fase 12: Prisma cria cópias que quebram com 1 golpe e Caleidoscópio deixa guarda aberta (dano dobrado)', s12.bossName === 'PRISMA' && s12.mirrorCount >= 2 && s12.mirrorShattered && s12.openState === 'open' && s12.openDmg === s12.normalDmg * 2, s12);
 
+  // 4b4f12) Fase 13: começo em 2D com Cubóide (onda de cubos) e Tetraedro (voa e mergulha); no ponto de
+  //          virada o mundo vira 3D (Three.js), a cidade e os bonecos 3D aparecem; o chefe Vértice faz a
+  //          Dobra Dimensional (câmera volta a ser plana) e fica desdobrado (dano dobrado)
+  const s13 = await ev(async () => {
+    const g = TT.game, out = {}, err0 = (TT.errors || []).length;
+    TT.paused = true;
+    TT.debug.start(12); TT.debug.god(true);
+    out.def = !!g.stage.dim3 && g.stage.sections.length === 5 && g.stage.sections[4].boss === 'vertice';
+    TT.debug.toSection(0);
+    let n = 0; while (g.enemies.length === 0 && n++ < 200) g.step();
+    out.kinds = [...new Set(g.enemies.map((e) => e.kind))].sort().join(',');
+    g.enemies.length = 0;
+    const p = g.player; p.invul = 0;
+    const cu = g.spawnEnemy('cuboid', 0, 1); cu.x = p.x + 200; cu.y = p.y; cu.entering = false;
+    cu.startAttack(cu.def.attacks[0]); for (let i = 0; i < cu.def.attacks[0].s + 2; i++) g.step();
+    out.cubes = g.effects.filter((e) => e instanceof TT.CubePop).length;
+    const te = g.spawnEnemy('tetra', 0, 1); te.x = p.x + 260; te.y = p.y; te.entering = false;
+    const h0 = te.hoverZ(); te.startAttack(te.def.attacks[1]);
+    let low = 999; for (let i = 0; i < 50; i++) { g.step(); g.render(); low = Math.min(low, te.hoverZ()); }
+    out.dive = h0 > 60 && low < 20;
+    const t0 = performance.now();
+    while (!(g.w3d && (g.w3d.ready || g.w3d.failed)) && performance.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 100));
+    out.ready = !!(g.w3d && g.w3d.ready);
+    g.enemies.length = 0; g.effects.length = 0; g.secIdx = 2; g.secActive = false; g.camX = g.camMin = 2200; p.x = 2950;
+    n = 0; while (!g.dimTrans && n++ < 300) g.step();
+    out.trans = !!g.dimTrans;
+    n = 0; while (g.dimTrans && n++ < 400) { g.step(); if (n % 25 === 0) g.render(); }
+    out.on = g.dim3On;
+    n = 0; while (!g.secActive && n++ < 600) { p.x = Math.min(p.x + 8, g.camX + 1200); g.step(); }
+    for (let i = 0; i < 150; i++) { g.step(); if (i % 3 === 0) g.render(); }
+    out.models = g.w3d.models.size; out.fighting = g.enemies.length;
+    TT.debug.toSection(4);
+    n = 0; while ((!g.boss || !g.boss.active) && n++ < 500) { g.step(); if (n % 20 === 0) g.render(); }
+    const b = g.boss; out.boss = b && b.name;
+    if (b) {
+      b.cool = 1e9; b.startAttack(b.ATK.fold); let maxFlat = 0;
+      n = 0; while (b.state === 'attack' && n++ < 400) { g.step(); g.render(); maxFlat = Math.max(maxFlat, b.flat); }
+      out.maxFlat = maxFlat; out.open = b.state;
+      const h = b.hp; b.takeHit({ x: b.x - 10, dmgMul: 1 }, { dmg: 10 }); out.openDmg = Math.round(h - b.hp);
+      for (const k of ['grid', 'rain', 'spin']) {
+        b.openT = 0; b.atk = null; b.setState('idle'); b.cool = 1e9; b.startAttack(b.ATK[k]);
+        n = 0; while (b.state === 'attack' && n++ < 300) { g.step(); if (n % 4 === 0) g.render(); }
+        out[k] = n > 10;
+      }
+    }
+    out.errors = (TT.errors || []).length - err0;
+    TT.debug.god(false); g.enemies.length = 0; TT.paused = false;
+    return out;
+  });
+  ok('fase 13: começa em 2D com Cubóide (onda de cubos) e Tetraedro (mergulha do alto)', s13.def && /cuboid/.test(s13.kinds) && /hive/.test(s13.kinds) && s13.cubes >= 5 && s13.dive, s13);
+  ok('fase 13: no ponto de virada a tela se desmonta e o mundo vira 3D (bonecos 3D lutando na praça)', s13.ready && s13.trans && s13.on && s13.models >= 3 && s13.fighting > 0, s13);
+  ok('fase 13: Vértice faz a Dobra Dimensional (câmera plana), fica desdobrado (dano dobrado) e usa grade, chuva e giro sem erro', s13.boss === 'VÉRTICE' && s13.maxFlat === 1 && s13.open === 'open' && s13.openDmg === 20 && s13.grid && s13.rain && s13.spin && s13.errors === 0, s13);
+
   // 4b4f11c) COMBO FINAL (□ □ △ = J J K) de todo personagem equipável só a partir da fase 8 (nível de poder 2);
   //          as versões alternativas têm o seu próprio combo final, diferente do Titã de origem
   const cf = await ev(() => {
@@ -1043,7 +1096,7 @@ async page => {
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
   const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 12 && songs.every((s) => s === 'theme'), songs);
+  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 13 && songs.every((s) => s === 'theme'), songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.

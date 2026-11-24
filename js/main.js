@@ -205,6 +205,8 @@
       players(n) { game.setPlayers(n); },
       god(on) { game.godMode = !!on; },
       start(i) { TT.audio.muted = true; game.score = 0; game.startStage(i || 0); },
+      // Fase 13: liga o modo 3D na hora (sem a transição). false se o Three.js ainda não carregou.
+      dim3() { return !!(game.w3d && game.w3d.forceOn()); },
       toSection(i) {
         game.enemies.length = 0;
         game.drill = null; game.boss = null;

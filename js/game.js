@@ -134,6 +134,9 @@
       const before = TT.STAGES.slice(0, i);
       if ((this.stage.combos && !before.some((s) => s.combos)) || (this.stage.powerUp && !before.some((s) => s.powerUp))) this.powerBanner = 1;
       for (const l of this.bg.layers) l.warm(0);
+      // fase 13: o mundo vira 3D no meio da fase (js/world3d.js carrega o Three.js agora, em segundo plano)
+      this.dim3On = false; this.dimTrans = null;
+      if (this.stage.dim3 && TT.World3D) { this.w3d = this.w3d || new TT.World3D(this); this.w3d.prepare(); }
       A().playSong(this.stage.song);
     }
 
@@ -143,7 +146,7 @@
       const fromLeft = n > 2 && i % 3 === 2;
       const x = fromLeft ? this.camX - 70 - i * 30 : this.camX + W + 70 + i * 45;
       const y = TT.FLOOR_TOP + 30 + ((i * 67) % (TT.FLOOR_BOTTOM - TT.FLOOR_TOP - 50));
-      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone, shard: TT.ShardEnemy, lantern: TT.PrismaticLantern }[kind];
+      const C = { drone: TT.Drone, shock: TT.ShockTrooper, bee: TT.BeeSoldier, hazmat: TT.HazmatSoldier, goo: TT.GooBlob, jinx: TT.JinxEnemy, mammoth: TT.Mammoth, card: TT.CardSoldier, bunny: TT.MagicBunny, commando: TT.SladeCommando, demon: TT.FireDemon, freezer: TT.FreezeTrooper, rouge: TT.MadameRouge, tvbot: TT.TVBot, popcorn: TT.PopcornMonster, guard: TT.RoyalGuard, eye: TT.HypnoEye, clone: TT.ShadowClone, shard: TT.ShardEnemy, lantern: TT.PrismaticLantern, cuboid: TT.Cuboid, tetra: TT.Tetra }[kind];
       const e = C ? new C(this, x, y) : new TT.Enemy(this, kind, x, y);
       if (kind === 'drone' || kind === 'lantern') e.z = 120;
       this.addEnemy(e);
@@ -271,6 +274,11 @@
         b = new TT.Prisma(this, this.camX + 880, 590);
         b.facing = -1; b.alpha = 0;
         this.introKind = 'shards';
+      } else if (sec.boss === 'vertice') {
+        // monta-se no ar a partir de arestas e faces que se juntam (a câmera 3D dá a volta nele)
+        b = new TT.Vertice(this, this.camX + 880, 590);
+        b.facing = -1; b.alpha = 0;
+        this.introKind = 'vertex';
       } else if (sec.boss === 'trigon') {
         // sobe do chão rachado, gigante, com o céu ficando vermelho
         b = new TT.Trigon(this, this.camX + 860, 590);
@@ -370,6 +378,17 @@
         if (k === 70) { b.alpha = 1; this.impact(b.x, b.y, 'PRISMA!', '#7bf0ff', 1.4); A().play('glass'); this.whiteFlash = 8; }
         if (k === 95) this.say(b, 'Eu sou Prisma... e seus reflexos agora me pertencem!', '#c2f2ff');
       }
+      if (this.introKind === 'vertex') {
+        const k = 170 - this.bossIntro;
+        b.alpha = TT.clamp((k - 30) / 60, 0, 1);
+        if (k < 90 && k % 6 === 0) {
+          const ang = Math.random() * Math.PI * 2, dist = 160 * (1 - k / 90) + 30;
+          this.particles.spawn('debris', b.x + Math.cos(ang) * dist, b.y - 150 + Math.sin(ang) * dist * 0.6, { vx: -Math.cos(ang) * 4, vy: -Math.sin(ang) * 3, color: TT.choice(['#5ff2ff', '#ff5fd2', '#8a5cff', '#ffffff']), size: TT.rand(6, 11), life: 20, vr: 0.3 });
+          if (k % 18 === 0) A().play('zap');
+        }
+        if (k === 90) { b.alpha = 1; this.impact(b.x, b.y, 'VÉRTICE!', '#5ff2ff', 1.5); A().play('super'); this.whiteFlash = 8; }
+        if (k === 118) this.say(b, 'Bem-vindos ao espaço de verdade. Aqui, nada é plano.', '#c9fbff');
+      }
       if (this.introKind === 'trigon') {
         const k = 170 - this.bossIntro;
         b.rise = TT.clamp((k - 20) / 100, 0, 1);
@@ -466,6 +485,7 @@
     }
 
     onHit(att, t, d) {
+      TT.depthHint = t.y;
       const big = !!(d.big || d.knockdown || d.dmg >= 14);
       const heroAtk = att && att.team === 'hero';
       this.hitstop = Math.max(this.hitstop, big ? 5 : 3);
@@ -794,6 +814,7 @@
 
     // Volta para a tela de título (a fase em andamento é abandonada).
     goTitle() {
+      this.dim3On = false; this.dimTrans = null;
       this.state = 'title'; this.stateT = 0; this.score = 0; this.menuIdx = 0; this.showControls = false; this.quitArm = false;
       this.particles.clear();
       A().playSong('theme');
@@ -900,6 +921,7 @@
         this.particles.update();
         return;
       }
+      if (this.dimTrans) { this.w3d.stepTransition(); this.particles.update(); return; }
       if (this.hitstop > 0) { this.hitstop--; this.particles.update(); return; }
       if (this.slowmo > 0) { this.slowmo--; if (this.slowmo % 2 === 1) { this.particles.update(); return; } }
 
@@ -913,6 +935,7 @@
         if (sl.switchCool > 0) sl.switchCool--;
         if (sl.out) continue;
         const p = this.team[sl.ai];
+        TT.depthHint = p.y;
         p.think(inp.pl[sl.id]);
         p.physics();
         // corpos grandes (chefes) empurram o jogador para não ficarem sobrepostos (não quando o chefe está no ar, como no salto do Slade)
@@ -925,9 +948,9 @@
       }
 
       this.updateBossIntro();
-      for (const e of this.enemies) { e.think(); e.physics(); }
-      for (const pr of this.projectiles) pr.update();
-      for (const ef of this.effects) ef.update();
+      for (const e of this.enemies) { TT.depthHint = e.y; e.think(); e.physics(); }
+      for (const pr of this.projectiles) { TT.depthHint = pr.y; pr.update(); }
+      for (const ef of this.effects) { TT.depthHint = ef.y != null ? ef.y : ef.f ? ef.f.y : TT.depthHint; ef.update(); }
       for (const pk of this.pickups) pk.update();
       for (const c of this.props) c.update();
       if (this.drill) this.drill.update();
@@ -942,6 +965,7 @@
       this.watchdog();
       this.updateCamera();
       this.updateSections();
+      if (this.w3d && this.stage.dim3) this.w3d.checkTrigger();
       if (this.goArrow > 0) this.goArrow++;
       if (this.boss) this.bossShown = Math.min(1, this.bossShown + 0.02);
 
@@ -1004,6 +1028,8 @@
           locked = this.secActive;
         }
       }
+      const d3 = this.stage.dim3;
+      if (d3 && !this.dim3On && this.w3d && !this.w3d.failed && this.camX <= d3.at) maxCam = Math.min(maxCam, d3.at);
       if (!locked) {
         // 1 jogador: segue o Titã; 2 jogadores: segue o meio dos dois sem deixar o de trás sair da tela
         const ps = this.players().filter((t) => !t.ko);
@@ -1075,6 +1101,7 @@
     }
 
     drawWorld(ctx) {
+      if (this.w3d && (this.dim3On || this.dimTrans) && this.w3d.ready) { this.w3d.drawWorld(ctx); this.drawScreenFx(ctx); return; }
       const shx = this.shake ? TT.rand(-this.shake, this.shake) : 0, shy = this.shake ? TT.rand(-this.shake, this.shake) * 0.6 : 0;
       ctx.save();
       ctx.translate(shx, shy);
@@ -1102,7 +1129,10 @@
       this.drawBubbles(ctx, camX);
       if (this.bg.fg) this.bg.fg.draw(ctx, camX);
       ctx.restore();
-
+      this.drawScreenFx(ctx);
+    }
+    // Vinheta, tom de tela e clarão (por cima do mundo, 2D ou 3D).
+    drawScreenFx(ctx) {
       ctx.drawImage(TT.vignette(), 0, 0, W, H);
       if (this.tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * this.tint.t / this.tint.dur; ctx.fillStyle = this.tint.col; ctx.fillRect(0, 0, W, H); ctx.restore(); }
       if (this.whiteFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (this.whiteFlash / 14) + ')'; ctx.fillRect(0, 0, W, H); }
@@ -1110,7 +1140,8 @@
 
     drawAmbient(ctx, camX) {
       const f = this.frame;
-      if (this.stage.id === 12) {
+      if (this.stage.id === 13 && TT.ambient13) TT.ambient13(ctx, camX, f);
+      else if (this.stage.id === 12) {
         // reflexos prismáticos e brilhos coloridos flutuando
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 22; i++) {
@@ -1233,14 +1264,17 @@
       }
     }
 
-    drawBubbles(ctx, camX) {
+    // pos(f) opcional: [x, y] na tela de quem fala (no modo 3D vem da câmera)
+    drawBubbles(ctx, camX, pos) {
       for (const b of this.bubbles) {
         const f = b.f;
         ctx.font = '22px ' + TT.FONT;
         const w = Math.max(80, ctx.measureText(b.text).width + 26);
+        const P = pos ? pos(f) : null;
+        if (pos && !P) continue;
         // mantém o balão inteiro dentro da tela (a ponta continua apontando para quem fala)
-        const fx = f.x - camX, x = TT.clamp(fx, w / 2 + 10, W - w / 2 - 10);
-        const y = Math.max(200, f.y - f.z - (f.height || 120) - 34);
+        const fx = P ? P[0] : f.x - camX, x = TT.clamp(fx, w / 2 + 10, W - w / 2 - 10);
+        const y = P ? TT.clamp(P[1], 60, H - 60) : Math.max(200, f.y - f.z - (f.height || 120) - 34);
         const pop = Math.min(1, b.t / 6);
         ctx.save(); ctx.translate(x, y); ctx.scale(pop, pop);
         const tail = TT.clamp(fx - x, -w / 2 + 14, w / 2 - 14);
