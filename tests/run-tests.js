@@ -60,7 +60,7 @@ async page => {
   const pick = await ev(() => {
     const g = TT.game;
     g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.stageSel = 0;
-    g.input.endStep(); // descarta o ENTER real ainda pendente (senão vira "confirmar" no 1º passo)
+    g.input.discard(); // descarta o ENTER real ainda pendente (senão vira "confirmar" no 1º passo)
     const press = (k) => { g.input.pressed.add(k); g.step(); };
     press('down'); press('down'); press('left');
     const sel = g.stageSel, label = g.menuLabel('stage').value;
@@ -1296,7 +1296,7 @@ async page => {
   await frames(30);
   const tc = {};
   tc.menu = await ev(() => {
-    const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.endStep();
+    const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.discard();
     const press = (k) => { g.input.pressed.add(k); g.step(); };
     const hidden = getComputedStyle(document.getElementById('tt-touch')).display === 'none';
     const was = g.touch.level;
@@ -1413,7 +1413,7 @@ async page => {
     const e = new Event('beforeinstallprompt'); e.prompt = () => { prompted++; }; e.userChoice = Promise.resolve({ outcome: 'accepted' });
     window.dispatchEvent(e);
     const items = g.titleItems();
-    g.state = 'title'; g.stateT = 50; g.showControls = false; g.menuIdx = items.indexOf('install'); g.input.endStep();
+    g.state = 'title'; g.stateT = 50; g.showControls = false; g.menuIdx = items.indexOf('install'); g.input.discard();
     g.input.pressed.add('menu'); g.step();
     return { has: items.includes('install'), label: g.menuLabel('install').text, prompted };
   });

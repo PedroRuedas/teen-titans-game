@@ -293,6 +293,11 @@
   const handF = {}, handB = {};
   // Desenha um personagem humanoide com o estilo dado. opt: { flash, t, scale, out }
   // out (opcional) recebe posições em coordenadas do mundo: cabeça (hx, hy) e mão da frente (fx, fy).
+  // Só a cabeça de um estilo, no traço do desenho (o 3D projeta isso no rosto dos vilões)
+  TT.drawHeadToon = function (ctx, st, r, pose) {
+    const t0 = TOON; TOON = st.toon !== false; FLASH = false;
+    try { st.drawHead(ctx, r, pose); } finally { TOON = t0; FLASH = false; }
+  };
   TT.drawRig = function (ctx, st, pose, x, y, facing, opt) {
     if (TT.SKIP_RIG) return; // modo 3D: o corpo é o modelo 3D (js/world3d.js)
     const sc = st.scale * (opt && opt.scale ? opt.scale : 1);

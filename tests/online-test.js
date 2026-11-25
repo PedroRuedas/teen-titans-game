@@ -17,7 +17,7 @@ async page => {
   await sleep(300);
 
   // anfitrião: JOGAR ONLINE (2º item do título) -> CRIAR SALA
-  await host.evaluate(() => { const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.endStep(); });
+  await host.evaluate(() => { const g = TT.game; g.state = 'title'; g.stateT = 50; g.menuIdx = 0; g.input.discard(); });
   // espera o jogo processar cada tecla (o 1º quadro depois de carregar monta os cenários e demora)
   await host.keyboard.press('ArrowDown');
   await host.waitForFunction(() => TT.game.menuIdx === 1, null, { timeout: 5000 }).catch(() => {});

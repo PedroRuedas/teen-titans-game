@@ -679,12 +679,13 @@
   function data(name) { const d = entry(name); step(d, 1e9); return d; }
   const QUEUE = [];
   let pumping = false;
+  function flush(d) { if (d.cbs) { const c = d.cbs; d.cbs = null; for (const f of c) f(d.geo); } }
   function kick() { if (!pumping) { pumping = true; setTimeout(pump, 30); } }
   function pump() {
     pumping = false;
-    while (QUEUE.length && CACHE.get(QUEUE[0]).geo) QUEUE.shift();
+    while (QUEUE.length && CACHE.get(QUEUE[0]).geo) flush(CACHE.get(QUEUE.shift()));
     if (!QUEUE.length) return;
-    step(CACHE.get(QUEUE[0]), 4);
+    const d = CACHE.get(QUEUE[0]); step(d, 4); if (d.geo) flush(d);
     pumping = true; setTimeout(pump, 33);
   }
 
@@ -1230,6 +1231,15 @@
     prewarm(THREE, names) { T = THREE; for (const n of names) { const k = n === 'cheetahAtk' ? 'cheetah' : n; if (DEF[k] && !QUEUE.includes(k)) { entry(k); if (!CACHE.get(k).geo) QUEUE.push(k); } } kick(); },
     prewarmBody(THREE, kind, st) { T = THREE; const k = bodyKey(kind, st); if (!QUEUE.includes(k)) { bodyEntry(kind, st); if (!CACHE.get(k).geo) QUEUE.push(k); } kick(); },
     humanBody,
+    // malha lisa de uma peça a partir de uma escultura montada por build(S, helpers) (para o cenário)
+    // mesma coisa, aos poucos (fila fatiada): cb(geo) quando ficar pronta
+    sculptStaticAsync(THREE, key, h, build, cb) {
+      T = THREE; let d = CACHE.get(key);
+      if (!d) { const S = new Sculpt(h); build(S, { noise3, rgb, mix }); d = { gen: meshOf(S), geo: null, ms: 0, cbs: [] }; CACHE.set(key, d); QUEUE.unshift(key); }
+      if (d.geo) cb(d.geo); else (d.cbs || (d.cbs = [])).push(cb);
+      kick();
+    },
+    sculptStatic(THREE, h, build) { T = THREE; const S = new Sculpt(h); build(S, { noise3, rgb, mix }); const gen = meshOf(S); let r; do { r = gen.next(); } while (!r.done); return r.value; },
     has(name) { return !!DEF[name]; },
     make(W, name, F, M, f) {
       T = window.THREE;

@@ -107,7 +107,7 @@
 
   // Estado de entrada de um jogador.
   class PlayerInput {
-    constructor() { this.down = new Set(); this.pressed = new Set(); this.padPrev = new Set(); this.padNow = new Set(); this.bot = null; }
+    constructor() { this.down = new Set(); this.pressed = new Set(); this.queue = []; this.padPrev = new Set(); this.padNow = new Set(); this.bot = null; }
     isDown(a) { return this.down.has(a); }
     wasPressed(a) { return this.pressed.has(a); }
     consume(a) { this.pressed.delete(a); }
@@ -130,9 +130,8 @@
         e.preventDefault();
         if (this.held.has(e.code)) return; // repetição automática
         this.held.set(e.code, m);
-        const P = this.pl[m[0]];
-        P.pressed.add(m[1]);
-        if (MENU_ACTS[m[1]]) P.pressed.add('menu');
+        // fila: dois apertos da mesma tecla antes do próximo passo do jogo (quadro lento) contam como dois
+        this.pl[m[0]].queue.push(m[1]);
       });
       window.addEventListener('keyup', (e) => { this.held.delete(e.code); });
       window.addEventListener('blur', () => this.held.clear());
@@ -176,6 +175,13 @@
 
     // Monta o estado do quadro: teclado + gamepad + bots.
     sample() {
+      // um aperto de cada tecla por passo; os repetidos ficam para os passos seguintes
+      for (const P of this.pl) {
+        if (!P.queue.length) continue;
+        let i = 0; // em ordem: para no primeiro aperto repetido (o resto, inclusive o que veio depois, espera o próximo passo)
+        for (; i < P.queue.length; i++) { const a = P.queue[i]; if (P.pressed.has(a)) break; P.pressed.add(a); if (MENU_ACTS[a]) P.pressed.add('menu'); }
+        P.queue = P.queue.slice(i);
+      }
       this.pollPad();
       for (const P of this.pl) P.down.clear();
       for (const [, m] of this.held) this.pl[m[0]].down.add(m[1]);
@@ -205,6 +211,8 @@
     wasPressed(a) { return this.pl[0].pressed.has(a) || this.pl[1].pressed.has(a); }
     consume(a) { for (const P of this.pl) P.pressed.delete(a); }
     endStep() { for (const P of this.pl) P.pressed.clear(); }
+    // joga fora tudo o que foi apertado e ainda não foi usado (inclusive a fila)
+    discard() { for (const P of this.pl) { P.pressed.clear(); P.queue.length = 0; } }
   }
   TT.Input = Input;
 })();

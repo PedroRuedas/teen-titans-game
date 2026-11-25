@@ -377,8 +377,20 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       chifres espirais do carneiro, presas do elefante, pelagem em relevo, escamas e listras do T-rex, pintas do
       guepardo, lã encaracolada) e são animados com os mesmos tempos dos desenhos; a esquiva da Ravena vira o **corvo da alma**
       em 3D (nas cores de cada versão); o coelho da maldição do Mumbo também; e o braço do Ciborgue vira o
-      **canhão sônico** nos golpes de canhão. Os outros personagens jogáveis (vilões e soldados liberados) continuam
-      com o desenho 2D original, de pé na profundidade deles.
+      **canhão sônico** nos golpes de canhão. **Todos os 23 personagens jogáveis são 3D**: os vilões e soldados
+      liberados (Soldado H.I.V.E., Robô do Slade, Cinderblock, Gizmo, Plasmus, Plasmus Mirim, Jinx, Mammoth, Mumbo,
+      Coelho-Guarda, Slade, Control Freak, Mad Mod e Trigon) usam o mesmo corpo esculpido, com o rosto do próprio
+      desenho 2D projetado na cabeça, uniforme pintado e peças 3D de cada um (cartola e capa do Mumbo, chifres de
+      cabelo da Jinx, juba do Mammoth, galhada do Trigon, orelhas do Coelho-Guarda, mochila-aranha do Gizmo,
+      bengala do Mad Mod, capa e controle do Control Freak, cabeça de pedra do Cinderblock).
+    - **Gráfico (js/gfx3d.js):** pós-processamento próprio com antisserrilhado MSAA, oclusão de contato nas dobras
+      e cantos, contorno de tinta pela profundidade em todo o cenário, brilho (bloom) das luzes, nitidez, gradação
+      de cor e vinheta; sombras do sol num mapa de 4096 px enquadrado na câmera; filtro anisotrópico máximo;
+      resolução dinâmica. Cenário refeito: fachadas com o dobro de resolução (tijolo, molduras, peitoris,
+      cortinas, ar-condicionado), asfalto com rachaduras e remendos, calçada com lajotas em relevo, árvores
+      esculpidas e chão completo em volta.
+    - **Controles:** apertos repetidos rápidos da mesma tecla não se perdem mais quando um quadro demora (cada aperto
+      é entregue em ordem, um por passo do jogo).
     - **No celular**, o 3D usa resolução menor e sem antialias (mais leve para a GPU do aparelho) e o analógico
       ganha um fundo escuro para não sumir sobre a cidade clara.
     - **Câmera diretora:** 3/4 nas arenas, **perseguição** pela avenida entre as arenas, **vista de cima** na 2ª arena
