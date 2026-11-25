@@ -109,9 +109,9 @@
   S.trigonP = mk({ scale: 1.3 }, S.trigon);
   // Ravena Vermelha (tomada por Trigon: manto vermelho e quatro olhos) e Ravena Branca (o manto branco do fim de "O Fim")
   S.redraven = mk({ cloak: '#a8122a', cloakFold: '#6a0816', torso: '#1a0a10', arm: '#1a0a10', glove: '#1a0a10', boot: '#6a0816',
-    faceOpt: { hood: ['#2a0608', '#a8122a', '#6a0816', '#d03a4a'], demon: true } }, S.raven);
+    faceOpt: { hood: ['#2a0608', '#a8122a', '#6a0816', '#d03a4a'], demon: true }, aura: 'red' }, S.raven);
   S.whiteraven = mk({ cloak: '#f4f4fa', cloakFold: '#b8bccc', torso: '#ecebf3', arm: '#ecebf3', glove: '#ecebf3', boot: '#d8dce8',
-    faceOpt: { hood: ['#bfc4d4', '#f6f6fa', '#c9cdd8', '#ffffff'] } }, S.raven);
+    faceOpt: { hood: ['#bfc4d4', '#f6f6fa', '#c9cdd8', '#ffffff'] }, aura: 'white' }, S.raven);
 
   // ---- Gizmo: baixinho careca de óculos verdes, macacão verde e mochila com patas de aranha mecânicas
   const GZ = { suit: '#3c8f3a', dark: '#2c2c34', metal: '#7c8798', lens: '#7dff6a' };

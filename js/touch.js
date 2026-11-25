@@ -28,7 +28,8 @@
 
   const CSS = `
   #tt-touch { position: fixed; inset: 0; pointer-events: none; z-index: 10; user-select: none; -webkit-user-select: none;
-    -webkit-touch-callout: none; font-family: ${TT.FONT}; display: none; }
+    -webkit-touch-callout: none; font-family: ${TT.FONT}; display: none;
+    transform: translateZ(0); will-change: transform; isolation: isolate; }
   #tt-touch.on { display: block; }
   #tt-touch .tb { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; display: flex;
     align-items: center; justify-content: center; color: #17121f; font-size: 2.7vmin; letter-spacing: 0.02em;
@@ -42,6 +43,8 @@
   #tt-stick-zone { position: absolute; left: 0; bottom: 0; width: 45vw; height: 62vh; pointer-events: auto; touch-action: none; }
   #tt-stick { position: absolute; width: 30vmin; height: 30vmin; margin: -15vmin 0 0 -15vmin; border-radius: 50%;
     background: rgba(255,255,255,0.18); border: 0.6vmin solid rgba(255,255,255,0.75); box-shadow: inset 0 0 0 0.6vmin #17121f; }
+  #tt-touch.d3 #tt-stick { background: rgba(12,6,30,0.42); border-color: #ffffff; }
+  #tt-touch.d3 #tt-knob { background: #ffffff; }
   #tt-knob { position: absolute; left: 50%; top: 50%; width: 13vmin; height: 13vmin; margin: -6.5vmin 0 0 -6.5vmin; border-radius: 50%;
     background: #e8ecff; border: 0.6vmin solid #17121f; box-shadow: 0 0.6vmin 0 rgba(0,0,0,0.4); }
   #tt-rotate { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; flex-direction: column;
@@ -53,6 +56,7 @@
   const FS_ICON = '<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="#17121f" stroke-width="3" stroke-linecap="round">'
     + '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/></svg>';
 
+  TT.isTouchDevice = () => hasTouch();
   function hasTouch() {
     try { return (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0; } catch (e) { return false; }
   }
@@ -238,6 +242,8 @@
     update() {
       if (!this.visible) return;
       const g = this.game, sup = this.btns.super;
+      // modo 3D (fase 13): fundo mais escuro no analógico para ele não sumir na cidade clara
+      this.root.classList.toggle('d3', !!(g.dim3On || g.dimTrans));
       if (sup) {
         const full = g.state === 'play' && g.energy >= 100;
         sup.classList.toggle('full', full);
