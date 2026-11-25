@@ -241,6 +241,7 @@
 
     drawShadow(ctx, camX) {
       const s = Math.max(0.35, 1 - this.z / 300);
+      if (TT.softShadow) { TT.softShadow(ctx, this.x - camX, this.y, this.shadowW * s, this.shadowW * 0.3 * s, 0.5, Math.min(1, this.z / 200)); return; }
       ctx.fillStyle = 'rgba(15,5,25,0.38)';
       ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, this.shadowW * s, this.shadowW * 0.3 * s, 0, 0, Math.PI * 2); ctx.fill();
     }
@@ -6308,6 +6309,7 @@
     }
     update() { if (this.flash > 0) this.flash--; if (this.wob > 0) this.wob--; }
     drawShadow(ctx, camX) {
+      if (TT.softShadow) { TT.softShadow(ctx, this.x - camX, this.y, 40, 11, 0.5, 0); return; }
       ctx.fillStyle = 'rgba(15,5,25,0.38)';
       ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 40, 11, 0, 0, Math.PI * 2); ctx.fill();
     }
@@ -6353,6 +6355,7 @@
       }
     }
     drawShadow(ctx, camX) {
+      if (TT.softShadow) { TT.softShadow(ctx, this.x - camX, this.y, 20, 6, 0.4, 0); return; }
       ctx.fillStyle = 'rgba(15,5,25,0.3)';
       ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
     }
