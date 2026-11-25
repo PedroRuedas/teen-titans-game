@@ -274,6 +274,192 @@
   const FORM3D = {};
   for (const n of FORM_NAMES) FORM3D[n] = function (F, M, f) { TT.Beasts3D.make(this, n, F, M, f); };
 
+  // ---- rostos 3D dos vilões (de frente, no mesmo traço dos Titãs)
+  const shut = (pose) => pose.eyes === 'shut' || pose.eyes === 'x';
+  // boca de dentes à mostra (Plasmus, Trigon, Gizmo...): w = meia largura
+  function teethMouth(g, K, x, y, w, h, pose, o) {
+    o = o || {};
+    const open = pose.mouth === 'shout' || pose.mouth === 'open', hh = open ? h * 1.8 : h;
+    const d = `M ${x - w} ${y - hh * 0.3} Q ${x} ${y + hh * 0.2} ${x + w} ${y - hh * 0.3} Q ${x + w * 0.8} ${y + hh} ${x} ${y + hh * 1.1} Q ${x - w * 0.8} ${y + hh} ${x - w} ${y - hh * 0.3} Z`;
+    K.fill(g, d, o.inside || '#4a0f1c', 5);
+    g.save(); g.clip(new Path2D(d));
+    g.fillStyle = o.teeth || '#fbf8ec';
+    const n = o.n || 6, tw = (w * 2) / n;
+    for (let i = 0; i < n; i++) { const tx = x - w + i * tw; g.fillRect(tx + 1.5, y - hh * 0.6, tw - 3, hh * 0.55); }
+    if (o.fangs) for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x + s * w * 0.55 - 6, y - hh * 0.2); g.lineTo(x + s * w * 0.55 + 6, y - hh * 0.2); g.lineTo(x + s * w * 0.55, y + hh * 0.75); g.closePath(); g.fill(); }
+    if (open) { g.fillStyle = '#d24a64'; g.beginPath(); g.ellipse(x, y + hh * 0.85, w * 0.45, hh * 0.3, 0, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    K.line(g, d, 5);
+  }
+  const blush = (g, x, y, col) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, 14, 8, 0, 0, Math.PI * 2); g.fill(); };
+  const VFACE = {
+    hive(g, K, pose) { // capacete cinza e viseira amarela
+      const skin = '#e8b98f';
+      g.fillStyle = skin; g.fillRect(0, 0, 512, 256);
+      g.fillStyle = '#5a6170'; g.fillRect(0, 0, 512, 104);
+      faceSpace(g, () => {
+        K.fill(g, 'M -330 -300 L 330 -300 L 330 -14 Q 160 -6 120 -8 L 104 -14 Q 0 -22 -104 -14 L -120 -8 Q -160 -6 -330 -14 Z', '#5a6170', 6);
+        K.line(g, 'M -330 -70 L 330 -70', 4, '#454b58');
+        K.fill(g, 'M -82 -54 L 82 -54 L 76 -14 Q 0 -6 -76 -14 Z', '#f0c62e', 6);
+        g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(-60, -46, 70, 8);
+        nose(g, K, skin);
+        K.mouth(g, 0, 58, pose, { def: 'frown' });
+      });
+    },
+    slade(g, K, pose) { // máscara dividida: metade preta (lado direito dele) e metade cobre com o olho
+      g.fillStyle = '#18191d'; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = '#d0711f'; g.fillRect(256, 0, 256, 256);
+      faceSpace(g, () => {
+        K.line(g, 'M 0 -330 L 0 330', 5);
+        // reflexo do metal
+        g.fillStyle = 'rgba(255,220,170,0.35)'; g.beginPath(); g.ellipse(60, -50, 26, 40, 0.3, 0, Math.PI * 2); g.fill();
+        // olho: furo escuro com a pupila vermelha
+        K.fill(g, 'M 10 -12 Q 34 -30 58 -12 Q 34 4 10 -12 Z', '#100808', 4);
+        if (!shut(pose)) { g.fillStyle = '#ff4a2a'; g.beginPath(); g.arc(34, -12, 6.5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffd0b0'; g.beginPath(); g.arc(32, -14, 2.2, 0, Math.PI * 2); g.fill(); }
+        // respiros da boca
+        for (const x of [22, 34, 46]) K.line(g, `M ${x} 44 L ${x} 76`, 5, '#18191d');
+        // furo do olho do lado preto (só um contorno)
+        K.line(g, 'M -58 -12 Q -34 -26 -10 -12', 3, '#2e3036');
+      });
+    },
+    gizmo(g, K, pose) { // careca, óculos verdes e sorriso de canto com dentinho
+      const skin = '#f2c7a5';
+      g.fillStyle = skin; g.fillRect(0, 0, 512, 256);
+      faceSpace(g, () => {
+        g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.ellipse(-10, -78, 60, 22, 0, 0, Math.PI * 2); g.fill(); // brilho da careca
+        K.fill(g, 'M -330 -44 L 330 -44 L 330 -12 L -330 -12 Z', '#2c2c34', 0); // tira dos óculos
+        for (const x of [-34, 34]) {
+          K.fill(g, `M ${x - 29} -26 A 29 29 0 1 0 ${x + 29} -26 A 29 29 0 1 0 ${x - 29} -26 Z`, '#3a4048', 6);
+          K.fill(g, `M ${x - 21} -26 A 21 21 0 1 0 ${x + 21} -26 A 21 21 0 1 0 ${x - 21} -26 Z`, shut(pose) ? '#3a8a3a' : '#7dff6a', 0);
+          g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(x - 8, -34, 7, 5, -0.5, 0, Math.PI * 2); g.fill();
+        }
+        K.line(g, 'M -5 -26 L 5 -26', 6, '#3a4048');
+        nose(g, K, skin);
+        if (pose.mouth === 'shout' || pose.mouth === 'open') K.mouth(g, 0, 60, pose);
+        else { K.line(g, 'M -22 56 Q 0 66 24 50', 5.5); K.fill(g, 'M 6 61 L 14 59 L 11 69 Z', '#ffffff', 2.5); }
+      });
+    },
+    plasmus(g, K, pose, st) { // gosma rosa: olhos amarelos pequenos e sorriso de dentes
+      const skin = st.skin || '#e8559a', kid = st.headR >= 20 && st.torsoH < 30;
+      g.fillStyle = skin; g.fillRect(0, 0, 512, 256);
+      const r = seeded(kid ? 5 : 9);
+      for (let i = 0; i < 18; i++) { g.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.14)' : 'rgba(120,0,60,0.14)'; g.beginPath(); g.ellipse(r() * 512, r() * 256, 6 + r() * 16, 5 + r() * 10, r() * 3, 0, Math.PI * 2); g.fill(); }
+      faceSpace(g, () => {
+        g.fillStyle = 'rgba(255,220,240,0.55)'; g.beginPath(); g.ellipse(-30, -66, 34, 14, -0.3, 0, Math.PI * 2); g.fill();
+        const er = kid ? 20 : 15;
+        const o = { rx: er, ry: er, sclera: '#ffe14a', pupil: '#140a22', irisK: 0.9, look: 0, lidW: 5 };
+        K.eye(g, -30, -4, pose, o); K.eye(g, 30, -4, pose, o);
+        teethMouth(g, K, 0, 50, kid ? 38 : 46, 12, pose, { n: kid ? 5 : 7 });
+      });
+    },
+    jinx(g, K, pose) { // pele clara, franja rosa, olhos de gato rosados e batom roxo
+      const skin = '#d9d3e4';
+      hairWindow(g, K, '#ff6fb8', skin, 'M -150 10 L -96 -30 L -70 -52 L -40 -30 L -18 -56 L 6 -32 L 30 -56 L 54 -30 L 78 -50 L 98 -28 ' + SIDES(30) + 'Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        const o = { rx: 24, ry: 18, sclera: '#ff8ad0', irisK: 0.3, pupil: '#2a0a24', look: 0, lashes: true, lidW: 7, tilt: 0 };
+        K.eye(g, -34, 0, pose, Object.assign({ lash: 1, tilt: 0.18 }, o));
+        K.eye(g, 34, 0, pose, Object.assign({ lash: -1, tilt: -0.18 }, o));
+        if (pose.mouth === 'shout' || pose.mouth === 'open') K.mouth(g, 0, 60, pose);
+        else K.fill(g, 'M -18 58 Q -6 52 0 56 Q 6 52 18 58 Q 4 68 -18 58 Z', '#6b3f93', 3);
+      });
+    },
+    mammoth(g, K, pose) { // juba laranja, monocelha, olhinhos e queixo largo
+      const skin = '#e7b28a';
+      hairWindow(g, K, '#e8762a', skin, 'M -150 10 L -110 -40 L -60 -46 L -20 -52 L 20 -50 L 60 -46 L 110 -40 ' + SIDES(40) + 'Z');
+      faceSpace(g, () => {
+        K.fill(g, 'M -62 -26 Q 0 -40 62 -26 L 60 -14 Q 0 -26 -60 -14 Z', '#c0581e', 3);
+        for (const x of [-26, 26]) { if (shut(pose)) K.line(g, `M ${x - 9} -2 L ${x + 9} -2`, 5); else { g.fillStyle = '#140a22'; g.beginPath(); g.ellipse(x, -2, 7, 9, 0, 0, Math.PI * 2); g.fill(); } }
+        K.fill(g, 'M -6 4 Q 0 0 8 4 L 14 30 Q 0 38 -14 30 Z', TT.shade(skin, -0.12), 4); // nariz largo
+        K.line(g, 'M -70 60 Q -60 96 0 104 Q 60 96 70 60', 4, TT.shade(skin, -0.25)); // queixão
+        for (let i = 0; i < 26; i++) { const a = -0.9 + i * 0.07; g.fillStyle = 'rgba(120,70,40,0.35)'; g.beginPath(); g.arc(Math.sin(a) * 72, 70 + Math.cos(a) * 24, 2, 0, Math.PI * 2); g.fill(); } // barba por fazer
+        K.mouth(g, 0, 62, pose, { def: 'frown' });
+      });
+    },
+    mumbo(g, K, pose) { // pele azul, cabelo branco dos lados, sobrancelhas e bigode brancos (o nariz é 3D)
+      const skin = '#86aee6';
+      hairWindow(g, K, '#f4f4f8', skin, 'M -96 300 L -96 -60 L 96 -60 L 96 300 Z');
+      faceSpace(g, () => {
+        const o = { rx: 17, ry: 19, iris: '#2a3a7a', irisK: 0.5, look: 0, lidW: 6 };
+        K.eye(g, -30, -12, pose, Object.assign({ brow: 'M -56 -40 Q -30 -54 -8 -38' }, o));
+        K.eye(g, 30, -12, pose, Object.assign({ brow: 'M 8 -38 Q 30 -54 56 -40' }, o));
+        for (const s of [-1, 1]) K.fill(g, `M 0 30 Q ${s * 30} 22 ${s * 52} 36 Q ${s * 38} 48 ${s * 18} 44 Q ${s * 6} 42 0 40 Z`, '#f4f4f8', 4); // bigode
+        K.mouth(g, 0, 64, pose, { def: 'smile' });
+      });
+    },
+    bunnyguard(g, K, pose) { // coelho branco enfeitiçado: olhos vermelhos, focinho rosa, dentões e bigodes
+      const skin = '#f6f4fa';
+      g.fillStyle = skin; g.fillRect(0, 0, 512, 256);
+      faceSpace(g, () => {
+        for (const s of [-1, 1]) {
+          if (shut(pose)) K.line(g, `M ${s * 32 - 12} -6 Q ${s * 32} 0 ${s * 32 + 12} -6`, 5);
+          else { K.fill(g, `M ${s * 32 - 11} -6 A 11 15 0 1 0 ${s * 32 + 11} -6 A 11 15 0 1 0 ${s * 32 - 11} -6 Z`, '#e01a3a', 3); g.fillStyle = '#ffd0d8'; g.beginPath(); g.arc(s * 32 - 3, -12, 3.5, 0, Math.PI * 2); g.fill(); }
+          K.line(g, `M ${s * 54} -36 L ${s * 16} -24`, 5); // sobrancelha brava
+          blush(g, s * 50, 22, 'rgba(255,150,180,0.45)');
+          K.line(g, `M ${s * 14} 30 L ${s * 70} 22 M ${s * 14} 36 L ${s * 72} 38`, 2.5, '#9a96a8'); // bigodes
+        }
+        K.fill(g, 'M -10 20 Q 0 14 10 20 Q 6 30 0 30 Q -6 30 -10 20 Z', '#ff8fb5', 3);
+        K.line(g, 'M 0 30 L 0 40 M -16 44 Q -8 50 0 40 Q 8 50 16 44', 4);
+        K.fill(g, 'M -9 44 L 9 44 L 9 62 L -9 62 Z', '#ffffff', 3); K.line(g, 'M 0 44 L 0 62', 2.5);
+        if (pose.mouth === 'shout' || pose.mouth === 'open') K.fill(g, 'M -14 64 Q 0 84 14 64 Z', '#5a1020', 3);
+      });
+    },
+    freak(g, K, pose) { // cabelo laranja espetado, sardas, bochechas coradas e sorriso
+      const skin = '#f3c9a6';
+      hairWindow(g, K, '#d65a24', skin, 'M -150 10 L -96 -36 L -70 -56 L -44 -40 L -22 -62 L 2 -42 L 26 -64 L 48 -42 L 72 -58 L 98 -34 ' + SIDES(40) + 'Z');
+      faceSpace(g, () => {
+        nose(g, K, skin);
+        const o = { rx: 12, ry: 16, iris: false, pupil: '#140a22', irisK: 1.6, look: 0, sclera: skin, lidW: 0 };
+        for (const s of [-1, 1]) {
+          if (shut(pose)) K.line(g, `M ${s * 30 - 10} -4 Q ${s * 30} 2 ${s * 30 + 10} -4`, 5);
+          else { g.fillStyle = '#140a22'; g.beginPath(); g.ellipse(s * 30, -4, 8, 12, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(s * 30 - 2, -8, 2.5, 0, Math.PI * 2); g.fill(); }
+          K.fill(g, `M ${s * 46} -30 L ${s * 14} -28 L ${s * 14} -22 L ${s * 46} -24 Z`, '#a8481e', 0); // sobrancelhas
+          blush(g, s * 54, 26, 'rgba(230,110,90,0.4)');
+          for (const [fx, fy] of [[40, 16], [52, 12], [46, 24], [60, 22]]) { g.fillStyle = '#c87a50'; g.beginPath(); g.arc(s * fx, fy, 2.6, 0, Math.PI * 2); g.fill(); } // sardas
+        }
+        void o;
+        K.mouth(g, 0, 60, pose, { def: 'smile' });
+        K.line(g, 'M -50 86 Q 0 104 50 86', 3.5, TT.shade(skin, -0.22)); // queixo duplo
+      });
+    },
+    madmod(g, K, pose) { // cabelo em cuia laranja, óculos redondos azuis e sorriso de dentes separados
+      const skin = '#f2c8a8';
+      hairWindow(g, K, '#e8682a', skin, 'M -150 30 L -104 -6 Q -70 -24 -30 -24 Q 30 -30 82 -14 L 104 -6 ' + SIDES(50) + 'Z');
+      faceSpace(g, () => {
+        K.fill(g, 'M -4 4 Q 2 2 6 6 L 18 36 Q 8 44 -8 38 Z', TT.shade(skin, -0.08), 4); // narigão
+        for (const x of [-32, 32]) {
+          K.fill(g, `M ${x - 22} 2 A 22 22 0 1 0 ${x + 22} 2 A 22 22 0 1 0 ${x - 22} 2 Z`, '#5fc8ff', 5);
+          if (!shut(pose)) { g.fillStyle = '#140a22'; g.beginPath(); g.arc(x + 2, 4, 5, 0, Math.PI * 2); g.fill(); }
+          g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(x - 8, -6, 6, 4, -0.5, 0, Math.PI * 2); g.fill();
+        }
+        K.line(g, 'M -10 0 Q 0 -6 10 0 M -54 0 L -96 -6 M 54 0 L 96 -6', 4);
+        teethMouth(g, K, 2, 62, 28, 9, pose, { n: 4 });
+        K.line(g, 'M -40 52 Q -46 60 -40 70 M 44 52 Q 50 60 44 70', 3, TT.shade(skin, -0.25)); // vincos do sorriso
+      });
+    },
+    trigon(g, K, pose) { // pele vermelha, quatro olhos amarelos, cabelo e barba negros, presas
+      const skin = '#c8102e';
+      hairWindow(g, K, '#1a1018', skin, 'M -150 -10 L -96 -44 L -50 -60 L 0 -66 L 50 -60 L 96 -44 ' + SIDES(20) + 'Z');
+      faceSpace(g, () => {
+        g.fillStyle = 'rgba(80,0,10,0.35)'; g.beginPath(); g.ellipse(0, -20, 70, 18, 0, 0, Math.PI * 2); g.fill();
+        for (const [x, y, w] of [[-34, -6, 19], [34, -6, 19], [-24, -36, 14], [24, -36, 14]]) {
+          const s = Math.sign(x), d = `M ${x - w} ${y + s * 0} Q ${x} ${y - w * 0.55} ${x + w} ${y} Q ${x} ${y + w * 0.4} ${x - w} ${y} Z`;
+          if (shut(pose)) { K.line(g, `M ${x - w} ${y} L ${x + w} ${y}`, 5); continue; }
+          g.save(); g.translate(x, y); g.rotate(s * 0.25); g.translate(-x, -y);
+          K.fill(g, d, '#ffe14a', 4);
+          g.fillStyle = '#ff9a1a'; g.beginPath(); g.ellipse(x, y, w * 0.35, w * 0.22, 0, 0, Math.PI * 2); g.fill();
+          g.restore();
+        }
+        K.line(g, 'M -64 -50 L -10 -30 M 64 -50 L 10 -30', 7, '#1a1018');
+        nose(g, K, skin);
+        teethMouth(g, K, 0, 56, 34, 9, pose, { n: 6, fangs: true, inside: '#3a0610' });
+        K.fill(g, 'M -46 76 Q 0 92 46 76 L 0 160 Z', '#1a1018', 4); // cavanhaque pontudo
+      });
+    },
+  };
+  VFACE.minion = VFACE.slade;
+  VFACE.plasmuskid = VFACE.plasmus;
+  for (const k in VFACE) FACE3D[k] = VFACE[k];
   // ---- peças 3D dos vilões (cabeça e corpo); "this" é o World3D
   const VHEAD = {
     jinx(M, hd, r) { // chifres de cabelo rosa presos com elástico preto
@@ -290,7 +476,8 @@
         const sp = this.part(M, hd, this.cone(r * 0.3, r * l, 8), this.toon('#e8762a')); sp.position.set(x * r, y * r, z * r); sp.rotation.set(rx, 0, rz);
       }
     },
-    mumbo(M, hd, r) { // cartola com fita vermelha
+    mumbo(M, hd, r) { // cartola com fita vermelha e narigão pontudo
+      const nz = this.part(M, hd, this.cone(r * 0.2, r * 0.85, 12), this.toon('#86aee6')); nz.position.set(r * 1.18, -r * 0.08, 0); nz.rotation.z = -Math.PI / 2 - 0.25;
       const brim = this.part(M, hd, this.cyl(r * 1.25, r * 1.25, 3, 28), this.toon('#121118')); brim.position.set(-r * 0.05, r * 0.85, 0); brim.rotation.z = -0.12;
       const top = this.part(M, hd, this.cyl(r * 0.8, r * 0.85, r * 1.5, 24), this.toon('#121118')); top.position.set(-r * 0.15, r * 1.6, 0); top.rotation.z = -0.12;
       const band = this.part(M, hd, this.cyl(r * 0.87, r * 0.87, r * 0.32, 24), this.toon('#c8102e'), { outline: false }); band.position.set(-r * 0.08, r * 1.04, 0); band.rotation.z = -0.12;
@@ -308,9 +495,10 @@
       }
     },
     madmod(M, hd, r) { // franja laranja em cuia
-      const cap = this.part(M, hd, this.geo('mmcap' + r, () => new T.SphereGeometry(r * 1.09, 24, 10, 0, Math.PI * 2, 0, 1.45)), this.toon('#e07a2a')); cap.position.x = -r * 0.06; cap.rotation.z = 0.05;
+      const cap = this.part(M, hd, this.geo('mmcap' + r, () => new T.SphereGeometry(r * 1.08, 24, 10, 0, Math.PI * 2, 0, 1.22)), this.toon('#e8682a')); cap.position.x = -r * 0.08; cap.rotation.z = 0.12;
     },
-    trigon(M, hd, r) { // galhada negra
+    trigon(M, hd, r) { // galhada negra e brilho dos quatro olhos
+      for (const [y, z, sz] of [[0.06, 0.34, 9], [0.06, -0.34, 9], [0.36, 0.24, 7], [0.36, -0.24, 7]]) { const gl = this.glowSprite('#ffd84a', sz, 0.5); gl.position.set(r * 0.98, r * y, r * z); hd.add(gl); }
       for (const s of [-1, 1]) {
         const a = this.part(M, hd, this.cone(r * 0.22, r * 2.2, 8), this.toon('#1a1018')); a.position.set(-r * 0.1, r * 1.7, s * r * 0.55); a.rotation.set(s * 0.35, 0, 0.25);
         const b = this.part(M, hd, this.cone(r * 0.12, r * 1.0, 6), this.toon('#1a1018')); b.position.set(r * 0.2, r * 2.1, s * r * 0.8); b.rotation.set(s * 0.5, 0, -0.6);
@@ -792,8 +980,8 @@
       } else if (VHEAD[kind]) {
         VHEAD[kind].call(this, M, hd, r, st, headMesh);
       } else if (kind === 'hive') {
-        const helm = this.part(M, hd, this.sph(r * 1.1, 18, 12), this.toon('#5a6170')); helm.position.set(-r * 0.22, r * 0.18, 0);
-      } else {
+        const helm = this.part(M, hd, this.geo('hhelm' + r, () => new T.SphereGeometry(r * 1.07, 24, 10, 0, Math.PI * 2, 0, 1.05)), this.toon('#5a6170')); helm.position.x = -r * 0.1; helm.rotation.z = 0.35;
+      } else if (!VFACE[kind]) { // (os vilões com rosto próprio já têm o cabelo/careca pintado)
         hairCap(st.hairCol || '#2a2038', 0.4, 0.2);
       }
     }
