@@ -368,9 +368,14 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       cinto de discos da Ravena, top, barriga e saia da Estelar). A **capa do Robin**, o **manto da Ravena** e o
       **cabelão da Estelar** são tecido: pendem dos ombros, balançam para trás com o movimento e são empurrados para
       fora do corpo, então não atravessam braços nem pernas. Os bonecos são animados pelos **mesmos ângulos de pose**
-      do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D. As **transformações também são 3D**:
+      do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D. O **corpo é esculpido** (js/beasts3d.js): peito,
+      cintura e quadril com forma, mãos com dedos, punhos das luvas, braçadeiras, joelhos, botas com cano, bico e sola,
+      cinto com bolsinhos do Robin, juntas e placas do Ciborgue; a malha dobra suave nos cotovelos e joelhos. As
+      **transformações também são 3D** e esculpidas da mesma forma (malha lisa de uma peça, com esqueleto):
       gorila, T-rex, rinoceronte, canguru, carneiro, elefante, a Fera e o guepardo do Mutano (e do Mutano Palhaço)
-      têm modelos próprios animados com os mesmos tempos dos desenhos; a esquiva da Ravena vira o **corvo da alma**
+      têm anatomia de bicho de verdade (olhos com íris e pálpebra, fileiras de dentes, presas, garras, cascos,
+      chifres espirais do carneiro, presas do elefante, pelagem em relevo, escamas e listras do T-rex, pintas do
+      guepardo, lã encaracolada) e são animados com os mesmos tempos dos desenhos; a esquiva da Ravena vira o **corvo da alma**
       em 3D (nas cores de cada versão); o coelho da maldição do Mumbo também; e o braço do Ciborgue vira o
       **canhão sônico** nos golpes de canhão. Os outros personagens jogáveis (vilões e soldados liberados) continuam
       com o desenho 2D original, de pé na profundidade deles.
