@@ -208,8 +208,8 @@ Todos os personagens extras têm modelo próprio, combo de 3 golpes, forte, espe
 | **Control Freak** | Fase 9 | ZAP! (raio do controle) | botão de PAUSA (pausa os inimigos) | MARATONA DE TV (TVs caem do céu) |
 | **Mad Mod** | Fase 10 | raio hipnótico | espiral que puxa os inimigos e explode | REVOLUÇÃO BRITÂNICA (Guardas Reais marcham pela tela) |
 | **Trigon** | Fase 11 | raios dos quatro olhos | chuva de fogo embaixo de cada inimigo | O FIM (onda vermelha e colunas de fogo) |
-| **Ravena Vermelha** | Fase 11 | golpes da Ravena (manto vermelho e quatro olhos) | | SELO DA IRA (selo de runas, correntes que puxam os inimigos e explosão) |
-| **Ravena Branca** | Fase 11 | golpes da Ravena (o manto branco do fim de "O Fim") | | TEMPESTADE DE PENAS (chuva de penas de luz; o clarão final cura a equipe) |
+| **Ravena Vermelha** | Fase 11 | golpes da Ravena com energia vermelha (manto vermelho e quatro olhos) | | SELO DA IRA (selo de runas, correntes que puxam os inimigos e explosão) |
+| **Ravena Branca** | Fase 11 | golpes da Ravena com energia branca (o manto branco do fim de "O Fim") | | TEMPESTADE DE PENAS (chuva de penas de luz; o clarão final cura a equipe) |
 
 ### Personagens que entram nas próximas fases
 
@@ -368,9 +368,14 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       cinto de discos da Ravena, top, barriga e saia da Estelar). A **capa do Robin**, o **manto da Ravena** e o
       **cabelão da Estelar** são tecido: pendem dos ombros, balançam para trás com o movimento e são empurrados para
       fora do corpo, então não atravessam braços nem pernas. Os bonecos são animados pelos **mesmos ângulos de pose**
-      do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D. Os outros personagens jogáveis (vilões e
-      soldados liberados) e as transformações animais do Mutano continuam com o desenho 2D original, de pé na
-      profundidade deles.
+      do 2D, então todo golpe e COMBO FINAL que já existe funciona em 3D. As **transformações também são 3D**:
+      gorila, T-rex, rinoceronte, canguru, carneiro, elefante, a Fera e o guepardo do Mutano (e do Mutano Palhaço)
+      têm modelos próprios animados com os mesmos tempos dos desenhos; a esquiva da Ravena vira o **corvo da alma**
+      em 3D (nas cores de cada versão); o coelho da maldição do Mumbo também; e o braço do Ciborgue vira o
+      **canhão sônico** nos golpes de canhão. Os outros personagens jogáveis (vilões e soldados liberados) continuam
+      com o desenho 2D original, de pé na profundidade deles.
+    - **No celular**, o 3D usa resolução menor e sem antialias (mais leve para a GPU do aparelho) e o analógico
+      ganha um fundo escuro para não sumir sobre a cidade clara.
     - **Câmera diretora:** 3/4 nas arenas, **perseguição** pela avenida entre as arenas, **vista de cima** na 2ª arena
       3D, **close no COMBO FINAL**, **volta completa** em torno do chefe quando ele aparece e câmera que passeia de
       um lado para o outro na fase 2 do chefe.

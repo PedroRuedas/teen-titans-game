@@ -190,7 +190,7 @@
         return;
       }
       if (m.soul) {
-        if (t === d.s) { this.soul = { x: a.x + 40, y: GY - a.z - 110, t: 0, plus: !!a.def.plus }; A().play('dark'); }
+        if (t === d.s) { this.soul = { x: a.x + 40, y: GY - a.z - 110, t: 0, plus: !!a.def.plus, pal: TT.ravenPal(a) }; A().play('dark'); }
         return;
       }
       if (m.shots) {
@@ -240,8 +240,8 @@
         const k = Math.min(1, sv.t / 14);
         sv.cx = TT.lerp(sv.x, cx, TT.easeInOut(k)); sv.cy = TT.lerp(sv.y, cy - 40, TT.easeInOut(k));
         if (sv.t === 14) {
-          this.hit(14, '#b98cff', true); this.burst(cx, cy, '#a77bff', 1.1);
-          for (let i = 0; i < 12; i++) this.fx.spawn('feather', cx + TT.rand(-80, 80), cy + TT.rand(-90, 60), { color: '#1a0f2e', size: 12, vx: TT.rand(-3, 3), vy: TT.rand(-4, 1), life: 34, vr: 0.2 });
+          this.hit(14, sv.pal.fx, true); this.burst(cx, cy, sv.pal.glow, 1.1);
+          for (let i = 0; i < 12; i++) this.fx.spawn('feather', cx + TT.rand(-80, 80), cy + TT.rand(-90, 60), { color: sv.pal.feather, size: 12, vx: TT.rand(-3, 3), vy: TT.rand(-4, 1), life: 34, vr: 0.2 });
           A().play('boom');
         }
         if (sv.t > 30) this.soul = null;
@@ -460,7 +460,7 @@
       const sv = this.soul;
       if (sv.t > 16 || sv.cx == null) return;
       ctx.save(); ctx.translate(sv.cx, sv.cy); ctx.scale(2.4, 2.4);
-      TT.drawSoulRaven(ctx, 0, 0, 1, sv.t);
+      TT.drawSoulRaven(ctx, 0, 0, 1, sv.t, sv.pal);
       ctx.restore();
       // tentáculos de sombra saindo do chão embaixo do alvo (golpes novos)
       if (sv.plus && sv.t > 8) {
@@ -470,7 +470,7 @@
           const x = TX + (i - 2) * 30;
           ctx.beginPath(); ctx.moveTo(x - 12, GY); ctx.quadraticCurveTo(x - 6, GY - h * 0.5, x + Math.sin(i * 2) * 20, GY - h * (0.6 + 0.4 * ((i * 7) % 3) / 2));
           ctx.quadraticCurveTo(x + 8, GY - h * 0.5, x + 12, GY); ctx.closePath();
-          ctx.fillStyle = '#120a22'; ctx.fill(); ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 4; ctx.stroke();
+          ctx.fillStyle = sv.pal.body; ctx.fill(); ctx.strokeStyle = sv.pal.rim; ctx.lineWidth = 4; ctx.stroke();
         }
         ctx.restore();
       }

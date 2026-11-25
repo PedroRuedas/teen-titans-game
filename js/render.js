@@ -212,10 +212,30 @@
 
   // Aura nas mãos (Ravena = energia negra, Estelar = energia verde) e círculo mágico à frente da palma.
   const AURA = {
-    dark: { core: '#0c0716', rim: '#8a5cff', hi: '#efe4ff', glow: '#a77bff' },
-    green: { core: '#d9ffe4', rim: '#22d66a', hi: '#ffffff', glow: '#5dff8a' },
+    dark: { core: '#0c0716', rim: '#8a5cff', hi: '#efe4ff', glow: '#a77bff', glove: '#17102a', puff: 'rgba(12,7,22,0.55)', disc: 'rgba(10,5,20,0.88)' },
+    green: { core: '#d9ffe4', rim: '#22d66a', hi: '#ffffff', glow: '#5dff8a', glove: '#b8ffcf', puff: 'rgba(120,255,160,0.35)', disc: 'rgba(80,255,140,0.28)' },
+    // Ravena Vermelha (energia de Trigon) e Ravena Branca (a luz de "O Fim")
+    red: { core: '#1e0408', rim: '#e8213a', hi: '#ffe0e5', glow: '#ff3b5a', glove: '#2a0610', puff: 'rgba(40,4,10,0.6)', disc: 'rgba(34,4,10,0.88)' },
+    white: { core: '#ffffff', rim: '#8fb0ff', hi: '#ffffff', glow: '#dfe8ff', glove: '#ffffff', puff: 'rgba(255,255,255,0.55)', disc: 'rgba(236,242,255,0.85)' },
   };
   TT.AURA = AURA;
+  // Cores dos poderes da Ravena por versão (energia negra, corvo, tentáculos, esferas, penas...).
+  // body = preenchimento, rim = contorno brilhante, hi = filete, glow = brilho, pool = poça no chão.
+  const RAVEN_PAL = {
+    raven: { body: '#120a22', crow: '#100822', rim: '#8a5cff', hi: '#f2eaff', glow: '#a77bff', pool: 'rgba(16,6,34,0.8)', poolRim: '#a77bff', ground: '#12082a',
+      orb: '#2a1050', feather: '#1a0f2e', light: '#d6c2ff', wisp: 'rgba(214,194,255,0.7)', shout: '#c8a8ff', deep: '#5a2a9a', text: '#e8dcff', eye: '#ffffff', fx: '#b98cff' },
+    redraven: { body: '#24050b', crow: '#1e0408', rim: '#e8213a', hi: '#ffe0e5', glow: '#ff3b5a', pool: 'rgba(40,4,10,0.82)', poolRim: '#ff3b5a', ground: '#2a050c',
+      orb: '#5a0a18', feather: '#3a0610', light: '#ffb3be', wisp: 'rgba(255,170,185,0.7)', shout: '#ff8a9a', deep: '#8a0a1c', text: '#ffdce2', eye: '#ffe14a', fx: '#ff3b5a' },
+    whiteraven: { body: '#fbfbff', crow: '#f6f7ff', rim: '#8fb0ff', hi: '#ffffff', glow: '#dfe8ff', pool: 'rgba(235,240,255,0.8)', poolRim: '#b8ccff', ground: '#e8eeff',
+      orb: '#c8d4ff', feather: '#eef0fa', light: '#ffffff', wisp: 'rgba(255,255,255,0.85)', shout: '#ffffff', deep: '#5a6ab0', text: '#ffffff', eye: '#3a6cff', fx: '#ffffff' },
+  };
+  TT.RAVEN_PAL = RAVEN_PAL;
+  // f = a Ravena (ou um efeito/projétil com owner); qualquer outra coisa recebe a paleta padrão
+  TT.ravenPal = function (f) {
+    let k = f && f.key;
+    if (!RAVEN_PAL[k] && f && f.owner) k = f.owner.key;
+    return RAVEN_PAL[k] || RAVEN_PAL.raven;
+  };
   function handAura(ctx, h, kind, k, circ, t) {
     const A = AURA[kind]; if (!A || FLASH) return;
     const dx = Math.sin(h.a), dy = Math.cos(h.a);
@@ -226,7 +246,7 @@
     for (let i = 0; i < 5; i++) {
       const a = t * 0.25 + i * 1.26, rr = 5 + 3 * Math.sin(t * 0.4 + i);
       ctx.beginPath(); ctx.ellipse(hx + Math.cos(a) * 4, hy + Math.sin(a) * 4 - 2, rr, rr * 1.5, a, 0, Math.PI * 2);
-      ctx.fillStyle = kind === 'dark' ? 'rgba(12,7,22,0.55)' : 'rgba(120,255,160,0.35)'; ctx.fill();
+      ctx.fillStyle = A.puff; ctx.fill();
     }
     ctx.restore();
     if (circ > 0.02) { // círculo mágico perpendicular ao antebraço
@@ -234,7 +254,7 @@
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.atan2(dy, dx));
       ctx.globalAlpha = Math.min(1, circ * 1.6);
       ctx.beginPath(); ctx.ellipse(0, 0, R * 0.38, R, 0, 0, Math.PI * 2);
-      ctx.fillStyle = kind === 'dark' ? 'rgba(10,5,20,0.88)' : 'rgba(80,255,140,0.28)'; ctx.fill();
+      ctx.fillStyle = A.disc; ctx.fill();
       ctx.strokeStyle = A.rim; ctx.lineWidth = 3; ctx.stroke();
       ctx.strokeStyle = A.hi; ctx.lineWidth = 1.2; ctx.stroke();
       ctx.beginPath(); ctx.ellipse(0, 0, R * 0.26, R * 0.68, 0, 0, Math.PI * 2);
@@ -310,7 +330,7 @@
     if (st.drawBack) st.drawBack(ctx, P);
 
     const dk = st.dark;
-    const pastel = (base, aura) => (aura > 0.25 ? (st.aura === 'dark' ? '#17102a' : '#b8ffcf') : base);
+    const pastel = (base, aura) => (aura > 0.25 ? ((AURA[st.aura] || AURA.green).glove) : base);
     // perna e braço de trás (tons escurecidos)
     limb(ctx, Hx - 3, Hy, pose.legB[0], pose.legB[1], L1, L2, st.legW, st.leg, st.boot, st.footR, st.boot, true, null, st.legOpt, true);
     const backArm = () => limb(ctx, sB[0], sB[1], pose.armB[0], pose.armB[1], st.armL[0], st.armL[1], st.armW, st.arm, pastel(st.glove, pose.auraB), st.handR,
@@ -1767,6 +1787,7 @@
 
   // Gorila: t = quadro do golpe, s = quadro do impacto. Braços sobem, descem esmagando o chão e voltam.
   TT.drawGorilla = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const up = TT.clamp(t / (s - 4), 0, 1), down = TT.clamp((t - (s - 4)) / 4, 0, 1);
@@ -1844,6 +1865,7 @@
 
   // T-Rex: preparação com rugido (t < s), corrida mordendo e freada no fim (t > end).
   TT.drawTRex = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 10, 0, 1);
@@ -1912,6 +1934,7 @@
 
   // Rinoceronte (ataque em corrida): cabeça baixa, chifre à frente, galope.
   TT.drawRhino = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 8, 0, 1);
@@ -1960,6 +1983,7 @@
 
   // Canguru: apoia na cauda e chuta com as duas patas (fim do combo do Mutano).
   TT.drawKangaroo = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const pre = TT.clamp(t / s, 0, 1), hit = t >= s && t < end, rec = TT.clamp((t - end) / 10, 0, 1);
@@ -2004,6 +2028,7 @@
 
   // Carneiro: recua e dá uma cabeçada com os chifres enrolados.
   TT.drawRam = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, rec = TT.clamp((t - end) / 8, 0, 1);
@@ -2040,6 +2065,7 @@
   // Guepardo: esquiva do Mutano (galope esticando e encolhendo a coluna).
   // Elefante (golpe forte novo do Mutano): empina nas patas de trás com a tromba erguida e pisa com tudo.
   TT.drawElephant = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const rear = t < s - 3 ? TT.easeOut(TT.clamp(t / (s - 3), 0, 1)) : t < s ? 1 - (t - (s - 3)) / 3 : 0;
@@ -2081,6 +2107,7 @@
   // A Fera (especial novo do Mutano, do episódio "A Fera Interior"): fera peluda e corcunda que
   // avança dando garradas alternadas com as duas mãos.
   TT.drawBeast = function (ctx, x, y, facing, t, s, end, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const act = t >= s && t < end, k = act ? (t - s) % 8 : 0, ph = k / 8, side = act ? Math.floor((t - s) / 8) % 2 : 0;
@@ -2145,6 +2172,7 @@
   TT.drawCheetahAtk = function (ctx, x, y, facing, t, s, end, flash) { TT.drawCheetah(ctx, x, y, facing, t, flash); };
 
   TT.drawCheetah = function (ctx, x, y, facing, t, flash) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     FLASH = !!flash;
     const { D, M, L, F, X } = BB;
     const ph = t * 0.75, s = Math.sin(ph), stretch = 1 + s * 0.12;
@@ -2169,11 +2197,13 @@
   };
 
   // Ravena atravessa como o corvo de sua alma (esquiva).
-  TT.drawSoulRaven = function (ctx, x, y, facing, t) {
+  TT.drawSoulRaven = function (ctx, x, y, facing, t, pal) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
+    const P = pal || RAVEN_PAL.raven;
     const f = Math.sin(t * 0.7) * 16, k = TT.clamp(t / 5, 0, 1);
-    TT.drawGlow(ctx, '#a77bff', x, y, 70, 0.55);
+    TT.drawGlow(ctx, P.glow, x, y, 70, 0.55);
     ctx.save(); ctx.translate(x, y); ctx.scale(facing * (0.6 + 0.4 * k), 0.6 + 0.4 * k);
-    ctx.fillStyle = '#0c0716'; ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.fillStyle = P.crow; ctx.strokeStyle = P.rim; ctx.lineWidth = 4; ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(46, -2); ctx.lineTo(24, -12);
     ctx.quadraticCurveTo(-4, -50 - f, -40, -60 - f); ctx.lineTo(-18, -24 - f * 0.4); ctx.lineTo(-58, -14);
@@ -2181,8 +2211,8 @@
     ctx.quadraticCurveTo(-8, 40 + f, -32, 54 + f); ctx.quadraticCurveTo(10, 40 + f * 0.5, 22, 10);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = '#efe4ff'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(28, -5, 4, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = P.hi; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = P.eye; ctx.beginPath(); ctx.ellipse(28, -5, 4, 2.6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   };
 

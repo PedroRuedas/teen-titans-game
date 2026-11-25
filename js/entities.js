@@ -132,7 +132,7 @@
       this.setState('attack');
       this.setAnim('attack');
       if (def.sound0) A().play(def.sound0);
-      if (def.shout) this.game.say(this, def.shout, def.shoutColor);
+      if (def.shout) this.game.say(this, def.shout, this.base === 'raven' && def.shoutColor ? TT.ravenPal(this).shout : def.shoutColor);
     }
 
     updateAttack() {
@@ -432,7 +432,7 @@
       special: {
         anim: 'rvSpecial', hands: 'open', cost: 40, s: 20, a: 1, r: 26, shout: 'Azarath Metrion Zinthos!', shoutColor: '#c8a8ff',
         onFrame(f, t, g) {
-          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 30, vr: 0.1 });
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: TT.ravenPal(f).feather, size: 10, vy: -1.5, life: 30, vr: 0.1 });
           if (t === this.s) { g.addEffect(new RavenBlast(g, f)); A().play('dark'); g.shake = 14; }
         },
       },
@@ -630,7 +630,7 @@
         onFrame(f, t, g) {
           if (t === 2) g.debrisBurst(f.x + f.facing * 40, f.y - 10, 5, '#5a5060');
           if (t !== this.s) return;
-          heroShot(f, g, { kind: 'tkRock', x: f.x + f.facing * 50, z: f.z + handZ(f, 70) + 20, vx: f.facing * 10.5, r: 32, dmg: 22, kb: 8, knockdown: true, launch: 8, blastR: 95, blastDmg: 10, blastColor: DARK, life: 80, trailN: 8 });
+          heroShot(f, g, { kind: 'tkRock', x: f.x + f.facing * 50, z: f.z + handZ(f, 70) + 20, vx: f.facing * 10.5, r: 32, dmg: 22, kb: 8, knockdown: true, launch: 8, blastR: 95, blastDmg: 10, blastColor: TT.ravenPal(f).glow, life: 80, trailN: 8 });
           A().play('dark');
         },
       },
@@ -639,7 +639,7 @@
       special: {
         anim: 'rvSpecial', hands: 'open', cost: 40, s: 20, a: 1, r: 26, shout: 'Azarath Metrion Zinthos!', shoutColor: '#c8a8ff',
         onFrame(f, t, g) {
-          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 30, vr: 0.1 });
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-60, 60), f.y - f.z - TT.rand(20, 140), { color: TT.ravenPal(f).feather, size: 10, vy: -1.5, life: 30, vr: 0.1 });
           if (t === this.s) { g.addEffect(new ShadowTendrils(g, f)); A().play('dark'); g.shake = 12; }
         },
       },
@@ -791,15 +791,15 @@
         { anim: 'rvSweep', hands: 'open', s: 6, a: 4, r: 10, dmg: 11, reach: [0, 104], kb: 2, stun: 24, sound0: 'whoosh', claw: true },
         // mãos de sombra: duas mãos de energia negra sobem do chão à frente e agarram
         { anim: 'rvPalm', hands: 'open', s: 7, a: 9, r: 12, dmg: 5, rehit: 4, reach: [40, 200], depth: 46, kb: 0.5, stun: 24, sound: 'dark',
-          onFrame(f, t, g) { if (t === this.s) g.addEffect(new ShadowHands(g, f.x + f.facing * 125, f.y, f.facing)); } },
+          onFrame(f, t, g) { if (t === this.s) g.addEffect(new ShadowHands(g, f.x + f.facing * 125, f.y, f.facing, f)); } },
         withFx(P.raven.light[2], 1.1, () => {}),
       ],
       // ESFERAS DE AZARATH: cada inimigo à frente é preso numa esfera de energia negra, erguido e esmagado
       ender: { name: 'ESFERAS DE AZARATH', anim: 'rvSpecial', hands: 'open', s: 14, a: 1, r: 28, sound0: 'dark', mouth: 'shout',
         onFrame(f, t, g) {
           if (t === 1) comboName(f, g, this.name);
-          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-50, 50), f.y - f.z - TT.rand(30, 140), { color: '#1a0f2e', size: 10, vy: -1.5, life: 26, vr: 0.1 });
-          if (t === this.s) { g.addEffect(new DarkOrbs(g, f, { range: 460, dmg: 30 })); g.tintScreen('#5a2a9a', 14); }
+          if (t < this.s && t % 2 === 0) g.particles.spawn('feather', f.x + TT.rand(-50, 50), f.y - f.z - TT.rand(30, 140), { color: TT.ravenPal(f).feather, size: 10, vy: -1.5, life: 26, vr: 0.1 });
+          if (t === this.s) { g.addEffect(new DarkOrbs(g, f, { range: 460, dmg: 30 })); g.tintScreen(TT.ravenPal(f).deep, 14); }
         } },
     },
     beastboy: {
@@ -1107,7 +1107,7 @@
       if (this.def.dashFx) { this.def.dashFx(this, g, t); return; }
       if (k === 'cyborg') { if (t % 2 === 0) this.jets(g); }
       else if (k === 'starfire') g.particles.spawn('glow', this.x - this.facing * 30, this.y - 92 + TT.rand(-8, 8), { color: GREEN, size: 34, life: 12, vx: -this.facing * 2 });
-      else if (k === 'raven') g.particles.spawn('feather', this.x - this.facing * 20, this.y - 70 + TT.rand(-30, 30), { color: '#1a0f2e', size: 9, life: 20, vr: 0.2, vx: -this.facing });
+      else if (k === 'raven') g.particles.spawn('feather', this.x - this.facing * 20, this.y - 70 + TT.rand(-30, 30), { color: TT.ravenPal(this).feather, size: 9, life: 20, vr: 0.2, vx: -this.facing });
       else if (t % 3 === 0) g.particles.spawn('dust', this.x - this.facing * 20, this.y - 6, { color: 'rgba(255,255,255,0.8)', size: 7, life: 14 });
     }
 
@@ -1132,7 +1132,7 @@
       } else if (this.state === 'dash' && this.def.drawDash) {
         this.def.drawDash(ctx, this, sx, sy, fl);
       } else if (this.state === 'dash' && this.base === 'raven') {
-        TT.drawSoulRaven(ctx, sx, sy - 48, this.facing, this.animT);
+        TT.drawSoulRaven(ctx, sx, sy - 48, this.facing, this.animT, TT.ravenPal(this));
       } else {
         if (this.state === 'dash' && this.base === 'starfire') this.drawComet(ctx, sx, sy);
         TT.computePose(this, this.pose);
@@ -1269,9 +1269,9 @@
     // Garra de energia negra da Ravena: contorno violeta + filete branco e brilho.
     drawClaw(ctx, sx, sy, a) {
       const fc = this.facing, k = (a.t - a.def.s) / a.def.a;
-      const r = a.def.reach[1];
+      const r = a.def.reach[1], P = TT.ravenPal(this);
       const cx = sx + fc * r * 0.55, cy = this.rigOut.fy != null ? this.rigOut.fy : sy - 70;
-      TT.drawGlow(ctx, DARK, cx, cy, r * 0.9, 0.55 * (1 - k * 0.5));
+      TT.drawGlow(ctx, P.glow, cx, cy, r * 0.9, 0.55 * (1 - k * 0.5));
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(fc, 1);
@@ -1281,11 +1281,11 @@
       ctx.lineTo(r * 0.2, -12); ctx.lineTo(r * 0.56, -6); ctx.lineTo(r * 0.16, 10); ctx.lineTo(r * 0.48, 28);
       ctx.quadraticCurveTo(0, 26, -r * 0.4, 30);
       ctx.closePath();
-      ctx.fillStyle = '#120a22'; ctx.fill();
-      ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.fillStyle = P.body; ctx.fill();
+      ctx.strokeStyle = P.rim; ctx.lineWidth = 7; ctx.stroke();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
       // fiapos de sombra
-      ctx.strokeStyle = 'rgba(214,194,255,0.7)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = P.wisp; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(-r * 0.3, 18); ctx.quadraticCurveTo(-r * 0.6, 10 + k * 10, -r * 0.8, 24); ctx.stroke();
       ctx.restore();
       ctx.globalAlpha = 1;
@@ -1893,6 +1893,7 @@
   // Coelho de desenho (inimigo da fase 6 e Titã transformado pelo feitiço do Mumbo).
   // o.sq = achatamento, o.acc = cor do lenço (Titã), o.red = olhos vermelhos (coelho do mal).
   function drawRabbit(ctx, x, y, facing, t, s, o) {
+    if (TT.SKIP_RIG) return; // no modo 3D a forma tem modelo próprio (js/world3d.js)
     o = o || {};
     const fl = !!o.flash, C = (c) => (fl ? '#ffffff' : c), sq = o.sq || 0;
     ctx.save(); ctx.translate(x, y); ctx.scale(facing * s * (1 - sq * 0.6), s * (1 + sq));
@@ -5678,8 +5679,8 @@
         if (this.t % 2 === 0) g.particles.spawn('glow', this.x - this.vx, this.y - this.z, { color: '#5dff8a', size: this.r * 1.2, life: 10 });
         if (this.t % 4 === 0) g.particles.spawn('star', this.x - this.vx * 2, this.y - this.z + TT.rand(-8, 8), { color: '#d9ffe4', size: 6, life: 12, rot: Math.random() });
       } else if (this.kind === 'raven') {
-        if (this.t % 3 === 0) g.particles.spawn('feather', this.x - this.vx * 3, this.y - this.z + TT.rand(-20, 20), { color: '#1a0f2e', size: 9, life: 22, vr: 0.2, vy: TT.rand(-1, 1) });
-        if (this.t % 4 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 30, life: 12 });
+        if (this.t % 3 === 0) g.particles.spawn('feather', this.x - this.vx * 3, this.y - this.z + TT.rand(-20, 20), { color: TT.ravenPal(this).feather, size: 9, life: 22, vr: 0.2, vy: TT.rand(-1, 1) });
+        if (this.t % 4 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: TT.ravenPal(this).glow, size: 30, life: 12 });
       } else if (this.kind === 'missile') {
         if (this.t % 2 === 0) g.particles.spawn('dust', this.x, this.y - this.z - 30, { color: 'rgba(200,200,200,0.7)', size: 8, life: 18 });
       } else if (this.kind === 'heroMissile') {
@@ -5687,7 +5688,7 @@
       } else if (this.kind === 'icedisk') {
         if (this.t % 3 === 0) g.particles.spawn('star', this.x - this.vx, this.y - this.z + TT.rand(-6, 6), { color: '#e6fbff', size: 6, life: 14, rot: Math.random() });
       } else if (this.kind === 'tkRock') {
-        if (this.t % 3 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: DARK, size: 34, life: 12 });
+        if (this.t % 3 === 0) g.particles.spawn('glow', this.x - this.vx * 2, this.y - this.z, { color: TT.ravenPal(this).glow, size: 34, life: 12 });
       } else if (this.kind === 'tvDrop') {
         if (this.t % 3 === 0) g.particles.spawn('star', this.x + TT.rand(-20, 20), this.y - this.z + 30, { color: '#e6fffb', size: 5, life: 10, rot: Math.random() });
       } else if (this.kind === 'meteor') {
@@ -5775,8 +5776,8 @@
           break;
         }
         case 'raven':
-          this.drawTrail(ctx, camX, '#8a5cff', 16);
-          drawRavenCrow(ctx, x, y, this.facing, 1.35, this.t, 1);
+          this.drawTrail(ctx, camX, TT.ravenPal(this).rim, 16);
+          drawRavenCrow(ctx, x, y, this.facing, 1.35, this.t, 1, false, TT.ravenPal(this));
           break;
         case 'icedisk': { // disco congelante: azul-gelo com brilho
           this.drawTrail(ctx, camX, '#bfefff', 7);
@@ -5809,10 +5810,10 @@
           break;
         }
         case 'tkRock': // pedaço do chão envolto na energia negra da Ravena
-          this.drawTrail(ctx, camX, '#8a5cff', 20);
-          TT.drawGlow(ctx, DARK, x, y, 64, 0.7);
+          this.drawTrail(ctx, camX, TT.ravenPal(this).rim, 20);
+          TT.drawGlow(ctx, TT.ravenPal(this).glow, x, y, 64, 0.7);
           drawBoulder(ctx, x, y, 1.15, this.spin * 0.2);
-          ctx.save(); ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
+          ctx.save(); ctx.strokeStyle = TT.ravenPal(this).light; ctx.lineWidth = 3; ctx.globalAlpha = 0.8;
           ctx.beginPath(); ctx.ellipse(x, y, 40, 30, this.spin * 0.1, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
           break;
         case 'rocketFist': { // punho-foguete do Ciborgue: punho de metal com chama atrás
@@ -5969,10 +5970,11 @@
       const r = Math.min(this.r, this.maxR), k = 1 - this.t / 34, x = this.x - camX;
       ctx.save();
       ctx.globalAlpha = 0.55 * k;
-      ctx.fillStyle = '#12082a';
+      const P = TT.ravenPal(this.owner);
+      ctx.fillStyle = P.ground;
       ctx.beginPath(); ctx.ellipse(x, this.y, r, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = k;
-      ctx.strokeStyle = '#d6c2ff'; ctx.lineWidth = 6;
+      ctx.strokeStyle = P.light; ctx.lineWidth = 6;
       ctx.stroke();
       ctx.restore();
     }
@@ -5980,7 +5982,7 @@
       // corvo de energia (a "alma" da Ravena) abrindo as asas sobre o grupo
       const k = this.t / 34, x = this.x - camX, y = this.y - 160 - k * 50;
       ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
-      drawRavenCrow(ctx, x, y, 1, 2.2 + k * 1.6, this.t, 0, true);
+      drawRavenCrow(ctx, x, y, 1, 2.2 + k * 1.6, this.t, 0, true, TT.ravenPal(this.owner));
       ctx.restore();
     }
     get y2() { return this.y; }
@@ -6015,18 +6017,19 @@
           const d = { dmg: 42, kb: 3, knockdown: true, launch: 13, big: true };
           if (e.takeHit(this.owner, d, TT.sign(e.x - this.owner.x) || 1)) g.onHit(this.owner, e, d);
         }
-        for (const s of this.spots) for (let i = 0; i < 5; i++) g.particles.spawn('feather', s.x + TT.rand(-40, 40), s.y - TT.rand(20, 160), { color: '#1a0f2e', size: 10, vy: -2, life: 30, vr: 0.2 });
+        for (const s of this.spots) for (let i = 0; i < 5; i++) g.particles.spawn('feather', s.x + TT.rand(-40, 40), s.y - TT.rand(20, 160), { color: TT.ravenPal(this.owner).feather, size: 10, vy: -2, life: 30, vr: 0.2 });
       }
       if (this.t > this.END) this.remove = true;
     }
     // poça negra com borda violeta (cresce até a erupção)
     drawGround(ctx, camX) {
       const k = Math.min(1, this.t / this.ERUPT), fade = this.t > this.END - 12 ? (this.END - this.t) / 12 : 1;
+      const P = TT.ravenPal(this.owner);
       ctx.save(); ctx.globalAlpha = Math.max(0, fade);
       for (const s of this.spots) {
         ctx.beginPath(); ctx.ellipse(s.x - camX, s.y, 90 * k, 36 * k, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(16,6,34,0.8)'; ctx.fill();
-        ctx.strokeStyle = '#a77bff'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = P.pool; ctx.fill();
+        ctx.strokeStyle = P.poolRim; ctx.lineWidth = 4; ctx.stroke();
       }
       ctx.restore();
     }
@@ -6036,6 +6039,7 @@
       if (t < 0) return;
       const up = TT.easeOut(Math.min(1, t / 5)), down = TT.clamp((t - 18) / 18, 0, 1), h = 170 * up * (1 - down);
       if (h < 2) return;
+      const P = TT.ravenPal(this.owner);
       ctx.save(); ctx.lineJoin = 'round';
       for (const s of this.spots) {
         const x = s.x - camX;
@@ -6046,11 +6050,11 @@
           ctx.quadraticCurveTo(x + ox - 8 + bend, s.y - hh * 0.5, x + ox + bend * 1.4, s.y - hh);
           ctx.quadraticCurveTo(x + ox + 8 + bend, s.y - hh * 0.5, x + ox + 12, s.y);
           ctx.closePath();
-          ctx.fillStyle = '#120a22'; ctx.fill();
-          ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 5; ctx.stroke();
-          ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 1.6; ctx.stroke();
+          ctx.fillStyle = P.body; ctx.fill();
+          ctx.strokeStyle = P.rim; ctx.lineWidth = 5; ctx.stroke();
+          ctx.strokeStyle = P.hi; ctx.lineWidth = 1.6; ctx.stroke();
         }
-        TT.drawGlow(ctx, DARK, x, s.y - h * 0.4, 70 + h * 0.3, 0.45);
+        TT.drawGlow(ctx, P.glow, x, s.y - h * 0.4, 70 + h * 0.3, 0.45);
       }
       ctx.restore();
     }
@@ -6165,16 +6169,18 @@
 
   // Mãos de sombra da Ravena saindo do chão (o dano vem do golpe; isto é o visual).
   class ShadowHands {
-    constructor(game, x, y, facing) { Object.assign(this, { game, x, y: y + 1, facing, t: 0, remove: false }); }
+    constructor(game, x, y, facing, owner) { Object.assign(this, { game, x, y: y + 1, facing, owner, t: 0, remove: false }); }
     update() { if (++this.t > 26) this.remove = true; }
     drawGround(ctx, camX) {
       const k = Math.min(1, this.t / 4) * (1 - TT.clamp((this.t - 18) / 8, 0, 1));
-      ctx.save(); ctx.fillStyle = 'rgba(16,6,34,0.8)'; ctx.strokeStyle = '#a77bff'; ctx.lineWidth = 3; ctx.globalAlpha = k;
+      const P = TT.ravenPal(this.owner);
+      ctx.save(); ctx.fillStyle = P.pool; ctx.strokeStyle = P.poolRim; ctx.lineWidth = 3; ctx.globalAlpha = k;
       ctx.beginPath(); ctx.ellipse(this.x - camX, this.y, 90, 30, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
     }
     draw(ctx, camX) {
       const up = TT.easeOut(Math.min(1, this.t / 6)), down = TT.clamp((this.t - 16) / 10, 0, 1), h = 150 * up * (1 - down);
       if (h < 3) return;
+      const P = TT.ravenPal(this.owner);
       ctx.save(); ctx.lineJoin = 'round';
       for (const [ox, sc] of [[-34, 0.85], [30, 1]]) {
         const x = this.x - camX + ox, top = this.y - h * sc, grab = Math.sin(this.t * 0.5) * 0.2;
@@ -6182,10 +6188,10 @@
         // dedos abertos em garra
         for (let i = 0; i < 4; i++) { const ang = -Math.PI / 2 + (i - 1.5) * (0.42 + grab); ctx.lineTo(x + Math.cos(ang) * 34, top + Math.sin(ang) * 34); ctx.lineTo(x + Math.cos(ang + 0.2) * 12, top + Math.sin(ang + 0.2) * 12 + 6); }
         ctx.lineTo(x + 10, top + 20); ctx.quadraticCurveTo(x + 18, this.y - h * 0.5 * sc, x + 14, this.y); ctx.closePath();
-        ctx.fillStyle = '#120a22'; ctx.fill(); ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.fillStyle = P.body; ctx.fill(); ctx.strokeStyle = P.rim; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = P.hi; ctx.lineWidth = 1.6; ctx.stroke();
       }
       ctx.restore();
-      TT.drawGlow(ctx, DARK, this.x - camX, this.y - h * 0.6, 80, 0.4);
+      TT.drawGlow(ctx, P.glow, this.x - camX, this.y - h * 0.6, 80, 0.4);
     }
   }
   TT.ShadowHands = ShadowHands;
@@ -6208,7 +6214,7 @@
       for (const e of this.caught) {
         if (e.dead || this.t >= this.CRUSH) continue;
         if (!e.isBoss) { e.z = Math.min(110, e.z + 5); e.vz = 0; e.vx = 0; } // erguido pela telecinese
-        if (this.t % 3 === 0) g.particles.spawn('glow', e.x + TT.rand(-30, 30), e.y - e.z - TT.rand(20, 120), { color: DARK, size: 30, life: 10 });
+        if (this.t % 3 === 0) g.particles.spawn('glow', e.x + TT.rand(-30, 30), e.y - e.z - TT.rand(20, 120), { color: TT.ravenPal(this.owner).glow, size: 30, life: 10 });
       }
       if (this.t === this.CRUSH) {
         g.shake = Math.max(g.shake, 16); A().play('boom');
@@ -6217,26 +6223,27 @@
           const d = { dmg: this.o.dmg, kb: 4, knockdown: true, launch: 4, big: true }, cy = e.y - e.z - (e.height || 100) * 0.5;
           if (!e.isBoss) e.vz = -6;
           if (e.takeHit(this.owner, d, this.owner.facing)) g.onHit(this.owner, e, d);
-          for (let i = 0; i < 12; i++) { const ang = Math.random() * Math.PI * 2, sp = TT.rand(5, 12); g.particles.spawn('debris', e.x, cy, { vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 3, grav: 0.4, color: TT.choice(['#8a5cff', '#1a0f2e', '#d6c2ff']), size: TT.rand(6, 11), life: 26, floor: e.y }); }
-          g.particles.spawn('ring', e.x, cy, { color: '#d6c2ff', size: 120, life: 14 });
-          g.particles.spawn('text', e.x, cy - 80, { text: 'KRRSH!', size: 38, color: '#e8dcff', color2: '#5a2a9a', vy: -0.6, life: 26, rot: TT.rand(-0.2, 0.2) });
+          for (let i = 0; i < 12; i++) { const ang = Math.random() * Math.PI * 2, sp = TT.rand(5, 12); g.particles.spawn('debris', e.x, cy, { vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 3, grav: 0.4, color: TT.choice([TT.ravenPal(this.owner).rim, TT.ravenPal(this.owner).feather, TT.ravenPal(this.owner).light]), size: TT.rand(6, 11), life: 26, floor: e.y }); }
+          g.particles.spawn('ring', e.x, cy, { color: TT.ravenPal(this.owner).light, size: 120, life: 14 });
+          g.particles.spawn('text', e.x, cy - 80, { text: 'KRRSH!', size: 38, color: TT.ravenPal(this.owner).text, color2: TT.ravenPal(this.owner).deep, vy: -0.6, life: 26, rot: TT.rand(-0.2, 0.2) });
         }
       }
       if (this.t > this.CRUSH + 6) this.remove = true;
     }
     draw(ctx, camX) {
       if (this.t >= this.CRUSH) return;
+      const P = TT.ravenPal(this.owner);
       const k = Math.min(1, this.t / 6), squeeze = this.t > this.CRUSH - 8 ? 1 - (this.t - (this.CRUSH - 8)) / 16 : 1;
       for (const e of this.caught) {
         if (e.dead) continue;
         const h = Math.min(e.height || 100, 240), x = e.x - camX, y = e.y - e.z - h * 0.5, R = (h * 0.62 + 20) * k * squeeze;
         ctx.save();
-        ctx.globalAlpha = 0.35; ctx.fillStyle = '#2a1050';
+        ctx.globalAlpha = 0.35; ctx.fillStyle = P.orb;
         ctx.beginPath(); ctx.ellipse(x, y, R, R * 1.05, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 0.95; ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 6; ctx.stroke();
-        ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, R * 0.9, R * 0.95, this.t * 0.1, 0.3, 2.2); ctx.stroke();
+        ctx.globalAlpha = 0.95; ctx.strokeStyle = P.rim; ctx.lineWidth = 6; ctx.stroke();
+        ctx.strokeStyle = P.hi; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, R * 0.9, R * 0.95, this.t * 0.1, 0.3, 2.2); ctx.stroke();
         ctx.restore();
-        TT.drawGlow(ctx, DARK, x, y, R * 1.6, 0.5);
+        TT.drawGlow(ctx, P.glow, x, y, R * 1.6, 0.5);
       }
     }
   }
@@ -6244,8 +6251,9 @@
 
   // Corvo de energia negra: corpo, asas com penas, contorno violeta + branco e olhos brilhantes.
   // front = true desenha de frente (asas abertas); senão, de perfil voando.
-  function drawRavenCrow(ctx, x, y, facing, s, t, alpha, front) {
-    TT.drawGlow(ctx, DARK, x, y, 46 * s, 0.6);
+  function drawRavenCrow(ctx, x, y, facing, s, t, alpha, front, pal) {
+    const P = pal || TT.RAVEN_PAL.raven;
+    TT.drawGlow(ctx, P.glow, x, y, 46 * s, 0.6);
     ctx.save(); ctx.translate(x, y); ctx.scale(facing * s, s);
     ctx.lineJoin = 'round';
     const flap = Math.sin(t * 0.45);
@@ -6268,14 +6276,14 @@
       ctx.lineTo(-18, 22 + f * 0.6); ctx.lineTo(-6, 10); ctx.lineTo(4, 8); ctx.lineTo(16, 5);
       ctx.closePath();
     }
-    ctx.fillStyle = '#100822'; ctx.fill();
-    ctx.strokeStyle = '#8a5cff'; ctx.lineWidth = 6; ctx.stroke();
-    ctx.strokeStyle = '#f2eaff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = P.crow; ctx.fill();
+    ctx.strokeStyle = P.rim; ctx.lineWidth = 6; ctx.stroke();
+    ctx.strokeStyle = P.hi; ctx.lineWidth = 2; ctx.stroke();
     // olhos brilhantes
     const eyes = front ? [[-6, -12], [6, -12]] : [[16, -2]];
     for (const [ex, ey] of eyes) {
-      TT.drawGlow(ctx, '#ffffff', ex, ey, 8, 0.9);
-      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(ex, ey, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+      TT.drawGlow(ctx, P.eye, ex, ey, 8, 0.9);
+      ctx.fillStyle = P.eye; ctx.beginPath(); ctx.ellipse(ex, ey, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }

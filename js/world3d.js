@@ -195,6 +195,329 @@
   // Quem ganha modelo 3D: os cinco Titãs (e as versões alternativas deles) e os inimigos da fase.
   // Os outros personagens jogáveis continuam com o desenho 2D original, de pé no plano da profundidade
   // (um boneco genérico em 3D não pareceria com eles).
+  // ------------------------------------------------------------ Formas em 3D
+  // Cada construtor monta a forma em F.g (frente = +X, unidades = pixels do desenho 2D, pés em y = 0) e
+  // define F.upd(fm, f), que anima com os mesmos tempos do desenho 2D em render.js (t, s = impacto, end).
+  const BB = { D: '#2b6418', M: '#4f9d2d', L: '#86d257', F: '#b4e48c', X: '#1d4710' };
+  const easeOut = (k) => 1 - (1 - k) * (1 - k);
+  const popScale = (t) => { const p = TT.clamp(t / 4, 0, 1); return 0.55 + 0.45 * easeOut(p) + Math.sin(p * Math.PI) * 0.12; };
+  const lp2 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  const FORM3D = {
+    // Gorila: braços sobem, descem esmagando o chão e voltam
+    gorilla(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      this.fp(M, body, this.ell(50, 58, 44), BB.M, 4, 92, 0).rotation.z = -0.3;
+      this.fp(M, body, this.ell(12, 24, 28), BB.F, 38, 84, 0, null, null, null, { outline: false });
+      for (const [z, c] of [[-20, BB.D], [20, BB.M]]) {
+        this.fp(M, body, this.cap(12, 22), c, z < 0 ? -20 : 14, 26, z).rotation.z = 0.2;
+        this.fp(M, body, this.ell(20, 8, 13), z < 0 ? BB.X : BB.D, z < 0 ? -16 : 20, 5, z);
+      }
+      const head = F.head = this.pivot(body, 44, 134, 0);
+      this.fp(M, head, S(24), BB.M, 0, 0, 0, 1, 0.95, 0.95);
+      this.fp(M, head, this.ell(16, 13, 17), BB.F, 16, -8, 0);
+      this.fp(M, head, this.ell(10, 5, 21), BB.X, 12, 9, 0);
+      for (const z of [-9, 9]) { this.feye(M, head, 19, 1, z, 4.5); this.dark(head, S(2), BB.X, 31, -5, z * 0.45); }
+      F.mouth = this.dark(head, S(1), '#5a1020', 24, -16, 0, 9, 6, 10);
+      F.armF = this.flimb(M, body, 20, 120, 30, 60, 56, 13, 12, BB.M, S(17), BB.M);
+      F.armB = this.flimb(M, body, -6, 124, -30, 60, 56, 13, 12, BB.D, S(17), BB.D);
+      F.upd = (fm) => {
+        const { t, s } = fm;
+        const up = TT.clamp(t / (s - 4), 0, 1), down = TT.clamp((t - (s - 4)) / 4, 0, 1), rec = TT.clamp((t - s - 5) / 14, 0, 1);
+        let sx = 1, sy = 1;
+        if (t < s - 4) { sx = 1 - 0.08 * easeOut(up); sy = 1 + 0.1 * easeOut(up); } else if (t < s + 5) { const k = TT.clamp((t - s) / 5, 0, 1); sx = t < s ? 1 : 1.2 - 0.06 * k; sy = t < s ? 1.04 : 0.82 + 0.05 * k; } else { sx = TT.lerp(1.14, 1, rec); sy = TT.lerp(0.87, 1, rec); }
+        const ps = popScale(t) * 1.12;
+        body.scale.set(sx * ps, sy * ps, ps);
+        let hx, hy;
+        if (down <= 0) { const e = easeOut(up); hx = TT.lerp(64, 4, e); hy = TT.lerp(-36, -210, e); } else { hx = TT.lerp(4, 112, down); hy = TT.lerp(-210, -10, down * down); }
+        if (t > s + 5) { hx = TT.lerp(112, 64, rec); hy = TT.lerp(-10, -36, rec); }
+        this.reach(F.armF, 20, 120, hx, -hy, -1);
+        this.reach(F.armB, -6, 124, hx - 14, -hy, -1);
+        const roar = t >= s - 3 && t < s + 10;
+        head.rotation.z = roar ? 0.12 : -0.05; F.mouth.visible = roar;
+      };
+    },
+    // T-Rex: rugido na preparação, corrida mordendo e freada
+    trex(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      const tilt = F.tilt = this.pivot(body, 0, 62, 0), b = this.pivot(tilt, 0, -62, 0);
+      this.fp(M, b, this.ell(50, 28, 32), BB.M, 8, 88, 0).rotation.z = 0.1;
+      this.fp(M, b, this.ell(24, 13, 24), BB.F, 32, 72, 0, null, null, null, { outline: false }).rotation.z = 0.35;
+      F.tail = [[-58, 92, 30, 15, 19], [-100, 86, 24, 10, 13], [-140, 80, 18, 6, 8]].map(([x, y, a, c, d]) => this.fp(M, b, this.ell(a, c, d), BB.M, x, y, 0));
+      for (let i = 0; i < 6; i++) this.fp(M, b, this.cone(6, 14, 5), BB.D, -40 + i * 13, 114 - Math.abs(i - 2) * 2, 0, null, null, null, { outline: false }).rotation.z = 0.25;
+      F.legs = [[-14, -12, BB.D], [8, 12, BB.M]].map(([hx, z, c]) => {
+        this.fp(M, b, this.ell(22, 30, 15), c, hx, 66, z * 1.5).rotation.z = 0.3;
+        const L = this.flimb(M, b, hx + 4, 50, z * 1.5, 26, 26, 8, 7, c);
+        this.fp(M, L.end, this.ell(16, 6, 10), c, 8, 0, 0);
+        return { L, hx };
+      });
+      for (const z of [-12, 12]) { const a = this.pivot(b, 46, 86, z); this.fp(M, a, this.cap(3.5, 12), BB.M, 0, -7, 0); a.rotation.z = 1.2; }
+      const head = F.head = this.pivot(b, 54, 112, 0);
+      this.fp(M, head, this.ell(38, 17, 20), BB.M, 30, 2, 0);
+      F.inner = this.dark(head, S(1), '#5a1020', 30, -10, 0, 32, 8, 15);
+      for (let i = 0; i < 6; i++) this.fang(M, head, 12 + i * 9, -14, 0, 2.6, 8, true).position.z = 0;
+      for (const z of [-11, 11]) this.feye(M, head, 22, 7, z, 6, '#ffd23a', true);
+      this.dark(head, S(2.5), BB.X, 66, 8, 0);
+      const jaw = F.jaw = this.pivot(head, 2, -8, 0);
+      this.fp(M, jaw, this.ell(28, 6, 16), BB.D, 28, -3, 0);
+      for (let i = 0; i < 5; i++) this.fang(M, jaw, 10 + i * 9, 3, 0, 2.4, 7);
+      F.upd = (fm) => {
+        const { t, s, end } = fm;
+        const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 10, 0, 1);
+        const ph = t * 0.45, step = run ? Math.sin(ph) : 0, bob = run ? -Math.abs(Math.cos(ph)) * 7 : 0;
+        const tl = t < s ? -0.28 * easeOut(pre) : run ? 0.06 : -0.12 * (1 - stop);
+        const jw = t < s ? 0.15 + 0.55 * pre : run ? 0.2 + Math.abs(Math.sin(t * 0.32)) * 0.45 : 0.15;
+        const ps = popScale(t) * 1.2, sq = run ? 1 + Math.cos(ph * 2) * 0.03 : 1;
+        body.position.y = -bob; body.scale.set(ps / sq, ps * sq, ps);
+        tilt.rotation.z = -tl;
+        head.rotation.z = -(t < s ? -0.3 * pre : run ? Math.sin(t * 0.32) * 0.06 : 0);
+        jaw.rotation.z = -jw; F.inner.visible = jw > 0.2;
+        const wag = Math.sin(t * 0.25) * 8;
+        F.tail.forEach((m, i) => { m.position.y = [92, 86, 80][i] + wag * (i + 1) * 0.5; m.position.z = wag * i * 0.6; });
+        F.legs.forEach(({ L, hx }, i) => {
+          const phs = i ? step : -step, fx = hx + 6 + phs * 22, lift = Math.max(0, -phs) * 14;
+          this.reach(L, hx + 4, 50, fx, 4 + lift, -1);
+          L.end.rotation.z = -(L.up.rotation.z + L.lo.rotation.z);
+        });
+      };
+    },
+    // Rinoceronte: cabeça baixa, chifre à frente, galope
+    rhino(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      const tilt = F.tilt = this.pivot(body, 0, 40, 0), b = this.pivot(tilt, 0, -40, 0);
+      F.legs = [[-40, -16, BB.D, -1], [26, -16, BB.D, 1], [-30, 16, BB.M, 1], [36, 16, BB.M, -1]].map(([x, z, c, sg]) => ({ L: this.flimb(M, b, x, 46, z, 20, 22, 9, 8.5, c, this.sph(9.5), BB.X), sg }));
+      this.fp(M, b, this.ell(60, 33, 32), BB.M, -3, 66, 0);
+      for (const x of [-26, 22]) this.fp(M, b, this.geo('torR', () => new T.TorusGeometry(31, 2, 6, 24, Math.PI)), BB.D, x, 66, 0, 1, 1.05, 1, { outline: false }).rotation.y = Math.PI / 2;
+      const tl = this.pivot(b, -62, 70, 0); this.fp(M, tl, this.cap(2.5, 14), BB.X, 0, -7, 0); tl.rotation.z = -0.5; F.tailP = tl;
+      const head = F.head = this.pivot(b, 48, 66, 0);
+      this.fp(M, head, this.ell(28, 18, 19), BB.M, 16, -4, 0);
+      this.fp(M, head, this.cone(7, 34, 8), '#eef6dc', 40, 14, 0).rotation.z = -0.55;
+      this.fp(M, head, this.cone(4.5, 16, 8), '#d6e6bd', 22, 16, 0).rotation.z = -0.3;
+      for (const z of [-11, 11]) { this.fp(M, head, this.cone(5, 14, 5), BB.D, -4, 16, z).rotation.z = 0.5; this.feye(M, head, 16, 5, z * 1.15, 4); }
+      this.dark(head, S(2.2), BB.X, 42, -10, 0);
+      F.upd = (fm) => {
+        const { t, s, end } = fm;
+        const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, stop = TT.clamp((t - end) / 8, 0, 1);
+        const ph = t * 0.55, gal = run ? Math.sin(ph) : 0, bob = run ? -Math.abs(Math.sin(ph)) * 6 : 0;
+        const tl = t < s ? -0.18 * easeOut(pre) : run ? 0.08 : -0.1 * (1 - stop);
+        const ps = popScale(t) * 1.1, st = run ? 1.08 : t < s ? 0.94 : 1;
+        body.position.y = -bob; body.scale.set(ps * st, ps / st, ps);
+        tilt.rotation.z = -tl;
+        head.rotation.z = -(run ? 0.12 + Math.sin(ph) * 0.05 : t < s ? -0.2 * pre : 0);
+        F.tailP.rotation.z = -0.5 + Math.sin(t * 0.8) * 0.3;
+        for (const { L, sg } of F.legs) { const p = gal * sg; L.up.rotation.z = p * 0.55; L.lo.rotation.z = -Math.max(0, p) * 0.7; }
+      };
+    },
+    // Canguru: apoia na cauda e chuta com as duas patas
+    kangaroo(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      const tp = this.pivot(body, -12, 46, 0); this.fp(M, tp, this.cap(9, 70), BB.D, 0, -40, 0, 1, 1, 1); tp.rotation.z = -1.03;
+      const lean = F.lean = this.pivot(body, -6, 50, 0);
+      F.legs = [[-8, -10, BB.D], [4, 10, BB.M]].map(([dx, z, c]) => {
+        this.fp(M, lean, this.ell(19, 25, 14), c, 2 + dx, 4, z).rotation.z = 0.3;
+        const L = this.flimb(M, lean, 8 + dx, -4, z, 30, 30, 8, 6.5, c);
+        const foot = this.pivot(L.end, 0, 0, 0); this.fp(M, foot, this.cap(5, 18), c, 0, -12, 0);
+        return { L, foot, dx };
+      });
+      this.fp(M, lean, this.ell(26, 50, 22), BB.M, 6, 34, 0).rotation.z = -0.08;
+      this.fp(M, lean, this.ell(10, 26, 16), BB.F, 21, 30, 0, null, null, null, { outline: false });
+      for (const z of [-9, 9]) { const a = this.pivot(lean, 26, 58, z); this.fp(M, a, this.cap(3, 12), BB.M, 0, -7, 0); a.rotation.z = 1.4; }
+      const head = F.head = this.pivot(lean, 14, 92, 0);
+      this.fp(M, head, this.ell(20, 12, 13), BB.M, 8, 0, 0);
+      for (const z of [-6, 6]) { this.fp(M, head, this.ell(6, 15, 4), z < 0 ? BB.D : BB.M, -6, 20, z).rotation.z = 0.35; this.feye(M, head, 8, 4, z * 1.5, 3.6); }
+      this.dark(head, S(2), BB.X, 28, 1, 0);
+      F.upd = (fm) => {
+        const { t, s, end } = fm;
+        const pre = TT.clamp(t / s, 0, 1), hit = t >= s && t < end, rec = TT.clamp((t - end) / 10, 0, 1);
+        const ln = t < s ? -0.42 * easeOut(pre) : hit ? -0.5 : -0.5 * (1 - rec);
+        const REST = [[10, -28], [26, -4]], CH = [[28, -62], [14, -38]], EX = [[46, -42], [104, -16]];
+        let ankle;
+        if (t < s) ankle = lp2(REST[1], CH[1], easeOut(pre));
+        else if (t < end) ankle = lp2(CH[1], EX[1], TT.clamp((t - s + 1) / 2, 0, 1));
+        else { const k = rec < 0.5 ? 2 * rec * rec : 1 - Math.pow(-2 * rec + 2, 2) / 2; ankle = lp2(EX[1], REST[1], k); }
+        const ps = popScale(t) * 1.08;
+        body.scale.setScalar(ps);
+        lean.rotation.z = -ln;
+        head.rotation.z = -(hit ? 0.25 : 0);
+        for (const { L, foot, dx } of F.legs) {
+          this.reach(L, 8 + dx, -4, ankle[0] + dx + 6, -(ankle[1] + 50), 1);
+          foot.rotation.z = t < s && pre < 0.3 ? Math.PI / 2 - (L.up.rotation.z + L.lo.rotation.z) : 0;
+        }
+      };
+    },
+    // Carneiro: recua e dá uma cabeçada com os chifres enrolados
+    ram(F, M) {
+      const S = (r) => this.sph(r, 16, 12), body = F.body = this.pivot(F.g, 0, 0, 0);
+      const tilt = F.tilt = this.pivot(body, 0, 30, 0), b = this.pivot(tilt, 0, -30, 0);
+      F.legs = [[-28, -10, BB.D, -1], [18, -10, BB.D, 1], [-20, 10, BB.M, 1], [26, 10, BB.M, -1]].map(([x, z, c, sg]) => ({ L: this.flimb(M, b, x, 40, z, 18, 18, 4, 3.6, c, this.sph(5), BB.X), sg }));
+      const puffs = [[-34, 56], [-22, 72], [-2, 77], [18, 70], [26, 52], [8, 40], [-16, 40]];
+      for (const [px, py] of puffs) for (const z of [-11, 11]) this.fp(M, b, S(17), z < 0 ? BB.M : BB.L, px, py, z);
+      this.fp(M, b, S(18), BB.F, -4, 60, 0, 1.2, 1, 1.4);
+      const head = F.head = this.pivot(b, 42, 58, 0);
+      this.fp(M, head, this.ell(20, 14, 13), BB.D, 10, -2, 0);
+      for (const z of [-1, 1]) {
+        this.feye(M, head, 12, 4, z * 10, 3.4, '#ffd23a', true);
+        this.fp(M, head, this.geo('ramHorn', () => new T.TorusGeometry(11, 4.2, 8, 20, Math.PI * 1.6)), '#e9f2d6', 0, 8, z * 13).rotation.z = 2.2;
+      }
+      F.upd = (fm) => {
+        const { t, s, end } = fm;
+        const pre = TT.clamp(t / s, 0, 1), run = t >= s && t < end, rec = TT.clamp((t - end) / 8, 0, 1);
+        const ph = t * 0.6, gal = run ? Math.sin(ph) : 0;
+        const tl = t < s ? -0.28 * easeOut(pre) : run ? 0.16 : 0.16 * (1 - rec);
+        const ps = popScale(t) * 1.1;
+        body.position.y = run ? Math.abs(Math.sin(ph)) * 5 : 0; body.scale.setScalar(ps);
+        tilt.rotation.z = -tl;
+        head.rotation.z = -(run ? 0.35 : t < s ? -0.25 * pre : 0.1);
+        for (const { L, sg } of F.legs) { const p = gal * sg; L.up.rotation.z = p * 0.5; L.lo.rotation.z = -Math.max(0, p) * 0.5; }
+      };
+    },
+    // Elefante: empina nas patas de trás com a tromba erguida e pisa com tudo
+    elephant(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      const rear = F.rear = this.pivot(body, -36, 0, 0), b = this.pivot(rear, 36, 0, 0);
+      for (const [x, z, c] of [[-44, -22, BB.D], [30, -22, BB.D], [-30, 22, BB.M], [44, 22, BB.M]]) {
+        this.fp(M, b, this.cap(13, 46), c, x, 34, z);
+        this.fp(M, b, this.ell(16, 7, 16), c, x, 5, z);
+      }
+      this.fp(M, b, this.ell(72, 52, 50), BB.M, -4, 104, 0);
+      const tl = this.pivot(b, -74, 100, 0); this.fp(M, tl, this.cap(2.5, 30), BB.X, 0, -15, 0); tl.rotation.z = -0.4; F.tailP = tl;
+      const head = F.head = this.pivot(b, 64, 132, 0);
+      F.ears = [-1, 1].map((sg) => { const e = this.pivot(head, -10, 2, sg * 26); this.fp(M, e, this.ell(26, 36, 4), BB.D, 0, 0, sg * 6); this.fp(M, e, this.ell(18, 26, 2), BB.F, 2, 0, sg * 9, null, null, null, { outline: false }); return e; });
+      this.fp(M, head, S(30), BB.M, 10, -2, 0, 1, 0.95, 0.95);
+      for (const z of [-1, 1]) { this.feye(M, head, 30, 6, z * 16, 4.5); this.fp(M, head, this.cone(4, 28, 6), '#f6f2e0', 34, -24, z * 12).rotation.z = 2.5; }
+      F.mouth = this.dark(head, S(1), '#5a1020', 30, -20, 0, 7, 5, 8);
+      F.trunk = [];
+      let p = head, x0 = 34, y0 = -2;
+      for (let i = 0; i < 5; i++) { const r = 10 - i * 1.2, q = this.pivot(p, x0, y0, 0); this.fp(M, q, this.cap(r, 16), BB.M, 0, -10, 0); F.trunk.push(q); p = q; x0 = 0; y0 = -20; }
+      F.upd = (fm) => {
+        const { t, s } = fm;
+        const rr = t < s - 3 ? easeOut(TT.clamp(t / (s - 3), 0, 1)) : t < s ? 1 - (t - (s - 3)) / 3 : 0;
+        const sq = t >= s && t < s + 6 ? 1 - (t - s) / 6 : 0;
+        const ps = popScale(t) * 1.15;
+        body.scale.set(ps * (1 + 0.1 * sq), ps * (1 - 0.12 * sq), ps);
+        rear.rotation.z = 0.55 * rr;
+        F.mouth.visible = rr > 0.5;
+        const DN = [0.35, 0.2, 0.1, -0.1, -0.25], UP = [2.3, 0.35, 0.4, 0.45, 0.6];
+        F.trunk.forEach((q, i) => { q.rotation.z = TT.lerp(DN[i], UP[i], rr) + Math.sin(t * 0.2 + i) * 0.04; });
+        F.ears.forEach((e, i) => { e.rotation.y = (i ? 1 : -1) * (0.15 + rr * 0.35 + Math.sin(t * 0.3) * 0.08); });
+        F.tailP.rotation.z = -0.4 + Math.sin(t * 0.6) * 0.25;
+      };
+    },
+    // A Fera: corcunda peluda que avança dando garradas alternadas
+    beast(F, M) {
+      const S = (r) => this.sph(r, 20, 14), body = F.body = this.pivot(F.g, 0, 0, 0);
+      for (let i = 0; i < 6; i++) { const bx = -52 + i * 12, by = 96 + i * 12 - (i > 3 ? (i - 3) * 14 : 0); this.fp(M, body, this.cone(7, 24, 5), BB.D, bx, by, 0).rotation.z = 0.7; }
+      this.fp(M, body, this.ell(48, 60, 42), BB.M, 6, 100, 0).rotation.z = -0.3;
+      this.fp(M, body, this.ell(11, 24, 26), BB.F, 36, 92, 0, null, null, null, { outline: false });
+      for (const [z, c] of [[-20, BB.D], [20, BB.M]]) {
+        this.fp(M, body, this.cap(11, 24), c, z < 0 ? -22 : 18, 26, z).rotation.z = 0.25;
+        this.fp(M, body, this.ell(20, 8, 13), z < 0 ? BB.X : BB.D, z < 0 ? -16 : 30, 5, z);
+      }
+      const head = F.head = this.pivot(body, 46, 146, 0);
+      this.fp(M, head, S(22), BB.M, 0, 0, 0, 1, 0.92, 0.9);
+      this.fp(M, head, this.ell(24, 11, 13), BB.M, 26, -6, 0);
+      this.dark(head, S(4), BB.X, 50, -3, 0);
+      for (const z of [-10, 10]) { this.fp(M, head, this.cone(6, 22, 5), BB.D, -6, 22, z).rotation.z = 0.35; this.feye(M, head, 16, 6, z * 1.1, 5, '#ffffff', true); }
+      this.dark(head, S(1), '#5a1020', 32, -14, 0, 14, 4, 9);
+      for (const x of [24, 34, 42]) this.fang(M, head, x, -11, 0, 2.2, 7, true);
+      const claws = (L) => { for (let i = -1; i <= 1; i++) { const c = this.fang(M, L.end, 0, 0, i * 5, 3, 22, true); c.position.set(Math.sin(i * 0.35) * 4, -14, i * 5); c.rotation.x = i * 0.25; } };
+      F.armB = this.flimb(M, body, -4, 128, -26, 46, 44, 10, 9, BB.D, S(11), BB.D); claws(F.armB);
+      F.armF = this.flimb(M, body, 22, 126, 26, 46, 44, 10, 9, BB.M, S(11), BB.M); claws(F.armF);
+      F.trail = this.glowSprite('#d6ffc0', 90, 0); F.armF.end.add(F.trail);
+      F.upd = (fm) => {
+        const { t, s, end } = fm;
+        const act = t >= s && t < end, k = act ? (t - s) % 8 : 0, ph = k / 8, side = act ? Math.floor((t - s) / 8) % 2 : 0;
+        const crouch = t < s ? easeOut(TT.clamp(t / s, 0, 1)) : 0;
+        const bob = act ? -Math.abs(Math.sin((t - s) * 0.4)) * 7 : crouch * 8;
+        const ps = popScale(t) * 1.18;
+        body.position.y = -bob; body.scale.setScalar(ps);
+        const swing = (on) => (on ? TT.lerp(-2.5, 1.4, easeOut(Math.min(1, ph * 1.6))) : TT.lerp(1.4, -1.2, ph));
+        const aF = act ? swing(side === 0) : TT.lerp(1.0, -1.8, crouch), aB = act ? swing(side === 1) : TT.lerp(0.8, -2.0, crouch);
+        F.armF.up.rotation.z = aF; F.armF.lo.rotation.z = -0.6;
+        F.armB.up.rotation.z = aB; F.armB.lo.rotation.z = -0.6;
+        head.rotation.z = -(act ? 0.12 : -0.1 * crouch);
+        F.trail.material.opacity = act && ph < 0.6 ? 0.9 * (1 - ph / 0.6) : 0;
+      };
+    },
+    // Guepardo: esquiva do Mutano (galope esticando e encolhendo a coluna)
+    cheetah(F, M) {
+      const S = (r) => this.sph(r, 16, 12), body = F.body = this.pivot(F.g, 0, 0, 0);
+      F.legs = [[-30, -8, 0.6, BB.D], [26, -8, 2.2, BB.D], [-24, 8, 3.4, BB.M], [32, 8, 5.0, BB.M]].map(([x, z, o, c]) => ({ L: this.flimb(M, body, x, 42, z, 19, 19, 4.2, 3.6, c, S(4.5), BB.X), o }));
+      this.fp(M, body, this.ell(46, 13, 14), BB.M, -2, 48, 0);
+      for (const [px, py, pz] of [[-34, 54, 9], [-20, 59, 5], [-6, 52, 12], [8, 60, 4], [22, 54, 10], [-26, 58, -7], [2, 59, -9], [16, 56, -11]]) this.dark(body, S(2.6), BB.X, px, py, pz);
+      F.tail = [this.pivot(body, -44, 50, 0)];
+      this.fp(M, F.tail[0], this.cap(2.6, 22), BB.M, 0, -12, 0);
+      F.tail.push(this.pivot(F.tail[0], 0, -24, 0)); this.fp(M, F.tail[1], this.cap(2.2, 18), BB.M, 0, -10, 0);
+      const head = F.head = this.pivot(body, 50, 58, 0);
+      this.fp(M, head, S(12), BB.M, 0, 0, 0, 1.1, 0.85, 0.9);
+      for (const z of [-6, 6]) { this.fp(M, head, this.cone(3, 9, 4), BB.D, -5, 10, z).rotation.z = 0.4; this.feye(M, head, 6, 3, z * 1.1, 3, '#ffd23a'); }
+      this.dark(head, S(1.8), BB.X, 13, -1, 0);
+      F.upd = (fm) => {
+        const t = fm.t, ph = t * 0.75, sn = Math.sin(ph), stretch = 1 + sn * 0.12, ps = popScale(t) * 1.05;
+        body.position.y = Math.abs(Math.cos(ph)) * 6;
+        body.scale.set(ps * stretch, ps / Math.sqrt(stretch), ps);
+        for (const { L, o } of F.legs) { const a = ph + o; L.up.rotation.z = Math.sin(a) * 0.65; L.lo.rotation.z = -Math.max(0, -Math.cos(a)) * 0.8; }
+        F.tail[0].rotation.z = -1.9 + sn * 0.25; F.tail[1].rotation.z = 0.5 + sn * 0.3;
+      };
+    },
+    // Corvo da alma (esquiva da Ravena), com as cores da versão (Ravena Vermelha / Branca)
+    soulraven(F, M, f) {
+      const P = TT.ravenPal(f), S = (r) => this.sph(r, 16, 12);
+      const body = F.body = this.pivot(F.g, 0, 58, 0);
+      const crow = this.toon(P.crow), rimM = this.neon(P.rim, { side: T.BackSide });
+      const piece = (parent, geo, x, y, z, sx, sy, sz) => {
+        const m = this.fp(M, parent, geo, crow, x, y, z, sx, sy, sz, { outline: false });
+        const r = new T.Mesh(geo, rimM); r.scale.setScalar(1.14); m.add(r);
+        return m;
+      };
+      piece(body, S(1), 0, 0, 0, 26, 11, 12);
+      piece(body, S(9), 24, 5, 0);
+      const beak = piece(body, this.cone(3.5, 13, 6), 37, 3, 0); beak.rotation.z = -Math.PI / 2;
+      piece(body, this.boxG(24, 2, 18), -32, -1, 0).rotation.z = 0.15;
+      for (const z of [-5.5, 5.5]) { const e = new T.Mesh(S(2.2), this.neon(P.eye)); e.position.set(29, 8, z); body.add(e); }
+      // asas: leque de penas (forma achatada) que bate para cima e para baixo
+      const shape = new T.Shape();
+      const W = [[14, 0], [6, 22], [-2, 40], [-10, 60], [-18, 50], [-22, 62], [-28, 44], [-34, 50], [-34, 30], [-40, 26], [-30, 12], [-14, 2]];
+      shape.moveTo(W[0][0], W[0][1]); for (const [x, y] of W.slice(1)) shape.lineTo(x, y);
+      const wg = this.geo('wingFan', () => new T.ShapeGeometry(shape));
+      const wm = this.toon(P.crow, { side: T.DoubleSide });
+      const pts = W.map(([x, y]) => new T.Vector3(x, y, 0));
+      const edge = this.geo('wingEdge', () => new T.BufferGeometry().setFromPoints(pts));
+      F.wings = [-1, 1].map((sg) => {
+        const w = this.pivot(body, 2, 4, sg * 6);
+        const m = new T.Mesh(wg, wm); m.rotation.x = sg * Math.PI / 2; m.userData.mat = wm; m.userData.flash = this.flashMatD; M.meshes.push(m); w.add(m);
+        const l = new T.LineLoop(edge, new T.LineBasicMaterial({ color: P.rim })); l.rotation.x = m.rotation.x; w.add(l);
+        return { w, sg };
+      });
+      F.glow = this.glowSprite(P.glow, 150, 0.6); body.add(F.glow);
+      F.upd = (fm) => {
+        const t = fm.t, k = TT.clamp(t / 5, 0, 1);
+        body.scale.setScalar(1.25 * (0.6 + 0.4 * k));
+        for (const { w, sg } of F.wings) w.rotation.x = -sg * Math.sin(t * 0.7) * 0.65;
+        body.position.y = 58 + Math.sin(t * 0.35) * 4;
+      };
+    },
+    // Coelho (maldição do Mumbo)
+    rabbit(F, M, f) {
+      const S = (r) => this.sph(r, 16, 12), W = '#f6f4fa', body = F.body = this.pivot(F.g, 0, 0, 0);
+      this.fp(M, body, this.ell(22, 20, 18), W, 0, 22, 0);
+      this.fp(M, body, S(7), W, -22, 26, 0);
+      for (const z of [-9, 9]) this.fp(M, body, this.ell(11, 5, 6), W, 8, 4, z);
+      const head = F.head = this.pivot(body, 14, 46, 0);
+      this.fp(M, head, S(14), W);
+      F.ears = [-5, 5].map((z) => { const e = this.pivot(head, -2, 10, z); this.fp(M, e, this.cap(4, 20), W, 0, 13, 0); this.dark(e, S(1), '#ffb6c8', 0.5, 13, Math.sign(z) * 2.5, 2, 9, 2); return e; });
+      for (const z of [-6, 6]) this.dark(head, S(2.4), '#d81a3a', 11, 4, z);
+      this.dark(head, S(2), '#ff8aa8', 14, -1, 0);
+      this.fp(M, body, this.geo('bunnyCol', () => new T.TorusGeometry(10, 2.4, 6, 16)), (f.def && f.def.color) || '#ffd23a', 10, 36, 0, null, null, null, { outline: false }).rotation.x = Math.PI / 2;
+      F.upd = (fm, d) => {
+        const t = fm.t, hop = d.state === 'walk' || d.state === 'run' ? Math.abs(Math.sin(t * 0.25)) * 10 : 0;
+        body.position.y = hop;
+        const back = d.state !== 'idle' && d.state !== 'air';
+        F.ears.forEach((e, i) => { e.rotation.z = (back ? 0.5 : 0) + Math.sin(t * 0.12 + i) * 0.08; e.rotation.x = (i ? 1 : -1) * 0.15; });
+      };
+    },
+  };
+  FORM3D.cheetahAtk = FORM3D.cheetah;
+
   const MODELED = new Set(['robin', 'apprentice', 'starfire', 'raven', 'cyborg', 'beastboy', 'clownbb']);
 
   class World3D {
@@ -221,7 +544,10 @@
     // ------------------------------------------------------------ Montagem
     init() {
       this.canvas = mkCanvas(W, H);
-      const r = this.renderer = new T.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance' });
+      // celular/tablet: sem antialias e resolução menor (o WebGL grande por cima do canvas do jogo pesa na GPU do
+      // aparelho e o navegador chega a parar de desenhar as camadas por cima, como o analógico)
+      this.mobile = TT.isTouchDevice ? TT.isTouchDevice() : false;
+      const r = this.renderer = new T.WebGLRenderer({ canvas: this.canvas, antialias: !this.mobile, powerPreference: this.mobile ? 'default' : 'high-performance' });
       r.setPixelRatio(1);
       r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
       r.setClearColor(0x1a0f3c, 1);
@@ -598,6 +924,12 @@
           const sh = this.part(M, M.torso, this.sph(st.armW * 0.66), this.toon('#c9ced8')); sh.position.set(0, th - 3, s * shW * 0.47); sh.scale.set(1, 0.85, 1);
           const pl = this.part(M, sh, this.sph(st.armW * 0.55, 14, 10), this.toon('#3b78d8'), { outline: false }); pl.position.z = s * st.armW * 0.42; pl.scale.z = 0.45;
         }
+        // canhão sônico: o antebraço da frente vira canhão nos golpes de canhão (pose.form = 'cannon')
+        const L2 = st.armL[1], cn = M.cannon = new T.Group(); M.armF.lo.add(cn); cn.visible = false;
+        this.part(M, cn, this.cyl(9, 10, 27, 18), this.toon('#9aa2ae')).position.y = -L2 + 0.5;
+        this.part(M, cn, this.cyl(10.6, 10.6, 7, 18), this.toon('#3b78d8'), { outline: false }).position.y = -L2 + 3;
+        const mz = new T.Mesh(this.cyl(6.5, 6.5, 1.5, 16), this.neon('#bfe6ff')); mz.position.y = -L2 - 13.6; cn.add(mz);
+        const mg = this.glowSprite('#4fb4ff', 52, 1); mg.position.y = -L2 - 17; cn.add(mg);
       } else if (kind === 'clownbb') {
         const ruff = this.part(M, M.torso, this.geo('ruff', () => new T.TorusGeometry(shW * 0.32, 3.2, 8, 18)), this.toon('#ffffff'));
         ruff.rotation.x = Math.PI / 2; ruff.position.y = th + 1;
@@ -762,14 +1094,88 @@
       return M;
     }
     clearModels() { for (const M of this.models.values()) this.scene.remove(M.root); this.models.clear(); }
-    // Titã numa forma desenhada em 2D (animais do Mutano, coelho da maldição, cometa...): esconde o modelo
-    flat2D(d) {
-      if (!d.key) return false;
-      if (d.bunny > 0 && !d.ko) return true;
+    // ------------------------------------------------------------ Formas 3D (animais do Mutano, corvo da alma, coelho)
+    // Mesmas regras do desenho 2D (Titan.draw): qual forma o Titã está agora e em que quadro dela.
+    formOf(d) {
+      if (!d.key) return null;
+      if (d.bunny > 0 && !d.ko) return { name: 'rabbit', t: d.animT || 0 };
       const a = d.atk, fa = a && a.def.formAt ? a.def.formAt(a.t) : null, form = fa ? fa.form : a && a.def.form;
-      if (form && TT.TITAN_FORMS && TT.TITAN_FORMS[form] && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) return true;
-      if (d.state === 'dash' && (d.base === 'beastboy' || d.base === 'raven' || d.def.drawDash)) return true;
-      return false;
+      if (form && TT.TITAN_FORMS && TT.TITAN_FORMS[form] && a.t > 1 && a.t < a.def.s + a.def.a + a.def.r - 1) {
+        return fa ? { name: form, t: fa.t, s: fa.s, end: fa.end } : { name: form, t: a.t, s: a.def.s, end: a.def.s + a.def.a };
+      }
+      if (d.state === 'dash') {
+        if (d.base === 'beastboy') return { name: 'cheetah', t: d.animT || 0 };
+        if (d.def.drawDash) return { name: 'custom' };
+        if (d.base === 'raven') return { name: 'soulraven', t: d.animT || 0 };
+      }
+      return null;
+    }
+    // Titã numa forma que só existe desenhada em 2D: esconde o modelo e usa o desenho
+    flat2D(d) { const fm = this.formOf(d); return !!fm && !FORM3D[fm.name]; }
+    formModel(M, name, f) {
+      M.forms = M.forms || {};
+      let F = M.forms[name];
+      if (!F) {
+        F = { g: new T.Group(), name };
+        F.g.visible = false;
+        FORM3D[name].call(this, F, M, f);
+        F.g.traverse((o) => { if (o.isMesh && o.material === this.outlineMat) o.castShadow = false; });
+        M.root.add(F.g);
+        (M.formSet = M.formSet || new Set()).add(F.g);
+        M.forms[name] = F;
+      }
+      return F;
+    }
+    // liga a forma (ou volta ao corpo normal): esconde todo o resto do boneco enquanto a forma aparece
+    showForm(M, F) {
+      if (M.curForm === F) return;
+      M.curForm = F;
+      for (const c of M.root.children) c.visible = M.formSet && M.formSet.has(c) ? c === (F && F.g) : !F;
+    }
+    // peça com contorno: posição e escala (sx, sy, sz)
+    fp(M, parent, geo, col, x, y, z, sx, sy, sz, o) {
+      const m = this.part(M, parent, geo, typeof col === 'string' ? this.toon(col) : col, o);
+      m.position.set(x, y, z);
+      if (sx != null) m.scale.set(sx, sy == null ? sx : sy, sz == null ? sx : sz);
+      return m;
+    }
+    ell(rx, ry, rz) { const k = [rx, ry, rz].map((v) => Math.round(v * 10) / 10); return this.geo('ell' + k.join(':'), () => new T.SphereGeometry(1, 20, 14).scale(k[0], k[1], k[2])); }
+    pivot(parent, x, y, z) { const p = new T.Group(); p.position.set(x, y, z); parent.add(p); return p; }
+    // membro de dois segmentos pendurado no pivô (0 = para baixo, + = para a frente), com peça na ponta
+    flimb(M, parent, x, y, z, L1, L2, r1, r2, col, endGeo, endCol) {
+      const up = this.pivot(parent, x, y, z);
+      this.fp(M, up, this.cap(r1, L1), col, 0, -L1 / 2, 0);
+      const lo = this.pivot(up, 0, -L1, 0);
+      this.fp(M, lo, this.cap(r2, L2), col, 0, -L2 / 2, 0);
+      const end = this.pivot(lo, 0, -L2, 0);
+      if (endGeo) this.fp(M, end, endGeo, endCol || col, 0, 0, 0);
+      return { up, lo, end, L1, L2 };
+    }
+    // dois ossos: leva a ponta do membro até (tx, ty) no plano do pai; bend = lado da dobra (+1 para a frente)
+    reach(L, sx, sy, tx, ty, bend) {
+      const dx = tx - sx, dy = ty - sy;
+      const d = TT.clamp(Math.hypot(dx, dy), Math.abs(L.L1 - L.L2) + 0.01, L.L1 + L.L2 - 0.01);
+      const c1 = Math.acos(TT.clamp((d * d + L.L1 * L.L1 - L.L2 * L.L2) / (2 * d * L.L1), -1, 1));
+      const c2 = Math.acos(TT.clamp((L.L1 * L.L1 + L.L2 * L.L2 - d * d) / (2 * L.L1 * L.L2), -1, 1));
+      L.up.rotation.z = Math.atan2(dx, -dy) + bend * c1;
+      L.lo.rotation.z = -bend * (Math.PI - c2);
+    }
+    // olho de bicho (branco + pupila; iris = olho amarelo com fenda); dir = 1 do lado da câmera, -1 do outro
+    feye(M, parent, x, y, z, r, iris, slit) {
+      const w = this.fp(M, parent, this.sph(r, 12, 10), iris ? '#fff8d0' : '#ffffff', x, y, z, 1, 0.9, 0.75);
+      const pz = Math.sign(z) * r * 0.35;
+      const p = new T.Mesh(this.sph(r * 0.58, 10, 8), this.neon(iris || '#150b22')); p.position.set(r * 0.55, -r * 0.05, pz); w.add(p);
+      if (slit) { const s = new T.Mesh(this.boxG(1, 1, 1), this.neon('#150b22')); s.scale.set(r * 0.22, r * 0.95, r * 0.22); s.position.set(r * 0.98, 0, pz * 1.2); w.add(s); }
+      const hl = new T.Mesh(this.sph(r * 0.22, 6, 5), this.neon('#ffffff')); hl.position.set(r * 0.8, r * 0.35, pz * 0.6); w.add(hl);
+      return w;
+    }
+    dark(parent, geo, col, x, y, z, sx, sy, sz) { // peça sem contorno (boca, narinas, pintas)
+      const m = new T.Mesh(geo, this.toon(col)); m.position.set(x, y, z); if (sx != null) m.scale.set(sx, sy == null ? sx : sy, sz == null ? sx : sz); parent.add(m); return m;
+    }
+    fang(M, parent, x, y, z, r, h, down) { // dente/garra (cone branco)
+      const m = this.fp(M, parent, this.cone(r, h, 6), '#f6f2e0', x, y, z, null, null, null, { outline: false });
+      if (down) m.rotation.z = Math.PI;
+      return m;
     }
     syncModel(d, M) {
       const f = d, root = M.root;
@@ -800,6 +1206,10 @@
       root.scale.set(sc, sc, sc);
       // o modelo vira o rosto um pouco para a câmera (como nos jogos de briga em 3D)
       root.rotation.y = f.facing > 0 ? -0.42 : Math.PI + 0.42;
+      // forma (animal do Mutano, corvo da alma, coelho): esconde o boneco e anima o modelo da forma
+      const fm = M.st && this.formOf(f), Fm = fm && FORM3D[fm.name] ? this.formModel(M, fm.name, f) : null;
+      this.showForm(M, Fm);
+      if (Fm) { Fm.g.scale.setScalar(1 / st.scale); Fm.upd(fm, f); return; }
       const L1 = st.legL[0], L2 = st.legL[1];
       const hipH = L1 + L2 - 4 - pose.bob;
       M.rp.rotation.z = -(pose.rot || 0);
@@ -827,8 +1237,9 @@
         M.staff.rotation.z = pose.staff || 0;
         M.staffMesh.scale.set(1, b + fw, 1); M.staffMesh.position.y = -(fw - b) / 2;
       }
+      if (M.cannon) M.cannon.visible = pose.form === 'cannon';
       // auras e brilhos das mãos
-      const auraCol = st.aura === 'dark' ? '#8a4dff' : st.aura === 'green' ? '#7dff6a' : '#ffffff';
+      const auraCol = { dark: '#8a4dff', green: '#7dff6a', red: '#ff2a44', white: '#e8eeff' }[st.aura] || '#ffffff';
       const gF = pose.glow ? 0.95 : (pose.auraF || 0), gB = pose.glow ? 0.75 : (pose.auraB || 0);
       M.glowF.material.opacity = Math.min(1, gF); M.glowB.material.opacity = Math.min(1, gB);
       if (gF > 0) M.glowF.material.color.set(pose.glow || auraCol);
@@ -1347,7 +1758,7 @@
     // ------------------------------------------------------------ Desenho do quadro
     syncSize() {
       const cw = this.game.canvas.width, ch = this.game.canvas.height;
-      const k = Math.min(1, 1920 / cw), w = Math.round(cw * k), h = Math.round(ch * k);
+      const k = Math.min(1, (this.mobile ? 1280 : 1920) / cw), w = Math.round(cw * k), h = Math.round(ch * k);
       if (this.canvas.width !== w || this.canvas.height !== h) this.renderer.setSize(w, h, false);
     }
     drawWorld(ctx) {
