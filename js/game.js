@@ -1108,6 +1108,7 @@
       const camX = this.camX;
       for (const l of this.bg.layers) l.draw(ctx, camX);
       this.drawAmbient(ctx, camX);
+      if (TT.groundDepth) TT.groundDepth(ctx); // sombra no pé do cenário (js/gfx2d.js)
 
       // sombras e marcações no chão (avisos de ataque dos chefes)
       for (const e of this.effects) if (e.drawGround) e.drawGround(ctx, camX);
@@ -1129,6 +1130,8 @@
       this.drawBubbles(ctx, camX);
       if (this.bg.fg) this.bg.fg.draw(ctx, camX);
       ctx.restore();
+      // pós-processamento (js/gfx2d.js): brilho, nitidez, contraste local e cor — antes do placar
+      if (TT.Gfx2D) { if (!TT.gfx2d) TT.gfx2d = new TT.Gfx2D(); try { TT.gfx2d.apply(this, ctx); } catch (e) { TT.gfx2d.ok = false; console.warn('[2D] pós-processamento falhou:', e && e.message); } }
       this.drawScreenFx(ctx);
     }
     // Vinheta, tom de tela e clarão (por cima do mundo, 2D ou 3D).

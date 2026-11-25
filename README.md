@@ -391,6 +391,10 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       resolução dinâmica. Cenário refeito: fachadas com o dobro de resolução (tijolo, molduras, peitoris,
       cortinas, ar-condicionado), asfalto com rachaduras e remendos, calçada com lajotas em relevo, árvores
       esculpidas e chão completo em volta.
+    - **Gráfico das fases 2D (js/gfx2d.js):** o mesmo acabamento do 3D em todas as fases — passe em WebGL sobre o
+      mundo (antes do placar) com brilho das luzes, nitidez, contraste local e gradação de cor; sombra de contato
+      macia sob personagens e caixas (diminui quando pulam); sombra no pé do cenário, onde o chão encontra o
+      fundo. Se o aparelho ficar lento, o efeito diminui sozinho.
     - **Controles:** apertos repetidos rápidos da mesma tecla não se perdem mais quando um quadro demora (cada aperto
       é entregue em ordem, um por passo do jogo).
     - **No celular**, o 3D usa resolução menor e sem antialias (mais leve para a GPU do aparelho) e o analógico
