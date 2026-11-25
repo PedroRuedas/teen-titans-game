@@ -379,8 +379,10 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       em 3D (nas cores de cada versão); o coelho da maldição do Mumbo também; e o braço do Ciborgue vira o
       **canhão sônico** nos golpes de canhão. **Todos os 23 personagens jogáveis são 3D**: os vilões e soldados
       liberados (Soldado H.I.V.E., Robô do Slade, Cinderblock, Gizmo, Plasmus, Plasmus Mirim, Jinx, Mammoth, Mumbo,
-      Coelho-Guarda, Slade, Control Freak, Mad Mod e Trigon) usam o mesmo corpo esculpido, com o rosto do próprio
-      desenho 2D projetado na cabeça, uniforme pintado e peças 3D de cada um (cartola e capa do Mumbo, chifres de
+      Coelho-Guarda, Slade, Control Freak, Mad Mod e Trigon) usam o mesmo corpo esculpido, com **rosto 3D próprio
+      desenhado de frente** no traço dos Titãs (máscara dividida do Slade, óculos do Gizmo e do Mad Mod, viseira da
+      H.I.V.E., olhos de gato da Jinx, quatro olhos brilhando do Trigon, narigão 3D e bigode do Mumbo, dentões do
+      Coelho-Guarda, sardas do Control Freak...), uniforme pintado e peças 3D de cada um (cartola e capa do Mumbo, chifres de
       cabelo da Jinx, juba do Mammoth, galhada do Trigon, orelhas do Coelho-Guarda, mochila-aranha do Gizmo,
       bengala do Mad Mod, capa e controle do Control Freak, cabeça de pedra do Cinderblock).
     - **Gráfico (js/gfx3d.js):** pós-processamento próprio com antisserrilhado MSAA, oclusão de contato nas dobras

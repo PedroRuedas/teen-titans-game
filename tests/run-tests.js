@@ -16,6 +16,9 @@ async page => {
   await page.goto('http://localhost:8765/?t=' + Date.now());
   await page.waitForFunction(() => window.TT && TT.debug);
   await sleep(400);
+  // num navegador recém-aberto o Chrome passa ~0,8 s sem desenhar quadros enquanto o processo de vídeo inicia:
+  // espera o jogo estar de fato rodando antes de testar o teclado (as teclas não se perdem, mas atrasam)
+  await page.waitForFunction(() => TT.game.frame > 90, null, { timeout: 15000 });
 
   // 1) Tela de título e início com teclado real
   ok('título carregado', await ev(() => TT.game.state === 'title'));
