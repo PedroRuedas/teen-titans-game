@@ -395,6 +395,13 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       mundo (antes do placar) com brilho das luzes, nitidez, contraste local e gradação de cor; sombra de contato
       macia sob personagens e caixas (diminui quando pulam); sombra no pé do cenário, onde o chão encontra o
       fundo. Se o aparelho ficar lento, o efeito diminui sozinho.
+    - **Depois de zerar a fase 13:** aparece o item **CÂMERA: 2D CLÁSSICA / 3D** no menu inicial (salvo no navegador).
+      Em 3D, todas as fases viram um palco: o cenário pintado da fase vira a parede do fundo e o chão, e os
+      personagens (heróis e vilões) andam em 3D com sombra, câmera de luta e todo o pós-processamento.
+    - **"Titãs, AVANTE!" em 3D (js/ultimate3d.js):** numa arena flutuante no céu de Jump City, cada Titã tem o seu
+      plano de câmera (Robin com bastão e birdarangues, Mutano de T-Rex, feixe sônico do Ciborgue, corvo da alma
+      gigante da Ravena, chuva de starbolts da Estelar); no final os cinco cercam o alvo, a câmera gira, os feixes
+      se juntam numa esfera de energia e vem o KA-BOOM com onda de choque. Sem WebGL, a cena 2D de sempre.
     - **Controles:** apertos repetidos rápidos da mesma tecla não se perdem mais quando um quadro demora (cada aperto
       é entregue em ordem, um por passo do jogo).
     - **No celular**, o 3D usa resolução menor e sem antialias (mais leve para a GPU do aparelho) e o analógico
