@@ -29,6 +29,9 @@
       const sd = TT.store.get('dificuldade', 'normal');
       this.difficulty = TT.DIFFICULTY[sd] ? sd : 'normal';
       this.menuIdx = 0; this.pauseIdx = 0;
+      // acessibilidade: tamanho do HUD, tremor de tela e clarões (salvos no navegador)
+      this.opt = { hud: TT.store.get('hud', 'auto'), shake: TT.store.get('tremor', '1') !== '0', flash: TT.store.get('clarao', '1') !== '0' };
+      this.optOpen = false; this.optIdx = 0;
       this.resetWorld();
       this.stageIdx = 0;
       this.drawables = [];
@@ -805,13 +808,55 @@
     // Itens do menu do título.
     titleItems() {
       const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'chars', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'chars', 'controls'];
+      it.splice(it.indexOf('controls'), 0, 'options');
       if (this.cam3dUnlocked) it.push('cam');
       if (!this.online) it.splice(1, 1);
       if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
       return it;
     }
     // Itens do menu de pausa.
-    pauseItems() { return this.touch ? ['resume', 'diff', 'touch', 'quit'] : ['resume', 'diff', 'quit']; }
+    pauseItems() { return this.touch ? ['resume', 'diff', 'touch', 'options', 'quit'] : ['resume', 'diff', 'options', 'quit']; }
+    // ---- Opções / acessibilidade (abre por cima do título ou da pausa)
+    optItems() {
+      const it = ['music', 'sfx', 'hud', 'shake', 'flash'];
+      if (this.touch) it.push('btnsize', 'touch');
+      it.push('back');
+      return it;
+    }
+    hudScale() {
+      const h = this.opt ? this.opt.hud : 'auto';
+      return h === 'normal' ? 1 : h === 'grande' ? 1.2 : h === 'enorme' ? 1.4 : (this.touch && this.touch.visible ? 1.25 : 1);
+    }
+    changeOpt(it, d) {
+      const a = A(), HUDS = ['auto', 'normal', 'grande', 'enorme'];
+      if (it === 'music') { a.setMusicVol(TT.clamp(a.musicVol + d, 0, 10)); a.play('select'); }
+      else if (it === 'sfx') { a.setSfxVol(TT.clamp(a.sfxVol + d, 0, 10)); a.play('select'); }
+      else if (it === 'hud') { const i = HUDS.indexOf(this.opt.hud); this.opt.hud = HUDS[((i < 0 ? 0 : i) + d + HUDS.length) % HUDS.length]; TT.store.set('hud', this.opt.hud); if (this.touch) this.touch.layout(); a.play('select'); }
+      else if (it === 'shake') { this.opt.shake = !this.opt.shake; TT.store.set('tremor', this.opt.shake ? '1' : '0'); a.play('select'); }
+      else if (it === 'flash') { this.opt.flash = !this.opt.flash; TT.store.set('clarao', this.opt.flash ? '1' : '0'); a.play('select'); }
+      else if (it === 'btnsize' && this.touch) { this.touch.cycleSize(d); a.play('select'); }
+      else if (it === 'touch' && this.touch) { this.touch.cycle(d); a.play('select'); }
+    }
+    updateOptions(inp) {
+      const items = this.optItems(), n = items.length, it = items[this.optIdx] || 'back';
+      if (inp.wasPressed('pause') || inp.wasPressed('heavy') || inp.wasPressed('special')) { this.optOpen = false; A().play('select'); return; }
+      if (inp.wasPressed('up')) { this.optIdx = (this.optIdx + n - 1) % n; A().play('select'); }
+      if (inp.wasPressed('down')) { this.optIdx = (this.optIdx + 1) % n; A().play('select'); }
+      const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
+      if (lr) this.changeOpt(it, lr);
+      if (inp.wasPressed('menu') || inp.wasPressed('light') || inp.wasPressed('jump')) {
+        if (it === 'back') { this.optOpen = false; A().play('select'); }
+        else this.changeOpt(it, it === 'music' || it === 'sfx' ? (it === 'music' ? (A().musicVol >= 10 ? -10 : 1) : (A().sfxVol >= 10 ? -10 : 1)) : 1);
+      }
+    }
+    drawOptions(ctx) {
+      ctx.fillStyle = 'rgba(5,0,20,0.985)'; ctx.fillRect(0, 0, W, H);
+      TT.drawText(ctx, 'OPÇÕES E ACESSIBILIDADE', W / 2, 92, 54, '#ffe14a', OUT, 'center', 10);
+      const items = this.optItems();
+      this.drawMenu(ctx, items.map((it) => this.menuLabel(it)), this.optIdx, W / 2, 180, items.length > 6 ? 54 : 62);
+      const touch = this.touch && this.touch.visible;
+      TT.drawText(ctx, touch ? 'analógico escolhe  •  ◄ ► muda  •  FORTE volta' : '↑↓ escolher  •  ←→ mudar  •  ESC / K volta', W / 2, 660, 22, '#ffffff', OUT, 'center', 5);
+    }
 
     // Abre a janela de instalação do navegador (o item só aparece quando o navegador oferece).
     installApp() {
@@ -837,6 +882,7 @@
       if (this.online && this.online.panelOpen) return; // janela do JOGAR ONLINE aberta
       if (!this.titleSong) { A().playSong('theme'); this.titleSong = true; }
       const ok = inp.wasPressed('menu') || inp.wasPressed('jump') || inp.wasPressed('light');
+      if (this.optOpen) { this.updateOptions(inp); return; }
       if (this.showControls) {
         if (inp.wasPressed('heavy') || inp.wasPressed('special') || ok || inp.wasPressed('pause')) this.showControls = false;
         return;
@@ -861,6 +907,7 @@
         if (it === 'online') { A().play('select'); this.online.openPanel(); return; }
         if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
         if (it === 'controls') { this.showControls = true; A().play('select'); return; }
+        if (it === 'options') { this.optOpen = true; this.optIdx = 0; A().play('select'); return; }
         if (it === 'chars') { this.openRoster(); return; }
         if (it === 'install') { this.installApp(); return; }
         A().play('select');
@@ -876,6 +923,7 @@
 
     // Menu de pausa: continuar / dificuldade / botões na tela.
     updatePause(inp) {
+      if (this.optOpen) { this.updateOptions(inp); return; }
       if (inp.wasPressed('pause')) { this.state = 'play'; this.quitArm = false; return; }
       const items = this.pauseItems(), n = items.length, it = items[this.pauseIdx] || 'resume';
       if (inp.wasPressed('up')) { this.pauseIdx = (this.pauseIdx + n - 1) % n; this.quitArm = false; A().play('select'); }
@@ -886,6 +934,7 @@
       if (inp.wasPressed('menu') || inp.wasPressed('light')) {
         if (it === 'resume') this.state = 'play';
         else if (it === 'diff') this.cycleDifficulty(1);
+        else if (it === 'options') { this.optOpen = true; this.optIdx = 0; A().play('select'); }
         else if (it === 'quit') {
           // pede confirmação: o progresso da fase é perdido
           if (this.quitArm) this.goTitle(); else { this.quitArm = true; A().play('select'); }
@@ -1106,6 +1155,7 @@
         case 'victory': this.drawVictory(ctx); break;
         default: break;
       }
+      if (this.optOpen && (this.state === 'title' || this.state === 'pause')) this.drawOptions(ctx);
       const ms = performance.now() - t0;
       this.stats.frames++;
       this.stats.renderMs += ms;
@@ -1114,7 +1164,7 @@
 
     drawWorld(ctx) {
       if (this.w3d && !this.force2D && (this.dim3On || this.dimTrans || this.w3d.diorama) && this.w3d.ready) { this.w3d.drawWorld(ctx); this.drawScreenFx(ctx); return; }
-      const shx = this.shake ? TT.rand(-this.shake, this.shake) : 0, shy = this.shake ? TT.rand(-this.shake, this.shake) * 0.6 : 0;
+      const skk = this.opt && !this.opt.shake ? 0 : this.shake, shx = skk ? TT.rand(-skk, skk) : 0, shy = skk ? TT.rand(-skk, skk) * 0.6 : 0;
       ctx.save();
       ctx.translate(shx, shy);
       const camX = this.camX;
@@ -1150,7 +1200,7 @@
     drawScreenFx(ctx) {
       ctx.drawImage(TT.vignette(), 0, 0, W, H);
       if (this.tint) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 * this.tint.t / this.tint.dur; ctx.fillStyle = this.tint.col; ctx.fillRect(0, 0, W, H); ctx.restore(); }
-      if (this.whiteFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (this.whiteFlash / 14) + ')'; ctx.fillRect(0, 0, W, H); }
+      if (this.whiteFlash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (this.whiteFlash / 14) * (this.opt && !this.opt.flash ? 0.25 : 1) + ')'; ctx.fillRect(0, 0, W, H); }
     }
 
     drawAmbient(ctx, camX) {
@@ -1360,9 +1410,22 @@
     }
 
     drawHUD(ctx) {
-      const slots = this.activeSlots();
-      this.drawPlayerPanel(ctx, slots[0], false);
-      if (slots[1]) this.drawPlayerPanel(ctx, slots[1], true);
+      const slots = this.activeSlots(), hk = this.hudScale();
+      const at = (ax, ay, fn) => { if (hk === 1) { fn(); return; } ctx.save(); ctx.translate(ax, ay); ctx.scale(hk, hk); ctx.translate(-ax, -ay); fn(); ctx.restore(); };
+      at(0, 0, () => this.drawPlayerPanel(ctx, slots[0], false));
+      if (slots[1]) at(W, 0, () => this.drawPlayerPanel(ctx, slots[1], true));
+      // HUD maior: a fileira da equipe cresce menos e anda para a direita (não encosta na barra de vida)
+      const tk = Math.min(hk, 1.1), sk = Math.min(hk, 1.25), dx = slots[1] ? 0 : Math.max(0, 466 * hk + 12 - (645 - 155 * tk));
+      this._hud = { sk, cx: 645 + dx, cy: 100 * tk + 34 };
+      ctx.save(); ctx.translate(dx, 0);
+      if (tk !== 1) { ctx.translate(645, 0); ctx.scale(tk, tk); ctx.translate(-645, 0); }
+      this.drawTeamRow(ctx, slots);
+      ctx.restore();
+      if (sk !== 1) { ctx.save(); ctx.translate(W, 0); ctx.scale(sk, sk); ctx.translate(-W, 0); this.drawScoreHUD(ctx); ctx.restore(); } else this.drawScoreHUD(ctx);
+      at(W / 2, 0, () => this.drawBossHUD(ctx));
+      this.drawHUDRest(ctx);
+    }
+    drawTeamRow(ctx, slots) {
 
       // equipe (anel branco = P1, ciano = P2)
       for (let i = 0; i < 5; i++) {
@@ -1382,6 +1445,8 @@
         if (t.ko) TT.drawText(ctx, 'X', x + 26, y + 28, 40, '#ff3b30', OUT, 'center', 6);
       }
 
+    }
+    drawScoreHUD(ctx) {
       // pontuação e combo
       if (this.coop) {
         // pontuação compartilhada no meio, abaixo da equipe
@@ -1391,11 +1456,15 @@
         TT.drawText(ctx, String(this.score).padStart(7, '0'), W - 24, 54, 34, '#ffffff', OUT, 'right', 6);
       }
       if (this.combo >= 3) {
-        const s = 1 + Math.max(0, (this.comboT - 100) / 20);
-        ctx.save(); ctx.translate(this.coop ? W - 30 : W - 30, this.coop ? 146 : 100); ctx.scale(s, s);
-        TT.drawText(ctx, this.combo + ' GOLPES!', 0, 0, 30, '#ffe14a', OUT, 'right', 6);
+        // com os botões na tela, o combo vai para baixo da equipe (a fileira de botões fica embaixo do placar)
+        const tv = this.touch && this.touch.visible, s = 1 + Math.max(0, (this.comboT - 100) / 20);
+        const hc = this._hud || { sk: 1, cx: 645, cy: 134 };
+        ctx.save(); ctx.translate(tv ? W - (W - hc.cx) / hc.sk : W - 30, tv ? hc.cy / hc.sk : this.coop ? 146 : 100); ctx.scale(s, s);
+        TT.drawText(ctx, this.combo + ' GOLPES!', 0, 0, 30, '#ffe14a', OUT, tv ? 'center' : 'right', 6);
         ctx.restore();
       }
+    }
+    drawBossHUD(ctx) {
 
       // barra do chefe
       const b = this.boss;
@@ -1405,6 +1474,8 @@
         TT.drawText(ctx, b.name, x, 136, 24, '#ff6a6a', OUT, 'left', 5);
         this.drawBar(ctx, x, 150, w, 18, b.hp / b.maxHp, b.hp < b.maxHp * 0.5 ? '#ff3b30' : '#ff8a3a');
       }
+    }
+    drawHUDRest(ctx) {
 
       // seta "SIGA"
       if (this.goArrow > 0 && this.goArrow < 400 && (this.goArrow >> 4) % 2 === 0 && this.section) {
@@ -1492,6 +1563,14 @@
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
         case 'cam': return { text: 'CÂMERA:', value: this.cam3d ? '3D' : '2D CLÁSSICA', color: this.cam3d ? '#5ff2ff' : '#ffffff' };
         case 'controls': return { text: 'CONTROLES' };
+        case 'options': return { text: 'OPÇÕES E ACESSIBILIDADE', color: '#6fe3ff' };
+        case 'music': { const v = A().musicVol; return { text: 'VOLUME DA MÚSICA:', value: v ? '▮'.repeat(v) + '▯'.repeat(10 - v) + ' ' + v * 10 + '%' : 'DESLIGADA', color: v ? '#5fd0ff' : '#9a95b8' }; }
+        case 'sfx': { const v = A().sfxVol; return { text: 'VOLUME DOS EFEITOS:', value: v ? '▮'.repeat(v) + '▯'.repeat(10 - v) + ' ' + v * 10 + '%' : 'DESLIGADOS', color: v ? '#5fd0ff' : '#9a95b8' }; }
+        case 'hud': { const h = this.opt.hud; return { text: 'TAMANHO DO HUD:', value: h === 'auto' ? 'AUTOMÁTICO' + (this.touch && this.touch.visible ? ' (GRANDE)' : '') : h === 'normal' ? 'NORMAL' : h === 'grande' ? 'GRANDE' : 'MUITO GRANDE', color: '#ffe14a' }; }
+        case 'shake': return { text: 'TREMOR DE TELA:', value: this.opt.shake ? 'LIGADO' : 'DESLIGADO', color: this.opt.shake ? '#ffffff' : '#9a95b8' };
+        case 'flash': return { text: 'CLARÕES:', value: this.opt.flash ? 'NORMAIS' : 'SUAVES', color: this.opt.flash ? '#ffffff' : '#9a95b8' };
+        case 'btnsize': return this.touch.sizeLabel();
+        case 'back': return { text: 'VOLTAR' };
         case 'chars': return { text: 'PERSONAGENS (' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ')' };
         case 'touch': return this.touch.label();
         case 'online': return this.online.label();

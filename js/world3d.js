@@ -1953,7 +1953,7 @@
         }
       }
       const c = this.cv, cam = this.cam;
-      const sh = g.shake || 0;
+      const sh = g.opt && !g.opt.shake ? 0 : (g.shake || 0);
       const ox = sh ? TT.rand(-sh, sh) * 1.4 : 0, oy = sh ? TT.rand(-sh, sh) : 0;
       const cp = Math.cos(c.pitch);
       cam.position.set(c.x + Math.sin(c.yaw) * cp * c.dist + ox, c.y + Math.sin(c.pitch) * c.dist + oy, c.z + Math.cos(c.yaw) * cp * c.dist);

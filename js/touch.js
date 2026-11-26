@@ -9,6 +9,8 @@
   // Valores do item de menu: desligado ou a opacidade dos botões.
   const LEVELS = ['off', 0.25, 0.4, 0.55, 0.7, 0.85, 1];
   const DEFAULT_OP = 0.55;
+  // Tamanho dos botões e do analógico (acessibilidade)
+  const SIZES = [{ k: 0.8, name: 'PEQUENOS' }, { k: 1, name: 'NORMAIS' }, { k: 1.2, name: 'GRANDES' }, { k: 1.4, name: 'MUITO GRANDES' }];
 
   // Botões: ação, rótulo, cor, posição (vmin a partir do canto direito/inferior) e diâmetro.
   const BUTTONS = [
@@ -72,6 +74,8 @@
       const saved = TT.store.get('botoes', null);
       this.level = saved === 'off' ? 'off' : saved != null && !isNaN(+saved) ? TT.clamp(+saved, 0.25, 1) : hasTouch() ? DEFAULT_OP : 'off';
       this.auto = saved == null;
+      const sz = TT.store.get('botoesTam', 1);
+      this.sizeIdx = TT.clamp(isNaN(+sz) ? 1 : +sz, 0, SIZES.length - 1);
       this.build();
       this.apply();
       // primeiro toque na tela de um aparelho sem nada salvo: liga os botões
@@ -86,7 +90,7 @@
       const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
       const root = this.root = document.createElement('div'); root.id = 'tt-touch';
       // analógico flutuante: aparece onde o dedo encosta dentro da zona da esquerda
-      const zone = document.createElement('div'); zone.id = 'tt-stick-zone';
+      const zone = this.zone = document.createElement('div'); zone.id = 'tt-stick-zone';
       const base = this.base = document.createElement('div'); base.id = 'tt-stick';
       const knob = this.knob = document.createElement('div'); knob.id = 'tt-knob';
       base.appendChild(knob); zone.appendChild(base); root.appendChild(zone);
@@ -95,20 +99,14 @@
       zone.addEventListener('pointermove', (e) => this.stickMove(e));
       for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) zone.addEventListener(ev, (e) => this.stickUp(e));
       this.btns = {};
-      for (const b of BUTTONS) {
-        const el = this.button(b);
-        Object.assign(el.style, { right: b.r + 'vmin', bottom: b.b + 'vmin', width: b.d + 'vmin', height: b.d + 'vmin', background: b.col });
-        if (b.d >= 18) el.style.fontSize = '3.2vmin';
-      }
-      let x = 2;
+      for (const b of BUTTONS) { const el = this.button(b); el.style.background = b.col; }
       for (const b of TOP.slice().reverse()) {
         if (b.act === 'fullscreen' && !document.documentElement.requestFullscreen) continue;
         const el = this.button(b);
-        el.classList.add('top');
-        Object.assign(el.style, { right: x + 'vmin', top: '13vmin', width: b.w + 'vmin', background: b.col });
-        x += b.w + 1.5;
+        el.classList.add('top'); el.style.background = b.col;
       }
       document.body.appendChild(root);
+      this.layout();
       const rot = this.rotate = document.createElement('div'); rot.id = 'tt-rotate';
       rot.innerHTML = '↻ GIRE O CELULAR<small>O jogo funciona deitado (tela na horizontal)</small>';
       document.body.appendChild(rot);
@@ -149,7 +147,29 @@
       return s;
     }
 
-    resetStick() { Object.assign(this.base.style, { left: '17vmin', top: 'calc(100% - 19vmin)' }); this.knob.style.transform = ''; }
+    resetStick() { const k = this.sizeK; Object.assign(this.base.style, { left: (17 * k) + 'vmin', top: 'calc(100% - ' + (19 * k) + 'vmin)' }); this.knob.style.transform = ''; }
+    get sizeK() { return SIZES[this.sizeIdx || 0] ? SIZES[this.sizeIdx].k : 1; }
+    // Posição e tamanho de todos os botões (tamanho escolhido nas opções; a fileira do alto fica abaixo do placar)
+    layout() {
+      if (!this.base) return;
+      const k = this.sizeK, hud = this.game.hudScale ? this.game.hudScale() : 1;
+      for (const b of BUTTONS) {
+        const el = this.btns[b.act]; if (!el) continue;
+        Object.assign(el.style, { right: (b.r * k) + 'vmin', bottom: (b.b * k) + 'vmin', width: (b.d * k) + 'vmin', height: (b.d * k) + 'vmin', fontSize: ((b.d >= 18 ? 3.2 : 2.7) * Math.min(k, 1.25)) + 'vmin' });
+      }
+      let x = 2;
+      for (const b of TOP.slice().reverse()) {
+        const el = this.btns[b.act]; if (!el) continue;
+        Object.assign(el.style, { right: x + 'vmin', top: (13.9 * hud) + 'vmin', width: (b.w * k) + 'vmin', height: (8.5 * k) + 'vmin', fontSize: (2.6 * Math.min(k, 1.25)) + 'vmin' });
+        x += b.w * k + 1.5;
+      }
+      Object.assign(this.base.style, { width: (30 * k) + 'vmin', height: (30 * k) + 'vmin', margin: (-15 * k) + 'vmin 0 0 ' + (-15 * k) + 'vmin' });
+      Object.assign(this.knob.style, { width: (13 * k) + 'vmin', height: (13 * k) + 'vmin', margin: (-6.5 * k) + 'vmin 0 0 ' + (-6.5 * k) + 'vmin' });
+      this.zone.style.width = Math.min(60, 45 * k) + 'vw'; this.zone.style.height = Math.min(80, 62 * k) + 'vh';
+      if (!this.stick) this.resetStick();
+    }
+    cycleSize(dir) { const n = SIZES.length; this.sizeIdx = ((this.sizeIdx || 0) + dir + n) % n; TT.store.set('botoesTam', this.sizeIdx); this.layout(); }
+    sizeLabel() { return { text: 'TAMANHO DOS BOTÕES:', value: SIZES[this.sizeIdx || 0].name, color: '#6fe3ff' }; }
 
     stickDown(e) {
       if (this.stick) return;
@@ -164,7 +184,7 @@
     stickMove(e) {
       const s = this.stick;
       if (!s || e.pointerId !== s.id) return;
-      const R = Math.min(innerWidth, innerHeight) * 0.13; // curso do analógico
+      const R = Math.min(innerWidth, innerHeight) * 0.13 * this.sizeK; // curso do analógico
       let dx = e.clientX - s.x0, dy = e.clientY - s.y0, d = Math.hypot(dx, dy);
       // logo que o dedo encosta, o ponto de contato "assenta" (o dedo achata e o centro desce alguns pixels):
       // nesse começo a origem acompanha o dedo, senão o boneco já sairia andando para baixo
@@ -233,6 +253,7 @@
     apply() {
       if (!this.root) return;
       this.root.classList.toggle('on', this.visible);
+      this.layout();
       this.root.style.opacity = this.visible ? String(this.level) : '0';
       if (!this.visible) this.releaseAll();
       this.rotate.classList.toggle('on', this.visible && hasTouch() && innerHeight > innerWidth);

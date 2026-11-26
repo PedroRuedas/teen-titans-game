@@ -402,6 +402,16 @@ Dá para escolher a fase inicial no título (item **FASE**, com ← →), útil 
       plano de câmera (Robin com bastão e birdarangues, Mutano de T-Rex, feixe sônico do Ciborgue, corvo da alma
       gigante da Ravena, chuva de starbolts da Estelar); no final os cinco cercam o alvo, a câmera gira, os feixes
       se juntam numa esfera de energia e vem o KA-BOOM com onda de choque. Sem WebGL, a cena 2D de sempre.
+    - **Opções e acessibilidade** (no menu inicial e na pausa): volume da música e dos efeitos (0 a 100%), tamanho
+      do HUD (automático = maior no celular, normal, grande, muito grande), tremor de tela liga/desliga, clarões
+      normais/suaves, tamanho dos botões na tela (pequenos a muito grandes, analógico junto) e opacidade dos botões.
+      No celular o HUD fica maior e reorganizado: a fileira da equipe não encosta na barra de vida e o contador de
+      golpes fica embaixo da equipe, longe dos botões do alto.
+    - **Trilha própria em cada fase:** Torre Titã (rock heroico), Perfuratriz (industrial), Usina (elétrica), Fábrica
+      de Gosma (saltitante), Academia H.I.V.E. (marcha militar), Show do Mumbo (ragtime), Covil do Slade (sombria),
+      Base da Irmandade (gelo, sininhos), Canal do Control Freak (surf de seriado), Academia do Mad Mod (órgão dos
+      anos 60), Reino de Trigon (órgão apocalíptico), Labirinto de Espelhos (parque abandonado) e A Terceira Dimensão
+      (synthwave). O título continua com a abertura de Teen Titans.
     - **Controles:** apertos repetidos rápidos da mesma tecla não se perdem mais quando um quadro demora (cada aperto
       é entregue em ordem, um por passo do jogo).
     - **No celular**, o 3D usa resolução menor e sem antialias (mais leve para a GPU do aparelho) e o analógico

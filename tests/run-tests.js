@@ -1098,8 +1098,8 @@ async page => {
     return calls;
   });
   ok('vozes: só a Ravena fala ("Azarath Metrion Zinthos!")', voices.length > 0 && voices.every((c) => c === 'raven:Azarath Metrion Zinthos!'), voices);
-  const songs = await ev(() => TT.STAGES.map((s) => s.song));
-  ok('trilha: a abertura de Teen Titans toca em todas as fases', songs.length === 13 && songs.every((s) => s === 'theme'), songs);
+  const songs = await ev(() => ({ list: TT.STAGES.map((s) => s.song), title: TT.audio.songName || TT.audio.pendingSong, playable: TT.STAGES.every((s) => { TT.audio.playSong(s.song); return !!TT.audio.song || !!TT.audio.track || !TT.audio.ctx; }) }));
+  ok('trilha: cada fase tem a sua música (e todas tocam)', songs.list.length === 13 && new Set(songs.list).size === 13 && songs.playable, songs);
 
   // 4c) Avisos dos chefes: marcação no chão + "!" ANTES de cada golpe, e a hitbox bate com a marcação.
   // Para cada ataque, o Titã fica parado num ponto dentro e noutro fora da zona marcada.
