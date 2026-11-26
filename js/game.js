@@ -136,7 +136,10 @@
       for (const l of this.bg.layers) l.warm(0);
       // fase 13: o mundo vira 3D no meio da fase (js/world3d.js carrega o Three.js agora, em segundo plano)
       this.dim3On = false; this.dimTrans = null;
-      if (this.stage.dim3 && TT.World3D) { this.w3d = this.w3d || new TT.World3D(this); this.w3d.prepare(); }
+      const c3 = this.cam3d;
+      if (this.w3d) this.w3d.wantDiorama = false;
+      if ((this.stage.dim3 || c3) && TT.World3D) { this.w3d = this.w3d || new TT.World3D(this); this.w3d.wantDiorama = c3; this.w3d.prepare(); }
+      else if (this.w3d && this.w3d.ready) this.w3d.setDiorama(false);
       A().playSong(this.stage.song);
     }
 
@@ -764,6 +767,8 @@
       if (this.bots) { for (const b of this.bots) if (b) b.update(); } else if (this.bot) this.bot.update();
       inp.sample();
       this.frame++; this.stateT++;
+      // cena 3D do "Titãs, avante!" (js/ultimate3d.js): começa a carregar quando a energia passa da metade
+      if (!this.ult3d && TT.Ultimate3D && !TT.NO_ULT3D && this.state === 'play' && this.energy >= 50) { try { this.ult3d = new TT.Ultimate3D(this); } catch (e) { this.ult3d = { ready: false }; console.warn('[3D] cena do avante:', e && e.message); } }
       if (inp.wasPressed('mute')) A().toggleMute();
       if (inp.anyKey) { A().init(); inp.anyKey = false; }
       switch (this.state) {
@@ -793,9 +798,14 @@
       if (this.online) this.online.hostTick();
     }
 
+    // Modo de câmera (2D clássica / 3D): liberado depois de zerar a fase 13 (A Terceira Dimensão).
+    get cam3dUnlocked() { return TT.Unlocks.cleared().has(13); }
+    get cam3d() { return this.cam3dUnlocked && TT.store.get('camera', '2d') === '3d' && !!TT.World3D; }
+    toggleCamera() { TT.store.set('camera', this.cam3d ? '2d' : '3d'); A().play('select'); }
     // Itens do menu do título.
     titleItems() {
       const it = this.touch ? ['play', 'online', 'stage', 'players', 'diff', 'chars', 'touch', 'controls'] : ['play', 'online', 'stage', 'players', 'diff', 'chars', 'controls'];
+      if (this.cam3dUnlocked) it.push('cam');
       if (!this.online) it.splice(1, 1);
       if (this.installPrompt) it.push('install'); // navegador ofereceu instalar o app
       return it;
@@ -839,12 +849,14 @@
       const lr = (inp.wasPressed('right') ? 1 : 0) - (inp.wasPressed('left') ? 1 : 0);
       if (lr && it === 'diff') this.cycleDifficulty(lr);
       if (lr && it === 'stage') this.cycleStage(lr);
+      if (lr && it === 'cam') this.toggleCamera();
       if (lr && it === 'players' && !this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); }
       if (lr && it === 'touch') { this.touch.cycle(lr); A().play('select'); }
       if (this.stateT > 20 && ok) {
         A().init();
         if (it === 'diff') { this.cycleDifficulty(1); return; }
         if (it === 'stage') { this.cycleStage(1); return; }
+        if (it === 'cam') { this.toggleCamera(); return; }
         if (it === 'players') { if (!this.onlineLock) { this.setPlayers(this.numPlayers === 1 ? 2 : 1); A().play('select'); } return; }
         if (it === 'online') { A().play('select'); this.online.openPanel(); return; }
         if (it === 'touch') { this.touch.cycle(1); A().play('select'); return; }
@@ -1101,7 +1113,7 @@
     }
 
     drawWorld(ctx) {
-      if (this.w3d && (this.dim3On || this.dimTrans) && this.w3d.ready) { this.w3d.drawWorld(ctx); this.drawScreenFx(ctx); return; }
+      if (this.w3d && !this.force2D && (this.dim3On || this.dimTrans || this.w3d.diorama) && this.w3d.ready) { this.w3d.drawWorld(ctx); this.drawScreenFx(ctx); return; }
       const shx = this.shake ? TT.rand(-this.shake, this.shake) : 0, shy = this.shake ? TT.rand(-this.shake, this.shake) * 0.6 : 0;
       ctx.save();
       ctx.translate(shx, shy);
@@ -1478,6 +1490,7 @@
         case 'players': return { text: 'JOGADORES:', value: this.onlineLock ? '2 (ONLINE)' : this.numPlayers === 2 ? '2 (CO-OP)' : '1', color: this.numPlayers === 2 ? '#6fe3ff' : '#ffffff' };
         case 'diff': return { text: 'DIFICULDADE:', value: df.name, color: df.color };
         case 'stage': { const i = this.stageSel || 0; return { text: 'FASE:', value: (i + 1) + ' — ' + TT.STAGES[i].name.split('— ')[1], color: '#ffe14a' }; }
+        case 'cam': return { text: 'CÂMERA:', value: this.cam3d ? '3D' : '2D CLÁSSICA', color: this.cam3d ? '#5ff2ff' : '#ffffff' };
         case 'controls': return { text: 'CONTROLES' };
         case 'chars': return { text: 'PERSONAGENS (' + TT.Unlocks.count() + '/' + TT.ROSTER.length + ')' };
         case 'touch': return this.touch.label();

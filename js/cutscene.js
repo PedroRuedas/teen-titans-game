@@ -60,6 +60,10 @@
       this.live = [];
       this.next = 0;
       this.finale = -1;
+      // cena em 3D (js/ultimate3d.js) quando o WebGL já carregou; senão, esta cena 2D
+      const u = game.ult3d;
+      this.u3 = u && u.ready && !TT.NO_ULT3D ? u : null;
+      if (this.u3) { try { this.u3.begin(this); } catch (e) { console.warn('[3D] avante:', e && e.message); this.u3 = null; } }
     }
 
     // Quantos quadros faltam (aproximado) — só precisa ser > 0 enquanto a cena roda.
@@ -87,6 +91,11 @@
     update(inp) {
       this.t++;
       this.fx.update();
+      if (this.u3) {
+        if (this.t >= INTRO) { try { this.u3.step(inp); } catch (e) { console.warn('[3D] avante:', e && e.message); this.u3 = null; this.startFinale(FINALE.boom - 2); return; } if (this.u3.done) { if (!this.u3.resolved) this.g.resolveSuper(); this.done = true; } }
+        if (this.t === INTRO) { this.white = 8; A().play('whoosh'); }
+        return;
+      }
       if (this.flashT > 0) this.flashT--;
       if (this.white > 0) this.white--;
       if (this.thurt > 0) this.thurt--;
@@ -325,6 +334,14 @@
     // ------------------------------------------------------------------ Desenho
     draw(ctx) {
       const t = this.t;
+      if (this.u3) {
+        if (t < INTRO + 4) this.drawIntro(ctx, Math.min(1, t / INTRO));
+        if (t >= INTRO - 6) {
+          const u = this.u3, al = TT.clamp((t - (INTRO - 6)) / 8, 0, 1) * TT.clamp((u.total - u.t) / 14, 0, 1);
+          try { u.draw(ctx, al); } catch (e) { console.warn('[3D] avante:', e && e.message); }
+        }
+        return;
+      }
       if (t < INTRO + 4) this.drawIntro(ctx, Math.min(1, t / INTRO));
       if (t < INTRO - 6) return;
       let al = TT.clamp((t - (INTRO - 6)) / 8, 0, 1);

@@ -299,6 +299,7 @@
     try { st.drawHead(ctx, r, pose); } finally { TOON = t0; FLASH = false; }
   };
   TT.drawRig = function (ctx, st, pose, x, y, facing, opt) {
+    TT._rigHit = true;
     if (TT.SKIP_RIG) return; // modo 3D: o corpo é o modelo 3D (js/world3d.js)
     const sc = st.scale * (opt && opt.scale ? opt.scale : 1);
     FLASH = !!(opt && opt.flash);

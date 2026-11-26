@@ -566,8 +566,9 @@
   TT.W3D_MODELED = MODELED;
 
   class World3D {
-    constructor(game) {
+    constructor(game, opts) {
       this.game = game;
+      this.opts = opts || {};
       this.ready = false; this.failed = false; this.pending = false;
       this.models = new Map();
       this.cv = null; // estado atual da câmera
@@ -577,11 +578,11 @@
     // Chamado em toda entrada na fase 13: carrega o Three.js (uma vez) e zera o estado da fase.
     prepare() {
       this.triggered = false; this.cv = null; this.trans = null;
-      if (this.ready) { this.clearModels(); this.prewarmForms(); return; }
+      if (this.ready) { this.clearModels(); this.prewarmForms(); this.setDiorama(!!this.wantDiorama); return; }
       if (this.failed || this.pending) return;
       this.pending = true;
       loadThree().then(() => {
-        try { this.init(); this.ready = true; this.prewarmForms(); } catch (e) { this.fail(e); }
+        try { this.init(); this.ready = true; this.prewarmForms(); if (this.wantDiorama) this.setDiorama(true); } catch (e) { this.fail(e); }
       }, (e) => this.fail(e)).then(() => { this.pending = false; });
     }
     // esculpe aos poucos (durante a parte 2D da fase) as formas que a equipe pode usar
@@ -635,11 +636,14 @@
       const sc = sun.shadow.camera; sc.left = -1100; sc.right = 1100; sc.top = 900; sc.bottom = -900; sc.near = 50; sc.far = 5000;
       sun.shadow.bias = -0.0006;
       this.scene.add(sun); this.scene.add(sun.target);
-      this.buildSky();
-      this.buildCity();
-      this.buildGround();
-      this.buildFx();
-      this.buildOverlay();
+      if (this.opts.hero) this.opts.hero(this); // palco próprio (js/ultimate3d.js)
+      else {
+        this.buildSky();
+        this.buildCity();
+        this.buildGround();
+        this.buildFx();
+        this.buildOverlay();
+      }
       this.hidden = mkCanvas(2, 2).getContext('2d');
       // pós-processamento (js/gfx3d.js): oclusão, contorno, brilho, nitidez e cor
       if (TT.Gfx3D) { try { this.gfx = new TT.Gfx3D(this); } catch (e) { this.gfx = null; console.warn('[3D] pós-processamento desligado:', e && e.message); } }
@@ -1170,6 +1174,7 @@
       if (d.isProp) return 'crate';
       if (d.model3d) return d.model3d;
       if (!d.style || !d.pose || typeof d.think !== 'function') return null;
+      if (!d.key && (this.diorama || this.opts.hero)) { const k = this.styleKind(d.style); if (k) return k; }
       if (d.key === 'apprentice') return 'apprentice';
       if (d.key === 'hivesoldier') return 'hive';
       if (d.key === 'clownbb') return 'clownbb';
@@ -1193,6 +1198,76 @@
     clearModels() { for (const M of this.models.values()) this.scene.remove(M.root); this.models.clear(); }
     // ------------------------------------------------------------ Formas 3D (animais do Mutano, corvo da alma, coelho)
     // Mesmas regras do desenho 2D (Titan.draw): qual forma o Titã está agora e em que quadro dela.
+    // Estilo de um inimigo -> modelo de vilão (Mammoth, Slade, Jinx...; variantes de chefe "P" incluídas)
+    styleKind(st) {
+      if (!st) return null;
+      if (!this._sk) {
+        this._sk = new Map();
+        const S = TT.STYLES || {};
+        for (const n in S) {
+          let k = null;
+          if (n === 'hive' || n.indexOf('hive') === 0) k = 'hive';
+          else if (n.indexOf('cinder') === 0) k = 'cinderblock';
+          else for (const v of VILLAINS) if (n === v || n.indexOf(v) === 0) { k = v; break; }
+          if (k) this._sk.set(S[n], k);
+        }
+      }
+      return this._sk.get(st) || null;
+    }
+    // ------------------------------------------------------------ Modo 3D das outras fases (diorama)
+    // O cenário 2D da fase vira um palco: o fundo pintado numa parede atrás do chão e o chão pintado deitado,
+    // redesenhados a cada quadro (com o parallax) num canvas largo; os personagens 3D andam no meio.
+    setDiorama(on) {
+      on = !!on && !this.failed;
+      this.diorama = on;
+      if (!this.ready) return;
+      if (this.cityGroup) this.cityGroup.visible = !on;
+      if (on && !this.dio) this.buildDiorama();
+      if (this.dio) this.dio.group.visible = on;
+      if (this.sky) this.sky.visible = !on;
+      this.cv = null;
+      if (on && TT.Beasts3D && TT.Beasts3D.prewarmBody) for (const k of ['hive'].concat(VILLAINS)) if (TT.STYLES[k === 'minion' ? 'slade' : k]) TT.Beasts3D.prewarmBody(T, k, TT.STYLES[k === 'minion' ? 'slade' : k]);
+    }
+    buildDiorama() {
+      const sc = this.mobile ? 0.6 : 0.85, BW = Math.round(W * 1.7);
+      const c = mkCanvas(Math.round(BW * sc), Math.round(H * sc));
+      const tex = new T.CanvasTexture(c); tex.minFilter = T.LinearFilter; tex.generateMipmaps = false; tex.anisotropy = 8;
+      const group = new T.Group(); this.scene.add(group);
+      const mat = new T.MeshBasicMaterial({ map: tex, fog: false });
+      const EXT = 1400, zb = Zof(FT), zf = Zof(H) + 420;
+      // fundo: parede de y = 0 (linha FT da pintura) até bem acima do topo (o topo da pintura se estende)
+      const bg = new T.PlaneGeometry(BW, FT + EXT), bu = bg.attributes.uv;
+      for (let i = 0; i < bu.count; i++) bu.setY(i, bu.getY(i) > 0.5 ? 1 + EXT / H : 1 - FT / H);
+      const back = new T.Mesh(bg, mat); back.position.set(0, (FT + EXT) / 2, zb); group.add(back);
+      // chão: pintura das linhas FT..H deitada de z(FT) a z(H) (e a última linha continua até a câmera)
+      const fg = new T.PlaneGeometry(BW, zf - zb), fu = fg.attributes.uv, fp = fg.attributes.position;
+      for (let i = 0; i < fu.count; i++) { const back2 = fu.getY(i) > 0.5; fu.setY(i, back2 ? 1 - FT / H : -(zf - Zof(H)) / (Zof(H) - zb) * (H - FT) / H); void fp; }
+      const floor = new T.Mesh(fg, mat); floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, (zb + zf) / 2); group.add(floor);
+      // sombras dos personagens sobre o chão pintado
+      const sh = new T.Mesh(new T.PlaneGeometry(BW, zf - zb), new T.ShadowMaterial({ opacity: 0.34 }));
+      sh.rotation.x = -Math.PI / 2; sh.position.set(0, 0.6, (zb + zf) / 2); sh.receiveShadow = true; group.add(sh);
+      // a parede também recebe sombra (personagem perto do fundo)
+      const shb = new T.Mesh(new T.PlaneGeometry(BW, FT + EXT), new T.ShadowMaterial({ opacity: 0.22 }));
+      shb.position.set(0, (FT + EXT) / 2, zb + 0.6); shb.receiveShadow = true; group.add(shb);
+      this.dio = { group, canvas: c, ctx: c.getContext('2d'), tex, sc, BW };
+    }
+    updateDiorama() {
+      const g = this.game, d = this.dio; if (!d || !g.bg) return;
+      const ctx = d.ctx, camX = g.camX, OX = (d.BW - W) / 2;
+      ctx.setTransform(d.sc, 0, 0, d.sc, 0, 0);
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, d.BW, H);
+      for (const l of g.bg.layers) {
+        const lx = camX * l.factor, CH = 512;
+        const first = Math.floor((lx - OX) / CH), last = Math.floor((lx - OX + d.BW) / CH);
+        for (let i = first; i <= last; i++) ctx.drawImage(l.chunk(i), i * CH - lx + OX, 0, CH + 2, H);
+        if (l.cache.size > 14) for (const k of l.cache.keys()) if (k < first - 2 || k > last + 2) l.cache.delete(k);
+      }
+      ctx.save(); ctx.translate(OX, 0);
+      try { g.drawAmbient(ctx, camX); } catch (e) { /* enfeite */ }
+      ctx.restore();
+      d.tex.needsUpdate = true;
+      d.group.position.x = camX + W / 2;
+    }
     formOf(d) {
       if (!d.key) return null;
       if (d.bunny > 0 && !d.ko) return { name: 'rabbit', t: d.animT || 0 };
@@ -1436,7 +1511,8 @@
       mesh.add(l); return l;
     }
     buildCity() {
-      const S = this.scene, r = seeded(1777);
+      const S = this.cityGroup = new T.Group(), r = seeded(1777);
+      this.scene.add(S);
       const X0 = 1700, X1 = 7900, NEON = TT.F13.NEON, NEON2 = TT.F13.NEON2;
       // asfalto da avenida
       const ac = mkCanvas(512, 512), ag = ac.getContext('2d');
@@ -1755,7 +1831,8 @@
       const g = this.game, sctx = this.snap.getContext('2d');
       sctx.setTransform(1, 0, 0, 1, 0, 0);
       const rs = TT.renderScale; TT.renderScale = 1;
-      g.drawWorld(sctx);
+      g.force2D = true;
+      try { g.drawWorld(sctx); } finally { g.force2D = false; }
       TT.renderScale = rs;
       this.snapTex.needsUpdate = true;
     }
@@ -1771,6 +1848,7 @@
     beginTransition() {
       const g = this.game;
       this.snapshot();
+      this.setDiorama(false);
       g.dimTrans = { t: 0, dur: 250 };
       this.cv = null;
       TT.audio.play('zap');
@@ -1799,6 +1877,7 @@
       const ps = g.players().filter((t) => !t.ko), px = ps.length ? ps.reduce((a, t) => a + t.x, 0) / ps.length : g.camX + W / 2;
       const cx = TT.clamp(lerp(g.camX + W / 2, px, 0.4), g.camX + 520, g.camX + W - 520);
       const base = { x: cx, y: 70, z: -20, yaw: 0.42 + Math.sin(fr * 0.006) * 0.07, pitch: 0.3, fov: 40, dist: 0, roll: 0, sm: 0.05, frame: 1060 };
+      if (this.diorama) { base.yaw = 0.24 + Math.sin(fr * 0.006) * 0.08; base.pitch = 0.3; base.y = 80; base.frame = 1180; }
       let s = base;
       const ct = g.comboTag;
       if (b && g.bossIntro > 0) {
@@ -1816,10 +1895,10 @@
         const mx = p ? (p.x + b.x) / 2 : b.x, my = p ? (p.y + b.y) / 2 : b.y;
         const p2 = b.phase2 && b.phase2();
         s = { x: TT.clamp(mx, g.camX + 520, g.camX + W - 520), y: 90, z: Zof(my) * 0.5, yaw: p2 ? Math.sin(fr * 0.004) * 0.62 : -0.38, pitch: p2 ? 0.34 : 0.28, fov: 42, dist: 0, roll: 0, sm: 0.04, frame: 1120 };
-      } else if (!g.secActive && !g.enemies.length && p) {
+      } else if (!this.diorama && !g.secActive && !g.enemies.length && p) {
         // entre as arenas: perseguição pela avenida, câmera baixa olhando para a frente
         s = { x: p.x + 260, y: 90, z: Zof(p.y) * 0.6, yaw: -0.92, pitch: 0.2, fov: 50, dist: 700, roll: 0, sm: 0.04 };
-      } else if (sec && g.secIdx === 3) {
+      } else if (!this.diorama && sec && g.secIdx === 3) {
         // 2ª arena 3D: vista de cima, quase um tabuleiro
         s = { x: cx, y: 40, z: 20, yaw: 0.12, pitch: 0.8, fov: 40, dist: 0, roll: 0, sm: 0.05, frame: 1180 };
       }
@@ -1836,6 +1915,10 @@
           else s.x = TT.clamp(s.x, hi - fw / 2, lo + fw / 2);
         }
         s.dist = this.fitDist(s.fov, fw);
+      }
+      if (this.diorama) { // o fundo é uma parede pintada: a câmera não dá a volta por trás dela
+        let y = Math.atan2(Math.sin(s.yaw), Math.cos(s.yaw));
+        s.yaw = TT.clamp(y, -0.55, 0.55);
       }
       // DOBRA DIMENSIONAL: o chefe achata o mundo e a câmera volta a ser plana
       const fl = b && b.flat ? b.flat : 0;
@@ -1878,7 +1961,7 @@
       cam.lookAt(c.x + ox, c.y + oy, c.z);
       cam.fov = c.fov; cam.near = Math.max(5, c.dist * 0.05); cam.far = c.dist + 45000; cam.updateProjectionMatrix();
       this.scene.fog.near = c.dist + 2200; this.scene.fog.far = c.dist + 9000;
-      this.sky.position.copy(cam.position);
+      if (this.sky) this.sky.position.copy(cam.position);
       // o sol (e a caixa das sombras) segue a ação
       this.sun.target.position.set(c.x, 0, c.z);
       this.sun.position.set(c.x - 700, 1300, c.z + 900);
@@ -1929,12 +2012,11 @@
         const M = this.modelFor(d);
         if (!M) continue;
         used.add(d);
-        if (this.flat2D(d)) { M.root.visible = false; continue; }
+        if (this.flat2D(d) || M.noRig > 6) { M.root.visible = false; continue; }
         this.syncModel(d, M);
       }
       for (const [d, M] of this.models) if (!used.has(d)) { this.scene.remove(M.root); this.models.delete(d); }
-      this.syncFx();
-      this.animateCity();
+      if (this.diorama) this.updateDiorama(); else { this.syncFx(); this.animateCity(); }
       this.drawGroundDecal();
       const t0 = performance.now();
       if (this.gfx) { try { this.gfx.render(this.scene, this.cam); } catch (e) { console.warn('[3D] pós-processamento falhou:', e && e.message); this.gfx = null; this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.cam); } }
@@ -1994,17 +2076,18 @@
       const ps = g.particles, spawn0 = ps.spawn, nop = () => ({});
       ps.spawn = nop;
       TT.renderScale = 1;
-      for (const d of list) if (d.key && d.rigOut) { try { d.draw(this.hidden, camX); } catch (e) { /* desenho de apoio */ } }
+      for (const d of list) if ((d.key || this.models.has(d)) && d.rigOut) { try { d.draw(this.hidden, camX); } catch (e) { /* desenho de apoio */ } }
       ps.spawn = spawn0;
       TT.renderScale = s;
       ctx.save();
       for (const d of D) {
-        const M = this.models.get(d), modeled = !!M && !this.flat2D(d);
+        const M = this.models.get(d), modeled = !!M && !this.flat2D(d) && !(M.noRig > 6);
         if (typeof d.y !== 'number') { ctx.setTransform(s, 0, 0, s, 0, 0); TT.SKIP_RIG = false; d.draw(ctx, camX); continue; }
         if (d.isProp && M) continue;
         if (!this.planeXf(ctx, d.y, d.x - camX, d.y - (d.z || 0))) continue;
-        TT.SKIP_RIG = modeled;
+        TT.SKIP_RIG = modeled; TT._rigHit = false;
         try { d.draw(ctx, camX); } finally { TT.SKIP_RIG = false; }
+        if (M && !d.key) M.noRig = TT._rigHit ? 0 : (M.noRig || 0) + 1;
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       }
       // partículas (os anéis deitados já foram para o chão)
